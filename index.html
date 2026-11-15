@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ระบบสั่งซื้อยา (รพ.เจริญกรุงประชารักษ์)</title>
+  <title>ระบบสั่งยา "องค์การเภสัชกรรม [CKP]"</title>
   <style>
     :root {
       --bg: #f4f7fc;
@@ -464,7 +464,7 @@
     <main class="main-area">
       <div class="hero-banner">
         <div>
-          <h1>ระบบสั่งซื้อยา (รพ.เจริญกรุงประชารักษ์)</h1>
+          <h1>ระบบสั่งยา "องค์การเภสัชกรรม [CKP]"</h1>
           <p>by Arissara.k</p>
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
@@ -587,7 +587,10 @@
       <div id="tab_history" class="hidden">
         <div class="card" style="overflow:hidden;">
           <div class="table-header">
-            <span style="font-size:16px; font-weight:700; color:var(--text-title);">ประวัติสั่งซื้อ / ติดตามการรับยา</span>
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+              <span style="font-size:16px; font-weight:700; color:var(--text-title);">ประวัติสั่งซื้อ / ติดตามการรับยา</span>
+              <input id="historySearch" type="text" oninput="renderHistory()" placeholder="ค้นหาชื่อยา..." class="input" style="width:220px; padding:6px 12px; font-size:13px;" />
+            </div>
             <span id="logStatusMsg" style="font-size:13px; color:var(--blue); font-weight:500;">กำลังเตรียมข้อมูล...</span>
           </div>
           <div class="scroll-box" style="max-height:580px;">
@@ -1097,11 +1100,16 @@
     }
 
     function renderHistory() {
-      const rows = logRows.slice().reverse();
+      const qEl = document.getElementById('historySearch');
+      const query = (qEl ? qEl.value : '').toLowerCase().trim();
+      const rows = logRows.slice().reverse().filter(function(item) {
+        return !query || String(item.name || '').toLowerCase().indexOf(query) !== -1;
+      });
       const tbody = document.getElementById('historyBody');
 
       if (!rows.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding:32px;color:var(--text-muted);">ยังไม่มีประวัติการสั่งซื้อใน Log_PO</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding:32px;color:var(--text-muted);">' +
+          (query ? 'ไม่พบรายการยาที่ค้นหา' : 'ยังไม่มีประวัติการสั่งซื้อใน Log_PO') + '</td></tr>';
         return;
       }
 
