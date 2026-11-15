@@ -595,7 +595,6 @@
               <thead>
                 <tr>
                   <th>วัน-เวลาที่สั่ง</th>
-                  <th>บริษัท</th>
                   <th class="text-center" style="width:150px;">รายการยา</th>
                   <th class="text-center" style="width:60px;">ลบ</th>
                 </tr>
@@ -1104,7 +1103,7 @@
       const tbody = document.getElementById('historyBody');
 
       if (!currentHistoryOrders.length) {
-        tbody.innerHTML = '<tr><td colspan="4" class="text-center" style="padding:32px;color:var(--text-muted);">ยังไม่มีประวัติการสั่งซื้อใน Log_PO</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center" style="padding:32px;color:var(--text-muted);">ยังไม่มีประวัติการสั่งซื้อใน Log_PO</td></tr>';
         return;
       }
 
@@ -1118,7 +1117,6 @@
         parts.push(
           '<tr onclick="toggleHistoryOrder(' + index + ')" style="cursor:pointer;">' +
             '<td style="font-weight:600;color:' + (allDone ? 'var(--green)' : 'var(--text-title)') + ';">' + esc(order.date) + poBadge + '</td>' +
-            '<td style="color:var(--blue);font-weight:500;">' + esc(order.company) + '</td>' +
             '<td class="text-center"><span class="pill">' + order.items.length + ' รายการ ' + (open ? '▲' : '▼') + '</span></td>' +
             '<td class="text-center"><button type="button" title="ลบใบสั่งซื้อ" onclick="event.stopPropagation(); deleteHistoryOrder(' + index + ', this)" class="btn-del-x">✕</button></td>' +
           '</tr>'
@@ -1142,7 +1140,7 @@
         }).join('');
 
         parts.push(
-          '<tr class="' + (open ? '' : 'hidden') + '"><td colspan="4" style="padding:0;"><div class="subtable-wrap"><table class="subtable">' +
+          '<tr class="' + (open ? '' : 'hidden') + '"><td colspan="3" style="padding:0;"><div class="subtable-wrap"><table class="subtable">' +
           '<thead><tr><th>รายการยา</th><th class="text-center">Packing</th><th class="text-right">จำนวน</th><th class="text-right">รวมเงิน</th><th class="text-center">วันที่รับยา</th><th class="text-center">ลิงก์บิล</th><th class="text-center">จัดการ</th></tr></thead>' +
           '<tbody>' + subRows + '</tbody></table></div></td></tr>'
         );
@@ -1181,7 +1179,7 @@
     function deleteHistoryOrder(index, btn) {
       const order = currentHistoryOrders[index];
       if (!order) return;
-      if (!confirm('ยืนยันลบใบสั่งซื้อวันที่ ' + order.date + '\nบริษัท: ' + order.company + '\nจำนวน ' + order.items.length + ' รายการ ออกจากชีต Log_PO หรือไม่?')) return;
+      if (!confirm('ยืนยันลบใบสั่งซื้อวันที่ ' + order.date + '\nจำนวน ' + order.items.length + ' รายการ ออกจากชีต Log_PO หรือไม่?')) return;
 
       btn.disabled = true;
       btn.textContent = '…';
