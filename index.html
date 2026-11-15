@@ -595,8 +595,13 @@
               <thead>
                 <tr>
                   <th>วัน-เวลาที่สั่ง</th>
-                  <th class="text-center" style="width:150px;">รายการยา</th>
-                  <th class="text-center" style="width:60px;">ลบ</th>
+                  <th>รายการยา</th>
+                  <th class="text-center">Packing</th>
+                  <th class="text-right">จำนวน</th>
+                  <th class="text-right">รวมเงิน</th>
+                  <th class="text-center">วันที่รับยา</th>
+                  <th class="text-center">ลิงก์บิล</th>
+                  <th class="text-center">จัดการ</th>
                 </tr>
               </thead>
               <tbody id="historyBody"></tbody>
@@ -1092,66 +1097,43 @@
     }
 
     function renderHistory() {
-      const map = new Map();
-      logRows.forEach(function(r) {
-        const key = r.orderDate + '_' + r.company;
-        if (!map.has(key)) map.set(key, { date: r.orderDate, company: r.company, poUrl: r.poUrl || '', items: [] });
-        map.get(key).items.push(r);
-        if (!map.get(key).poUrl && r.poUrl) map.get(key).poUrl = r.poUrl;
-      });
-      currentHistoryOrders = Array.from(map.values()).reverse();
+      const rows = logRows.slice().reverse();
       const tbody = document.getElementById('historyBody');
 
-      if (!currentHistoryOrders.length) {
-        tbody.innerHTML = '<tr><td colspan="3" class="text-center" style="padding:32px;color:var(--text-muted);">ยังไม่มีประวัติการสั่งซื้อใน Log_PO</td></tr>';
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding:32px;color:var(--text-muted);">ยังไม่มีประวัติการสั่งซื้อใน Log_PO</td></tr>';
         return;
       }
 
-      const parts = [];
-      currentHistoryOrders.forEach(function(order, index) {
-        const allDone = order.items.every(function(i) { return !!i.receiveDate; });
-        const open = expandedSet.has(index);
-        const poBadge = /^https?:\/\//i.test(order.poUrl)
-          ? ' <a href="' + esc(order.poUrl) + '" target="_blank" onclick="event.stopPropagation();" style="margin-left:8px;font-size:12px;color:var(--blue);text-decoration:underline;font-weight:600;">เปิด PO</a>'
+      const html = rows.map(function(item) {
+        const poBadge = /^https?:\/\//i.test(item.poUrl)
+          ? '<div style="margin-top:2px;"><a href="' + esc(item.poUrl) + '" target="_blank" style="font-size:12px;color:var(--blue);text-decoration:underline;font-weight:600;">เปิด PO</a></div>'
           : '';
-        parts.push(
-          '<tr onclick="toggleHistoryOrder(' + index + ')" style="cursor:pointer;">' +
-            '<td style="font-weight:600;color:' + (allDone ? 'var(--green)' : 'var(--text-title)') + ';">' + esc(order.date) + poBadge + '</td>' +
-            '<td class="text-center"><span class="pill">' + order.items.length + ' รายการ ' + (open ? '▲' : '▼') + '</span></td>' +
-            '<td class="text-center"><button type="button" title="ลบใบสั่งซื้อ" onclick="event.stopPropagation(); deleteHistoryOrder(' + index + ', this)" class="btn-del-x">✕</button></td>' +
+        return (
+          '<tr style="background:' + (item.receiveDate ? '#f8fbff' : '#ffffff') + ';">' +
+            '<td style="white-space:nowrap;font-weight:600;color:' + (item.receiveDate ? 'var(--green)' : 'var(--text-title)') + ';">' +
+              esc(item.orderDate) + poBadge +
+            '</td>' +
+            '<td style="font-weight:500;color:var(--text-title);">' + esc(item.name) + '</td>' +
+            '<td class="text-center">' + esc(item.packing) + '</td>' +
+            '<td class="text-right" style="color:var(--blue);font-weight:600;">' + fmtNum(item.qty) + '</td>' +
+            '<td class="text-right">' + fmtNum(item.total, 2) + '</td>' +
+            '<td class="text-center"><input id="h_date_' + item.rowIndex + '" type="date" value="' + esc(item.receiveDate) + '" class="input-sm" /></td>' +
+            '<td class="text-center">' +
+              '<input id="h_url_' + item.rowIndex + '" type="text" value="' + esc(item.billUrl) + '" placeholder="วางลิงก์บิล..." class="input-sm" style="width:140px;" />' +
+              '<div id="h_link_' + item.rowIndex + '">' + buildBillPreviewHtml(item.billUrl) + '</div>' +
+            '</td>' +
+            '<td class="text-center" style="white-space:nowrap;">' +
+              '<div style="display:inline-flex;align-items:center;gap:6px;">' +
+                '<button type="button" onclick="saveHistoryRow(' + item.rowIndex + ', this)" class="btn btn-green" style="padding:6px 12px;font-size:12px;">บันทึก</button>' +
+                '<button type="button" title="ลบรายการ" onclick="deleteHistoryRow(' + item.rowIndex + ', this)" class="btn-del-x">✕</button>' +
+              '</div>' +
+            '</td>' +
           '</tr>'
         );
+      }).join('');
 
-        const subRows = order.items.map(function(item) {
-          return (
-            '<tr style="background:' + (item.receiveDate ? '#f8fbff' : '#ffffff') + ';">' +
-              '<td style="font-weight:500;color:var(--text-title);">' + esc(item.name) + '</td>' +
-              '<td class="text-center">' + esc(item.packing) + '</td>' +
-              '<td class="text-right" style="color:var(--blue);font-weight:600;">' + fmtNum(item.qty) + '</td>' +
-              '<td class="text-right">' + fmtNum(item.total, 2) + '</td>' +
-              '<td class="text-center"><input id="h_date_' + item.rowIndex + '" type="date" value="' + esc(item.receiveDate) + '" class="input-sm" /></td>' +
-              '<td class="text-center">' +
-                '<input id="h_url_' + item.rowIndex + '" type="text" value="' + esc(item.billUrl) + '" placeholder="วางลิงก์บิล..." class="input-sm" style="width:155px;" />' +
-                '<div id="h_link_' + item.rowIndex + '">' + buildBillPreviewHtml(item.billUrl) + '</div>' +
-              '</td>' +
-              '<td class="text-center"><button type="button" onclick="saveHistoryRow(' + item.rowIndex + ', this)" class="btn btn-green" style="padding:6px 12px;font-size:12px;">บันทึก</button></td>' +
-            '</tr>'
-          );
-        }).join('');
-
-        parts.push(
-          '<tr class="' + (open ? '' : 'hidden') + '"><td colspan="3" style="padding:0;"><div class="subtable-wrap"><table class="subtable">' +
-          '<thead><tr><th>รายการยา</th><th class="text-center">Packing</th><th class="text-right">จำนวน</th><th class="text-right">รวมเงิน</th><th class="text-center">วันที่รับยา</th><th class="text-center">ลิงก์บิล</th><th class="text-center">จัดการ</th></tr></thead>' +
-          '<tbody>' + subRows + '</tbody></table></div></td></tr>'
-        );
-      });
-      tbody.innerHTML = parts.join('');
-    }
-
-    function toggleHistoryOrder(index) {
-      if (expandedSet.has(index)) expandedSet.delete(index);
-      else expandedSet.add(index);
-      renderHistory();
+      tbody.innerHTML = html;
     }
 
     function saveHistoryRow(rowIndex, btn) {
@@ -1176,21 +1158,19 @@
         .updateLogHistory({ rowIndex: rowIndex, receiveDate: dateVal, billUrl: urlVal });
     }
 
-    function deleteHistoryOrder(index, btn) {
-      const order = currentHistoryOrders[index];
-      if (!order) return;
-      if (!confirm('ยืนยันลบใบสั่งซื้อวันที่ ' + order.date + '\nจำนวน ' + order.items.length + ' รายการ ออกจากชีต Log_PO หรือไม่?')) return;
+    function deleteHistoryRow(rowIndex, btn) {
+      const item = logRows.find(function(r) { return r.rowIndex === rowIndex; });
+      if (!item) return;
+      if (!confirm('ยืนยันลบรายการ "' + item.name + '"\nวันที่สั่ง: ' + item.orderDate + '\nออกจากชีต Log_PO หรือไม่?')) return;
 
       btn.disabled = true;
       btn.textContent = '…';
-      const payload = order.items.map(function(i) { return { rowIndex: i.rowIndex, name: i.name }; });
+      const payload = [{ rowIndex: item.rowIndex, name: item.name }];
 
       google.script.run
         .withSuccessHandler(function(res) {
-          const removeIds = new Set(order.items.map(function(i) { return i.rowIndex; }));
-          logRows = logRows.filter(function(r) { return !removeIds.has(r.rowIndex); });
-          expandedSet.clear();
-          document.getElementById('logStatusMsg').textContent = '✓ ลบใบสั่งซื้อ (' + res.deletedCount + ' รายการ) เรียบร้อยแล้ว';
+          logRows = logRows.filter(function(r) { return r.rowIndex !== rowIndex; });
+          document.getElementById('logStatusMsg').textContent = '✓ ลบรายการเรียบร้อยแล้ว (' + res.deletedCount + ' รายการ)';
           renderHistory();
           loadInitialData(true);
         })
