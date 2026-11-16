@@ -433,7 +433,7 @@
     @media print {
       body { background: #ffffff !important; color: #000000 !important; }
       .app-shell { display: block !important; }
-      .sidebar, .hero-banner, .no-print, #errorBanner, #uiUpdateBanner, #tab_order, #tab_history, #tab_dashboard { display: none !important; }
+      .sidebar, .hero-banner, .no-print, #errorBanner, #uiUpdateBanner, #tab_order, #tab_history, #tab_tracking, #tab_dashboard, #tab_vmi_dashboard { display: none !important; }
       .main-area { padding: 0 !important; max-width: none !important; }
       #tab_po { display: block !important; }
       .po-sheet { box-shadow: none !important; border: none !important; padding: 0 !important; max-width: none !important; color: #000 !important; }
@@ -449,14 +449,17 @@
         <div class="menu-label">เมนูหลัก</div>
         <button type="button" id="tBtn_order" onclick="switchTab('order')" class="nav-item active">📋 เลือกรายการสั่งซื้อ</button>
         <button type="button" id="tBtn_po" onclick="switchTab('po')" class="nav-item">📄 ใบสั่งซื้อ (A4) (<span id="badgeCount">0</span>)</button>
-        <button type="button" id="tBtn_history" onclick="switchTab('history')" class="nav-item">🕒 ประวัติ / ติดตามรับยา</button>
+        <button type="button" id="tBtn_history" onclick="switchTab('history')" class="nav-item">🕒 ประวัติการสั่งยา</button>
+        <button type="button" id="tBtn_tracking" onclick="switchTab('tracking')" class="nav-item">📦 ติดตามสถานะการสั่งยา</button>
         <button type="button" id="tBtn_dashboard" onclick="switchTab('dashboard')" class="nav-item">📊 Dashboard ยานอก VMI</button>
+        <button type="button" id="tBtn_vmi_dashboard" onclick="switchTab('vmi_dashboard')" class="nav-item">💊 Dashboard ยา VMI</button>
       </div>
 
       <div>
         <div class="menu-label">ระบบที่เชื่อมต่อ</div>
         <a href="https://docs.google.com/spreadsheets/d/1qfJYh6Fuc8VJkCmCfkUcsT6764IFo3o14_Kxm35g8-k/edit?gid=0#gid=0" target="_blank" class="nav-item">📗 อนุมัติหลักการ GPO 70</a>
         <a href="https://docs.google.com/spreadsheets/d/1m_E-gn9TVIQ4lJvLj6YhRy1v_hq2ootWtO1fdc8QC14/edit?gid=818636122#gid=818636122" target="_blank" class="nav-item">📘 ตามงาน รพจ.70</a>
+        <a href="https://docs.google.com/spreadsheets/d/1nMCbRkML0fEim_O7qhD8RCAqmdWwuhEP/edit?gid=2139036780#gid=2139036780" target="_blank" class="nav-item">📙 รายการซื้อ ยา GPO</a>
         <a href="https://docs.google.com/spreadsheets/d/1pNUM8Ex-YzjfLMGwL6djari4rtGMBXmykRPCll8fa8k/edit?usp=sharing" target="_blank" class="nav-item">📒 list gpo 70</a>
       </div>
     </aside>
@@ -469,7 +472,9 @@
         </div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
           <button type="button" onclick="switchTab('dashboard')" class="hero-btn">📊 Dashboard ยานอก VMI</button>
-          <button type="button" onclick="switchTab('history')" class="hero-btn">ประวัติสั่งซื้อ / รับยา</button>
+          <button type="button" onclick="switchTab('vmi_dashboard')" class="hero-btn">💊 Dashboard ยา VMI</button>
+          <button type="button" onclick="switchTab('history')" class="hero-btn">🕒 ประวัติการสั่งยา</button>
+          <button type="button" onclick="switchTab('tracking')" class="hero-btn">📦 ติดตามสถานะการสั่งยา</button>
           <button type="button" onclick="openPO()" class="hero-btn">เตรียมใบสั่งซื้อ</button>
           <button type="button" id="refreshDataBtn" onclick="loadInitialData(true)" class="hero-btn" title="ดึงข้อมูลล่าสุดจาก Google Sheets">🔄 รีเฟรชข้อมูล</button>
           <button type="button" id="refreshUiBtn" onclick="refreshUi()" class="hero-btn" title="ดึงโค้ดหน้าเว็บล่าสุดจาก GitHub">🌐 อัปเดตหน้าเว็บ</button>
@@ -583,12 +588,12 @@
         </div>
       </div>
 
-      <!-- TAB 3: HISTORY -->
+      <!-- TAB 3: HISTORY (ประวัติการสั่งยา) -->
       <div id="tab_history" class="hidden">
         <div class="card" style="overflow:hidden;">
           <div class="table-header">
             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
-              <span style="font-size:16px; font-weight:700; color:var(--text-title);">ประวัติสั่งซื้อ / ติดตามการรับยา</span>
+              <span style="font-size:16px; font-weight:700; color:var(--text-title);">ประวัติการสั่งยา (ทั้งหมดใน Log_PO)</span>
               <input id="historySearch" type="text" oninput="renderHistory()" placeholder="ค้นหาชื่อยา..." class="input" style="width:220px; padding:6px 12px; font-size:13px;" />
             </div>
             <span id="logStatusMsg" style="font-size:13px; color:var(--blue); font-weight:500;">กำลังเตรียมข้อมูล...</span>
@@ -608,6 +613,99 @@
                 </tr>
               </thead>
               <tbody id="historyBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3.5: TRACKING (ติดตามสถานะการสั่งยา 3 กล่อง) -->
+      <div id="tab_tracking" class="hidden stack-col">
+        <div class="card" style="padding:14px 20px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px;">
+          <div>
+            <span style="font-size:16px; font-weight:700; color:var(--text-title);">ติดตามสถานะการสั่งยา (ชีต Log_PO)</span>
+            <div id="trackingSummaryMsg" style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">แสดงเฉพาะรายการที่ยังรอดำเนินการ</div>
+          </div>
+          <input id="trackingSearch" type="text" oninput="renderTracking()" placeholder="ค้นหาชื่อยา..." class="input" style="width:240px; padding:7px 12px; font-size:13px;" />
+        </div>
+
+        <!-- กล่อง 1: รอจัดส่ง (คอลัมน์ K วันที่รับยา ว่าง) -->
+        <div class="card" style="overflow:hidden;">
+          <div class="table-header" style="background:#fffbeb;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span style="font-size:15px; font-weight:700; color:#b45309;">🚚 1. รายการยารอจัดส่ง</span>
+              <span style="font-size:12px; color:var(--text-muted);">(คอลัมน์ K: วันที่รับยา ว่าง)</span>
+            </div>
+            <span id="trackShipBadge" class="pill" style="background:#fef3c7;color:#b45309;">0 รายการ</span>
+          </div>
+          <div class="scroll-box" style="max-height:300px;">
+            <table class="clean-table">
+              <thead>
+                <tr>
+                  <th>วัน-เวลาที่สั่ง</th>
+                  <th>รายการยา</th>
+                  <th class="text-center">Packing</th>
+                  <th class="text-right">จำนวน</th>
+                  <th class="text-right">รวมเงิน</th>
+                  <th class="text-center">วันที่รับยา (K)</th>
+                  <th class="text-center">ลิงก์บิล (L)</th>
+                  <th class="text-center">บันทึก</th>
+                </tr>
+              </thead>
+              <tbody id="trackShipBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- กล่อง 2: รอใบเสนอราคา (คอลัมน์ M ยังไม่ติ๊ก/ว่าง) -->
+        <div class="card" style="overflow:hidden;">
+          <div class="table-header" style="background:#eff6ff;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span style="font-size:15px; font-weight:700; color:var(--blue);">📄 2. รายการรอใบเสนอราคา</span>
+              <span style="font-size:12px; color:var(--text-muted);">(คอลัมน์ M: รอใบเสนอราคา ยังไม่ติ๊ก/ว่าง)</span>
+            </div>
+            <span id="trackQuoteBadge" class="pill">0 รายการ</span>
+          </div>
+          <div class="scroll-box" style="max-height:300px;">
+            <table class="clean-table">
+              <thead>
+                <tr>
+                  <th>วัน-เวลาที่สั่ง</th>
+                  <th>รายการยา</th>
+                  <th class="text-center">Packing</th>
+                  <th class="text-right">จำนวน</th>
+                  <th class="text-right">รวมเงิน</th>
+                  <th class="text-center">PO / บิลยา</th>
+                  <th class="text-center">สถานะ (คอลัมน์ M)</th>
+                </tr>
+              </thead>
+              <tbody id="trackQuoteBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- กล่อง 3: รอใบแจ้งหนี้ (คอลัมน์ N ยังไม่ติ๊ก/ว่าง) -->
+        <div class="card" style="overflow:hidden;">
+          <div class="table-header" style="background:#fef2f2;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span style="font-size:15px; font-weight:700; color:#be123c;">🧾 3. รายการรอใบแจ้งหนี้</span>
+              <span style="font-size:12px; color:var(--text-muted);">(คอลัมน์ N: รอใบแจ้งหนี้ ยังไม่ติ๊ก/ว่าง)</span>
+            </div>
+            <span id="trackInvBadge" class="pill" style="background:#ffe4e6;color:#be123c;">0 รายการ</span>
+          </div>
+          <div class="scroll-box" style="max-height:300px;">
+            <table class="clean-table">
+              <thead>
+                <tr>
+                  <th>วัน-เวลาที่สั่ง</th>
+                  <th>รายการยา</th>
+                  <th class="text-center">Packing</th>
+                  <th class="text-right">จำนวน</th>
+                  <th class="text-right">รวมเงิน</th>
+                  <th class="text-center">PO / บิลยา</th>
+                  <th class="text-center">สถานะ (คอลัมน์ N)</th>
+                </tr>
+              </thead>
+              <tbody id="trackInvBody"></tbody>
             </table>
           </div>
         </div>
@@ -675,6 +773,68 @@
           </div>
         </div>
       </div>
+
+      <!-- TAB 5: DASHBOARD ยา VMI (VMI70) -->
+      <div id="tab_vmi_dashboard" class="hidden stack-col">
+        <div class="kpi-grid" id="vmiKpiGrid"></div>
+
+        <div class="dash-charts-grid">
+          <div class="card chart-card">
+            <div>
+              <h3 class="chart-title">ยอดสั่งซื้อยา VMI รายเดือน</h3>
+              <p class="chart-sub">สรุปมูลค่ารวมและจำนวนรายการสั่งซื้อจากชีต VMI70</p>
+            </div>
+            <div class="vchart" id="vmiMonthlyChart"></div>
+          </div>
+
+          <div class="card chart-card">
+            <div>
+              <h3 class="chart-title">Top 5 รายการยา VMI มูลค่าสูงสุด</h3>
+              <p class="chart-sub">เรียงตามมูลค่าสั่งซื้อสะสมจากชีต VMI70</p>
+            </div>
+            <div class="hbar-list" id="vmiTopDrugs"></div>
+          </div>
+        </div>
+
+        <div class="card" style="overflow:hidden;">
+          <div class="table-header">
+            <div>
+              <span style="font-size:16px; font-weight:700; color:var(--text-title);">รายการยา VMI (ชีต VMI70)</span>
+              <div id="vmiSubtitle" style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">ข้อมูลทั้งหมดจากชีต VMI70</div>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+              <input id="vmiSearch" type="text" oninput="renderVmiDashboard()" placeholder="ค้นหาชื่อยา / รหัส / ใบแจ้งหนี้..." class="input" style="width:220px; padding:6px 11px; font-size:13px;" />
+              <select id="vmiMonthFilter" onchange="renderVmiDashboard()" class="select" style="width:145px; padding:6px 10px; font-size:13px;">
+                <option value="ALL">ทุกเดือน</option>
+              </select>
+              <select id="vmiStatusFilter" onchange="renderVmiDashboard()" class="select" style="width:155px; padding:6px 10px; font-size:13px;">
+                <option value="ALL">ทุกสถานะ</option>
+                <option value="DONE">มีบิล / ใบแจ้งหนี้</option>
+                <option value="WAIT">รอดำเนินการ</option>
+              </select>
+            </div>
+          </div>
+          <div class="scroll-box" style="max-height:480px;">
+            <table class="clean-table">
+              <thead>
+                <tr>
+                  <th>วันที่สั่ง</th>
+                  <th>รหัส</th>
+                  <th>รายการยา</th>
+                  <th class="text-center">Packing</th>
+                  <th class="text-center">หน่วย</th>
+                  <th class="text-right">จำนวน</th>
+                  <th class="text-right">ราคา/หน่วย</th>
+                  <th class="text-right">รวมเงิน</th>
+                  <th>ใบแจ้งหนี้</th>
+                  <th class="text-center">สถานะ / บิลยา</th>
+                </tr>
+              </thead>
+              <tbody id="vmiTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 
@@ -682,7 +842,7 @@
   <script id="initPayload" type="application/json"><?!= initialJson ?></script>
 
   <script>
-    const LOCAL_CACHE_KEY = 'ck_po_local_cache_v3';
+    const LOCAL_CACHE_KEY = 'ck_po_local_cache_v4';
     let SHEETS_DATA = {};
     let SHEET_NAMES = [];
     let logRows = [];
@@ -775,7 +935,9 @@
 
       renderOrderTable();
       if (!document.getElementById('tab_history').classList.contains('hidden')) renderHistory();
+      if (!document.getElementById('tab_tracking').classList.contains('hidden')) renderTracking();
       if (!document.getElementById('tab_dashboard').classList.contains('hidden')) renderNonVmiDashboard();
+      if (!document.getElementById('tab_vmi_dashboard').classList.contains('hidden')) renderVmiDashboard();
     }
 
     function loadInitialData(forceRefresh) {
@@ -868,7 +1030,7 @@
     }
 
     function switchTab(tab) {
-      const tabs = ['order', 'po', 'history', 'dashboard'];
+      const tabs = ['order', 'po', 'history', 'tracking', 'dashboard', 'vmi_dashboard'];
       for (let i = 0; i < tabs.length; i++) {
         const t = tabs[i];
         const panel = document.getElementById('tab_' + t);
@@ -879,7 +1041,9 @@
       try {
         if (tab === 'po') renderPO();
         if (tab === 'history') renderHistory();
+        if (tab === 'tracking') renderTracking();
         if (tab === 'dashboard') renderNonVmiDashboard();
+        if (tab === 'vmi_dashboard') renderVmiDashboard();
       } catch (err) {
         showError('แสดงผลหน้า ' + tab + ' ไม่สำเร็จ: ' + (err && err.message ? err.message : err));
       }
@@ -1191,6 +1355,142 @@
     }
 
     // ==========================================
+    // TRACKING (ติดตามสถานะการสั่งยา 3 กล่อง)
+    // ==========================================
+    function buildDocLinksHtml(item) {
+      const parts = [];
+      if (/^https?:\/\//i.test(item.poUrl)) {
+        parts.push('<a href="' + esc(item.poUrl) + '" target="_blank" style="font-size:12px;color:var(--blue);text-decoration:underline;font-weight:600;">เปิด PO</a>');
+      }
+      if (/^https?:\/\//i.test(item.billUrl)) {
+        parts.push('<a href="' + esc(item.billUrl) + '" target="_blank" style="font-size:12px;color:var(--green);text-decoration:underline;font-weight:600;">ดูบิลยา</a>');
+      }
+      return parts.length ? parts.join(' &bull; ') : '<span style="color:var(--text-muted);">-</span>';
+    }
+
+    function renderTracking() {
+      const qEl = document.getElementById('trackingSearch');
+      const query = (qEl ? qEl.value : '').toLowerCase().trim();
+      const baseRows = logRows.slice().reverse().filter(function(item) {
+        return !query || String(item.name || '').toLowerCase().indexOf(query) !== -1;
+      });
+
+      const shipRows = baseRows.filter(function(item) {
+        return !String(item.receiveDate || '').trim();
+      });
+      const quoteRows = baseRows.filter(function(item) {
+        return !item.hasQuote;
+      });
+      const invRows = baseRows.filter(function(item) {
+        return !item.hasInvoice;
+      });
+
+      document.getElementById('trackShipBadge').textContent = shipRows.length + ' รายการ';
+      document.getElementById('trackQuoteBadge').textContent = quoteRows.length + ' รายการ';
+      document.getElementById('trackInvBadge').textContent = invRows.length + ' รายการ';
+      document.getElementById('trackingSummaryMsg').textContent =
+        'รอจัดส่ง ' + shipRows.length + ' • รอใบเสนอราคา ' + quoteRows.length + ' • รอใบแจ้งหนี้ ' + invRows.length + ' รายการ';
+
+      document.getElementById('trackShipBody').innerHTML = shipRows.length
+        ? shipRows.map(function(item) {
+            const poBadge = /^https?:\/\//i.test(item.poUrl)
+              ? '<div style="margin-top:2px;"><a href="' + esc(item.poUrl) + '" target="_blank" style="font-size:12px;color:var(--blue);text-decoration:underline;font-weight:600;">เปิด PO</a></div>'
+              : '';
+            return (
+              '<tr>' +
+                '<td style="white-space:nowrap;font-weight:600;">' + esc(item.orderDate) + poBadge + '</td>' +
+                '<td style="font-weight:500;color:var(--text-title);">' + esc(item.name) + '</td>' +
+                '<td class="text-center">' + esc(item.packing) + '</td>' +
+                '<td class="text-right" style="color:var(--blue);font-weight:600;">' + fmtNum(item.qty) + '</td>' +
+                '<td class="text-right">' + fmtNum(item.total, 2) + '</td>' +
+                '<td class="text-center"><input id="ts_date_' + item.rowIndex + '" type="date" value="' + esc(item.receiveDate) + '" class="input-sm" /></td>' +
+                '<td class="text-center"><input id="ts_url_' + item.rowIndex + '" type="text" value="' + esc(item.billUrl) + '" placeholder="วางลิงก์บิล..." class="input-sm" style="width:140px;" /></td>' +
+                '<td class="text-center"><button type="button" onclick="saveTrackShipRow(' + item.rowIndex + ', this)" class="btn btn-green" style="padding:6px 12px;font-size:12px;">บันทึก</button></td>' +
+              '</tr>'
+            );
+          }).join('')
+        : '<tr><td colspan="8" class="text-center" style="padding:22px;color:var(--text-muted);">ไม่มีรายการรอจัดส่ง</td></tr>';
+
+      document.getElementById('trackQuoteBody').innerHTML = quoteRows.length
+        ? quoteRows.map(function(item) {
+            return (
+              '<tr>' +
+                '<td style="white-space:nowrap;font-weight:500;">' + esc(item.orderDate) + '</td>' +
+                '<td style="font-weight:500;color:var(--text-title);">' + esc(item.name) + '</td>' +
+                '<td class="text-center">' + esc(item.packing) + '</td>' +
+                '<td class="text-right" style="color:var(--blue);font-weight:600;">' + fmtNum(item.qty) + '</td>' +
+                '<td class="text-right">' + fmtNum(item.total, 2) + '</td>' +
+                '<td class="text-center">' + buildDocLinksHtml(item) + '</td>' +
+                '<td class="text-center">' +
+                  '<button type="button" onclick="toggleTrackFlag(' + item.rowIndex + ', \'hasQuote\', true, this)" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">✓ ได้รับแล้ว</button>' +
+                '</td>' +
+              '</tr>'
+            );
+          }).join('')
+        : '<tr><td colspan="7" class="text-center" style="padding:22px;color:var(--text-muted);">ไม่มีรายการรอใบเสนอราคา</td></tr>';
+
+      document.getElementById('trackInvBody').innerHTML = invRows.length
+        ? invRows.map(function(item) {
+            return (
+              '<tr>' +
+                '<td style="white-space:nowrap;font-weight:500;">' + esc(item.orderDate) + '</td>' +
+                '<td style="font-weight:500;color:var(--text-title);">' + esc(item.name) + '</td>' +
+                '<td class="text-center">' + esc(item.packing) + '</td>' +
+                '<td class="text-right" style="color:var(--blue);font-weight:600;">' + fmtNum(item.qty) + '</td>' +
+                '<td class="text-right">' + fmtNum(item.total, 2) + '</td>' +
+                '<td class="text-center">' + buildDocLinksHtml(item) + '</td>' +
+                '<td class="text-center">' +
+                  '<button type="button" onclick="toggleTrackFlag(' + item.rowIndex + ', \'hasInvoice\', true, this)" class="btn btn-green" style="padding:5px 12px;font-size:12px;">✓ ได้รับแล้ว</button>' +
+                '</td>' +
+              '</tr>'
+            );
+          }).join('')
+        : '<tr><td colspan="7" class="text-center" style="padding:22px;color:var(--text-muted);">ไม่มีรายการรอใบแจ้งหนี้</td></tr>';
+    }
+
+    function saveTrackShipRow(rowIndex, btn) {
+      const dateVal = document.getElementById('ts_date_' + rowIndex).value.trim();
+      const urlVal = document.getElementById('ts_url_' + rowIndex).value.trim();
+      btn.textContent = 'กำลังบันทึก...';
+      btn.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function() {
+          const target = logRows.find(function(r) { return r.rowIndex === rowIndex; });
+          if (target) { target.receiveDate = dateVal; target.billUrl = urlVal; }
+          saveLocalCache({ sheets: SHEETS_DATA, sheetNames: SHEET_NAMES, log: logRows });
+          renderTracking();
+        })
+        .withFailureHandler(function(err) {
+          btn.textContent = 'บันทึก';
+          btn.disabled = false;
+          alert('บันทึกไม่สำเร็จ: ' + (err && err.message ? err.message : err));
+        })
+        .updateLogHistory({ rowIndex: rowIndex, receiveDate: dateVal, billUrl: urlVal });
+    }
+
+    function toggleTrackFlag(rowIndex, field, val, btn) {
+      btn.disabled = true;
+      btn.textContent = 'กำลังบันทึก...';
+      const payload = { rowIndex: rowIndex };
+      payload[field] = val;
+
+      google.script.run
+        .withSuccessHandler(function() {
+          const target = logRows.find(function(r) { return r.rowIndex === rowIndex; });
+          if (target) target[field] = Boolean(val);
+          saveLocalCache({ sheets: SHEETS_DATA, sheetNames: SHEET_NAMES, log: logRows });
+          renderTracking();
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = '✓ ได้รับแล้ว';
+          alert('อัปเดตสถานะไม่สำเร็จ: ' + (err && err.message ? err.message : err));
+        })
+        .updateLogHistory(payload);
+    }
+
+    // ==========================================
     // DASHBOARD นอก VMI (Log_PO)
     // ==========================================
     function normalizeDrugName(name) {
@@ -1362,6 +1662,158 @@
       }).join('');
 
       tbody.innerHTML = tableHtml || '<tr><td colspan="10" class="text-center" style="padding:28px;color:var(--text-muted);">ไม่พบรายการนอก VMI ที่ตรงกับตัวกรอง</td></tr>';
+    }
+
+    // ==========================================
+    // DASHBOARD ยา VMI (ชีต VMI70)
+    // ==========================================
+    function isVmiDone(item) {
+      const url = String(item.billUrl || '').trim();
+      const inv = String(item.invoiceNo || '').trim();
+      return /^https?:\/\//i.test(url) || (inv !== '' && inv !== '-');
+    }
+
+    function renderVmiDashboard() {
+      const vmiItems = SHEETS_DATA['VMI70'] || [];
+
+      const monthSel = document.getElementById('vmiMonthFilter');
+      const curMonth = monthSel.value || 'ALL';
+      const monthMap = new Map();
+      vmiItems.forEach(function(r) {
+        const ym = parseOrderYearMonth(r.orderDate);
+        if (!monthMap.has(ym.key)) monthMap.set(ym.key, { key: ym.key, label: ym.label, total: 0, count: 0 });
+        monthMap.get(ym.key).total += parseNum(r.total);
+        monthMap.get(ym.key).count += 1;
+      });
+      const sortedMonths = Array.from(monthMap.values()).sort(function(a, b) { return a.key.localeCompare(b.key); });
+      monthSel.innerHTML = '<option value="ALL">ทุกเดือน</option>' +
+        sortedMonths.slice().reverse().map(function(m) {
+          return '<option value="' + esc(m.key) + '">' + esc(m.label) + ' (' + m.count + ')</option>';
+        }).join('');
+      if (Array.from(monthSel.options).some(function(o) { return o.value === curMonth; })) monthSel.value = curMonth;
+
+      const query = (document.getElementById('vmiSearch').value || '').toLowerCase().trim();
+      const statusFilter = document.getElementById('vmiStatusFilter').value;
+      const monthFilter = monthSel.value;
+
+      const filtered = vmiItems.filter(function(r) {
+        const matchQ = !query ||
+          String(r.name || '').toLowerCase().indexOf(query) !== -1 ||
+          String(r.code || '').toLowerCase().indexOf(query) !== -1 ||
+          String(r.invoiceNo || '').toLowerCase().indexOf(query) !== -1 ||
+          String(r.remark || '').toLowerCase().indexOf(query) !== -1;
+        const matchM = monthFilter === 'ALL' || parseOrderYearMonth(r.orderDate).key === monthFilter;
+        const done = isVmiDone(r);
+        const matchS = statusFilter === 'ALL' || (statusFilter === 'DONE' && done) || (statusFilter === 'WAIT' && !done);
+        return matchQ && matchM && matchS;
+      });
+
+      const totalSpend = filtered.reduce(function(s, r) { return s + parseNum(r.total); }, 0);
+      const uniqueDrugs = new Set(filtered.map(function(r) { return normalizeDrugName(r.name); })).size;
+      const doneCount = filtered.filter(isVmiDone).length;
+      const waitCount = filtered.length - doneCount;
+      const pctDone = filtered.length ? Math.round((doneCount / filtered.length) * 100) : 0;
+      const peakMonth = sortedMonths.slice().sort(function(a, b) { return b.total - a.total; })[0];
+
+      document.getElementById('vmiKpiGrid').innerHTML =
+        '<div class="kpi-card">' +
+          '<div class="kpi-label"><span>รายการสั่งซื้อยา VMI</span><span>💊</span></div>' +
+          '<div class="kpi-val" style="color:var(--blue);">' + filtered.length + ' <span style="font-size:14px;font-weight:600;color:var(--text-muted);">รายการ</span></div>' +
+          '<div class="kpi-sub">ครอบคลุม ' + uniqueDrugs + ' ชนิดยา (จากชีต VMI70)</div>' +
+        '</div>' +
+        '<div class="kpi-card">' +
+          '<div class="kpi-label"><span>ยอดสั่งซื้อรวม (VMI)</span><span>💰</span></div>' +
+          '<div class="kpi-val" style="color:var(--green);">' + fmtNum(totalSpend, 2) + '</div>' +
+          '<div class="kpi-sub">บาท (ตามชีต VMI70)</div>' +
+        '</div>' +
+        '<div class="kpi-card">' +
+          '<div class="kpi-label"><span>สถานะใบแจ้งหนี้ / แนบบิล</span><span>✅</span></div>' +
+          '<div class="kpi-val">' + doneCount + ' <span style="font-size:14px;font-weight:600;color:var(--text-muted);">/ ' + filtered.length + ' (' + pctDone + '%)</span></div>' +
+          '<div class="kpi-sub">มีบิล/แจ้งหนี้ ' + doneCount + ' • รอดำเนินการ ' + waitCount + '</div>' +
+        '</div>' +
+        '<div class="kpi-card">' +
+          '<div class="kpi-label"><span>เดือนที่ยอดสั่งซื้อสูงสุด</span><span>📈</span></div>' +
+          '<div class="kpi-val" style="font-size:21px;">' + (peakMonth ? esc(peakMonth.label) : '-') + '</div>' +
+          '<div class="kpi-sub">' + (peakMonth ? (fmtNum(peakMonth.total, 2) + ' บาท (' + peakMonth.count + ' รายการ)') : 'ไม่มีข้อมูล') + '</div>' +
+        '</div>';
+
+      const maxM = Math.max.apply(null, [1].concat(sortedMonths.map(function(m) { return m.total; })));
+      document.getElementById('vmiMonthlyChart').innerHTML = sortedMonths.length
+        ? sortedMonths.map(function(m) {
+            const hPct = Math.max(6, Math.round((m.total / maxM) * 100));
+            const shortAmt = m.total >= 1000 ? (m.total / 1000).toFixed(0) + 'k' : fmtNum(m.total, 0);
+            return (
+              '<div class="vbar-col" title="' + esc(m.label) + ': ' + fmtNum(m.total, 2) + ' บาท (' + m.count + ' รายการ)">' +
+                '<div class="vbar-amt">' + shortAmt + '</div>' +
+                '<div class="vbar-fill" style="height:' + hPct + '%;"></div>' +
+                '<div class="vbar-lbl">' + esc(m.label) + '</div>' +
+                '<div class="vbar-cnt">' + m.count + ' รายการ</div>' +
+              '</div>'
+            );
+          }).join('')
+        : '<div style="margin:auto;color:var(--text-muted);">ยังไม่มีข้อมูลรายเดือน</div>';
+
+      const drugMap = new Map();
+      filtered.forEach(function(r) {
+        const key = normalizeDrugName(r.name);
+        if (!drugMap.has(key)) drugMap.set(key, { name: r.name, total: 0, qty: 0, count: 0 });
+        const d = drugMap.get(key);
+        d.total += parseNum(r.total);
+        d.qty += parseNum(r.qty);
+        d.count += 1;
+      });
+      const top5 = Array.from(drugMap.values()).sort(function(a, b) { return b.total - a.total; }).slice(0, 5);
+      const maxDrug = Math.max.apply(null, [1].concat(top5.map(function(d) { return d.total; })));
+
+      document.getElementById('vmiTopDrugs').innerHTML = top5.length
+        ? top5.map(function(d, idx) {
+            const wPct = Math.max(4, Math.round((d.total / maxDrug) * 100));
+            return (
+              '<div>' +
+                '<div class="hbar-head">' +
+                  '<span class="hbar-name">' + (idx + 1) + '. ' + esc(d.name) + ' <span style="color:var(--text-muted);font-weight:500;">(' + d.count + ' ครั้ง • ' + fmtNum(d.qty) + ' หน่วย)</span></span>' +
+                  '<span class="hbar-val">' + fmtNum(d.total, 2) + ' ฿</span>' +
+                '</div>' +
+                '<div class="hbar-track"><div class="hbar-fill" style="width:' + wPct + '%;"></div></div>' +
+              '</div>'
+            );
+          }).join('')
+        : '<div style="color:var(--text-muted);padding:20px 0;">ไม่พบรายการที่ตรงกับเงื่อนไข</div>';
+
+      document.getElementById('vmiSubtitle').textContent =
+        'พบ ' + filtered.length + ' จากทั้งหมด ' + vmiItems.length + ' รายการในชีต VMI70';
+
+      const tbody = document.getElementById('vmiTableBody');
+      const tableHtml = filtered.slice().reverse().map(function(item) {
+        const billUrl = String(item.billUrl || '').trim();
+        let billCell = '';
+        if (/^https?:\/\//i.test(billUrl)) {
+          billCell = '<a href="' + esc(billUrl) + '" target="_blank" class="status-tag status-ok" style="text-decoration:none;">✓ ดูบิลยา</a>';
+        } else if (item.invoiceNo) {
+          billCell = '<span class="status-tag status-ok">✓ มีแจ้งหนี้</span>';
+        } else {
+          billCell = '<span class="status-tag status-wait">รอดำเนินการ</span>';
+        }
+        const remarkTag = item.remark
+          ? '<div style="font-size:11.5px;color:#b45309;margin-top:2px;">' + esc(item.remark) + '</div>'
+          : '';
+        return (
+          '<tr>' +
+            '<td style="white-space:nowrap;font-weight:500;">' + esc(item.orderDate || '-') + '</td>' +
+            '<td style="font-family:ui-monospace,monospace;font-size:12px;color:var(--text-muted);">' + esc(item.code || '-') + '</td>' +
+            '<td style="font-weight:600;color:var(--text-title);max-width:260px;">' + esc(item.name) + remarkTag + '</td>' +
+            '<td class="text-center">' + esc(item.packing || '-') + '</td>' +
+            '<td class="text-center">' + esc(item.unit || '-') + '</td>' +
+            '<td class="text-right" style="color:var(--blue);font-weight:600;">' + fmtNum(item.qty) + '</td>' +
+            '<td class="text-right">' + fmtNum(item.price, 2) + '</td>' +
+            '<td class="text-right" style="color:var(--green);font-weight:700;">' + fmtNum(item.total, 2) + '</td>' +
+            '<td style="font-size:12.5px;white-space:nowrap;">' + esc(item.invoiceNo || '-') + '</td>' +
+            '<td class="text-center">' + billCell + '</td>' +
+          '</tr>'
+        );
+      }).join('');
+
+      tbody.innerHTML = tableHtml || '<tr><td colspan="10" class="text-center" style="padding:28px;color:var(--text-muted);">ไม่พบรายการยา VMI ที่ตรงกับตัวกรอง</td></tr>';
     }
 
     bootstrapApp();
