@@ -807,10 +807,11 @@
               <select id="vmiMonthFilter" onchange="renderVmiDashboard()" class="select" style="width:145px; padding:6px 10px; font-size:13px;">
                 <option value="ALL">ทุกเดือน</option>
               </select>
-              <select id="vmiStatusFilter" onchange="renderVmiDashboard()" class="select" style="width:155px; padding:6px 10px; font-size:13px;">
+              <select id="vmiStatusFilter" onchange="renderVmiDashboard()" class="select" style="width:170px; padding:6px 10px; font-size:13px;">
                 <option value="ALL">ทุกสถานะ</option>
-                <option value="DONE">มีบิล / ใบแจ้งหนี้</option>
-                <option value="WAIT">รอดำเนินการ</option>
+                <option value="WAIT_SHIP">รอจัดส่ง</option>
+                <option value="WAIT_INV">รอใบแจ้งหนี้</option>
+                <option value="DONE">ครบแล้ว (มีบิล/แจ้งหนี้)</option>
               </select>
             </div>
           </div>
@@ -1667,10 +1668,18 @@
     // ==========================================
     // DASHBOARD ยา VMI (ชีต VMI70)
     // ==========================================
-    function isVmiDone(item) {
-      const url = String(item.billUrl || '').trim();
+    function hasVmiInvoice(item) {
       const inv = String(item.invoiceNo || '').trim();
-      return /^https?:\/\//i.test(url) || (inv !== '' && inv !== '-');
+      return inv !== '' && inv !== '-';
+    }
+
+    function hasVmiBill(item) {
+      const url = String(item.billUrl || '').trim();
+      return url !== '' && url !== '-';
+    }
+
+    function isVmiDone(item) {
+      return hasVmiInvoice(item) && hasVmiBill(item);
     }
 
     function renderVmiDashboard() {
@@ -1703,15 +1712,20 @@
           String(r.invoiceNo || '').toLowerCase().indexOf(query) !== -1 ||
           String(r.remark || '').toLowerCase().indexOf(query) !== -1;
         const matchM = monthFilter === 'ALL' || parseOrderYearMonth(r.orderDate).key === monthFilter;
-        const done = isVmiDone(r);
-        const matchS = statusFilter === 'ALL' || (statusFilter === 'DONE' && done) || (statusFilter === 'WAIT' && !done);
+        const hasInv = hasVmiInvoice(r);
+        const hasBill = hasVmiBill(r);
+        let matchS = true;
+        if (statusFilter === 'WAIT_SHIP') matchS = !hasBill;
+        else if (statusFilter === 'WAIT_INV') matchS = !hasInv;
+        else if (statusFilter === 'DONE') matchS = hasInv && hasBill;
         return matchQ && matchM && matchS;
       });
 
       const totalSpend = filtered.reduce(function(s, r) { return s + parseNum(r.total); }, 0);
       const uniqueDrugs = new Set(filtered.map(function(r) { return normalizeDrugName(r.name); })).size;
       const doneCount = filtered.filter(isVmiDone).length;
-      const waitCount = filtered.length - doneCount;
+      const waitShipCount = filtered.filter(function(r) { return !hasVmiBill(r); }).length;
+      const waitInvCount = filtered.filter(function(r) { return !hasVmiInvoice(r); }).length;
       const pctDone = filtered.length ? Math.round((doneCount / filtered.length) * 100) : 0;
       const peakMonth = sortedMonths.slice().sort(function(a, b) { return b.total - a.total; })[0];
 
@@ -1729,7 +1743,7 @@
         '<div class="kpi-card">' +
           '<div class="kpi-label"><span>สถานะใบแจ้งหนี้ / แนบบิล</span><span>✅</span></div>' +
           '<div class="kpi-val">' + doneCount + ' <span style="font-size:14px;font-weight:600;color:var(--text-muted);">/ ' + filtered.length + ' (' + pctDone + '%)</span></div>' +
-          '<div class="kpi-sub">มีบิล/แจ้งหนี้ ' + doneCount + ' • รอดำเนินการ ' + waitCount + '</div>' +
+          '<div class="kpi-sub">รอจัดส่ง ' + waitShipCount + ' • รอใบแจ้งหนี้ ' + waitInvCount + '</div>' +
         '</div>' +
         '<div class="kpi-card">' +
           '<div class="kpi-label"><span>เดือนที่ยอดสั่งซื้อสูงสุด</span><span>📈</span></div>' +
@@ -1786,13 +1800,26 @@
       const tbody = document.getElementById('vmiTableBody');
       const tableHtml = filtered.slice().reverse().map(function(item) {
         const billUrl = String(item.billUrl || '').trim();
+        const hasBill = hasVmiBill(item);
+        const hasInv = hasVmiInvoice(item);
+        const hasUrl = /^https?:\/\//i.test(billUrl);
         let billCell = '';
-        if (/^https?:\/\//i.test(billUrl)) {
+        if (!hasBill && !hasInv) {
+          billCell = '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">' +
+            '<span class="status-tag status-wait">รอจัดส่ง</span>' +
+            '<span class="status-tag status-cancel">รอใบแจ้งหนี้</span>' +
+          '</div>';
+        } else if (!hasBill) {
+          billCell = '<span class="status-tag status-wait">รอจัดส่ง</span>';
+        } else if (!hasInv) {
+          const billLink = hasUrl
+            ? '<div style="margin-top:3px;"><a href="' + esc(billUrl) + '" target="_blank" style="font-size:11.5px;color:var(--blue);text-decoration:underline;">ดูบิลยา</a></div>'
+            : '';
+          billCell = '<span class="status-tag status-cancel">รอใบแจ้งหนี้</span>' + billLink;
+        } else if (hasUrl) {
           billCell = '<a href="' + esc(billUrl) + '" target="_blank" class="status-tag status-ok" style="text-decoration:none;">✓ ดูบิลยา</a>';
-        } else if (item.invoiceNo) {
-          billCell = '<span class="status-tag status-ok">✓ มีแจ้งหนี้</span>';
         } else {
-          billCell = '<span class="status-tag status-wait">รอดำเนินการ</span>';
+          billCell = '<span class="status-tag status-ok">✓ ครบถ้วน</span>';
         }
         const remarkTag = item.remark
           ? '<div style="font-size:11.5px;color:#b45309;margin-top:2px;">' + esc(item.remark) + '</div>'
