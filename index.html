@@ -1,3 +1,1948 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบสั่งยา "องค์การเภสัชกรรม [CKP]"</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet" crossorigin="anonymous">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+  <style>
+    :root {
+      --bg: #f4f7fc;
+      --surface: #ffffff;
+      --surface-soft: #f8fafd;
+      --border: #e6ecf5;
+      --text-title: #1e293b;
+      --text-body: #334155;
+      --text-muted: #64748b;
+      --blue: #2563eb;
+      --blue-light: #eff6ff;
+      --green: #16a34a;
+      --green-soft: #dcfce7;
+      --amber: #d97706;
+      --amber-soft: #fef3c7;
+      --shadow: 0 8px 26px rgba(15, 23, 42, 0.05);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: 'Sarabun', 'Noto Sans Thai', 'Leelawadee UI', 'Segoe UI', Tahoma, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text-body);
+      background: var(--bg);
+    }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      min-height: 100vh;
+    }
+
+    @media (max-width: 960px) {
+      .app-shell { grid-template-columns: 1fr; }
+    }
+
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 22px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .menu-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      padding: 0 12px;
+      margin-bottom: 8px;
+    }
+
+    .nav-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: left;
+      transition: background 0.15s ease, color 0.15s ease;
+      text-decoration: none;
+      position: relative;
+    }
+
+    .nav-item:hover { background: var(--surface-soft); color: var(--text-title); }
+    .nav-item.active { background: var(--blue-light); color: var(--blue); font-weight: 600; }
+    .nav-item.active::before {
+      content: '';
+      position: absolute;
+      left: -16px;
+      top: 8px;
+      bottom: 8px;
+      width: 3px;
+      border-radius: 0 4px 4px 0;
+      background: var(--blue);
+    }
+
+    .main-area {
+      padding: 24px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      max-width: 1260px;
+    }
+
+    .hero-banner {
+      background: linear-gradient(135deg, #2563eb 0%, #3b82f6 65%, #60a5fa 100%);
+      border-radius: 16px;
+      padding: 24px 28px;
+      color: #ffffff;
+      box-shadow: 0 14px 30px rgba(37, 99, 235, 0.22);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-banner::after {
+      content: '';
+      position: absolute;
+      right: -40px;
+      top: -50px;
+      width: 240px;
+      height: 240px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.08);
+      pointer-events: none;
+    }
+
+    .hero-banner h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
+    .hero-banner p { margin: 4px 0 0; font-size: 14px; color: rgba(255, 255, 255, 0.88); }
+
+    .hero-btn {
+      background: rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(255, 255, 255, 0.32);
+      color: #ffffff;
+      font-family: inherit;
+      font-size: 13.5px;
+      font-weight: 600;
+      padding: 9px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .hero-btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.28); }
+    .hero-btn:disabled { opacity: 0.65; cursor: wait; }
+
+    .error-banner {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      font-weight: 600;
+    }
+
+    .info-banner {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+      color: #065f46;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 13.5px;
+      font-weight: 600;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+    }
+
+    .content-grid {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 1080px) { .content-grid { grid-template-columns: 1fr; } }
+
+    .form-card { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .form-card h2 { margin: 0; font-size: 16px; font-weight: 700; color: var(--text-title); }
+
+    .field label {
+      display: block;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 5px;
+    }
+
+    .input, .select {
+      width: 100%;
+      font-family: inherit;
+      font-size: 14px;
+      color: var(--text-title);
+      background: var(--surface-soft);
+      border: 1px solid #dbe3ef;
+      border-radius: 10px;
+      padding: 9px 12px;
+      outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    }
+    .input:focus, .select:focus {
+      background: #ffffff;
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      font-family: inherit;
+      font-size: 13.5px;
+      font-weight: 600;
+      padding: 9px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #ffffff;
+      color: var(--text-title);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn:hover { background: var(--surface-soft); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .btn-primary {
+      background: var(--blue);
+      border-color: var(--blue);
+      color: #ffffff;
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.22);
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+
+    .btn-green { background: #16a34a; border-color: #16a34a; color: #ffffff; }
+    .btn-green:hover { background: #15803d; }
+
+    .btn-clear {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 600;
+      background: #fff1f2;
+      color: #e11d48;
+      border: 1px solid #fecdd3;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-clear:hover:not(:disabled) { background: #ffe4e6; border-color: #fda4af; }
+    .btn-clear:disabled { background: #f8fafc; color: #94a3b8; border-color: #e2e8f0; cursor: not-allowed; }
+
+    .btn-del-x {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      border-radius: 999px;
+      border: none;
+      background: transparent;
+      color: #ef4444;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .btn-del-x:hover:not(:disabled) { background: #fee2e2; color: #dc2626; }
+    .btn-del-x:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .table-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 600;
+      background: var(--blue-light);
+      color: var(--blue);
+    }
+
+    .sync-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 500;
+      background: #f1f5f9;
+      color: var(--text-muted);
+    }
+
+    .scroll-box { overflow: auto; max-height: 540px; }
+
+    table.clean-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-variant-numeric: tabular-nums;
+    }
+
+    table.clean-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #f8fafd;
+      color: var(--text-muted);
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    table.clean-table tbody td {
+      padding: 11px 14px;
+      font-size: 14px;
+      color: var(--text-body);
+      border-bottom: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+
+    table.clean-table tbody tr:hover { background: #f8fbff; }
+
+    .text-right { text-align: right; }
+    .text-center { text-align: center; }
+    .hidden { display: none !important; }
+    .stack-col { display: flex; flex-direction: column; gap: 16px; }
+
+    .po-sheet {
+      background: #ffffff;
+      color: #000000;
+      max-width: 210mm;
+      margin: 0 auto;
+      padding: 24px 28px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      font-family: 'Sarabun', 'Leelawadee UI', 'Noto Sans Thai', 'Segoe UI', Tahoma, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .po-table {
+      width: 100%;
+      table-layout: fixed;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+    }
+    .po-table th, .po-table td {
+      border: 1px solid #000000;
+      padding: 6px 5px;
+      vertical-align: middle;
+      line-height: 1.35;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+    .po-table thead th {
+      background: #f8fafc;
+      color: #000000;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+      line-height: 1.25;
+      white-space: nowrap;
+      padding: 7px 4px;
+    }
+    .po-table tbody td:nth-child(2) { font-size: 11.5px; }
+    .po-table tbody td:nth-child(5),
+    .po-table tbody td:nth-child(6),
+    .po-table tbody td:nth-child(7) { font-size: 12.5px; white-space: nowrap; }
+    .po-remark { width: 100%; border: none; border-bottom: 1px dotted #94a3b8; font-family: inherit; font-size: 12px; outline: none; background: transparent; color: #000000; }
+
+    .subtable-wrap { background: #f8fafd; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    .subtable { width: 100%; border-collapse: collapse; font-size: 13px; background: #ffffff; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+    .subtable th { background: #f1f5f9; color: var(--text-muted); font-weight: 600; padding: 9px 10px; text-align: left; }
+    .subtable td { padding: 9px 10px; border-top: 1px solid #f1f5f9; }
+    .input-sm { font-family: inherit; font-size: 12.5px; color: var(--text-title); background: #f8fafd; border: 1px solid #dbe3ef; border-radius: 8px; padding: 5px 8px; outline: none; }
+    .input-sm:focus { border-color: var(--blue); background: #ffffff; }
+
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    @media (max-width: 1120px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) { .kpi-grid { grid-template-columns: 1fr; } }
+
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .kpi-label { font-size: 12.5px; font-weight: 600; color: var(--text-muted); display: flex; align-items: center; justify-content: space-between; }
+    .kpi-val { font-size: 24px; font-weight: 700; color: var(--text-title); letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    .kpi-sub { font-size: 12px; color: var(--text-muted); }
+
+    .dash-charts-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 16px; }
+    @media (max-width: 980px) { .dash-charts-grid { grid-template-columns: 1fr; } }
+
+    .chart-card { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+    .chart-title { font-size: 15px; font-weight: 700; color: var(--text-title); margin: 0; }
+    .chart-sub { font-size: 12px; color: var(--text-muted); margin: 2px 0 0; }
+
+    .vchart {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+      height: 185px;
+      padding: 18px 8px 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .vbar-col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; gap: 6px; min-width: 44px; }
+    .vbar-amt { font-size: 11px; font-weight: 600; color: var(--blue); white-space: nowrap; }
+    .vbar-fill { width: 100%; max-width: 42px; border-radius: 8px 8px 4px 4px; background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%); min-height: 6px; }
+    .vbar-lbl { font-size: 11.5px; font-weight: 600; color: var(--text-body); text-align: center; }
+    .vbar-cnt { font-size: 10.5px; color: var(--text-muted); }
+
+    .hbar-list { display: flex; flex-direction: column; gap: 11px; }
+    .hbar-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 12.5px; margin-bottom: 4px; }
+    .hbar-name { font-weight: 600; color: var(--text-title); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .hbar-val { font-weight: 700; color: var(--blue); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .hbar-track { height: 8px; border-radius: 999px; background: #eff6ff; overflow: hidden; }
+    .hbar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #2563eb, #60a5fa); }
+
+    .status-tag { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+    .status-ok { background: var(--green-soft); color: #15803d; }
+    .status-wait { background: var(--amber-soft); color: #b45309; }
+    .status-cancel { background: #ffe4e6; color: #be123c; }
+
+    @media print {
+      body { background: #ffffff !important; color: #000000 !important; }
+      .app-shell { display: block !important; }
+      .sidebar, .hero-banner, .no-print, #errorBanner, #uiUpdateBanner, #tab_order, #tab_history, #tab_tracking, #tab_dashboard, #tab_vmi_dashboard { display: none !important; }
+      .main-area { padding: 0 !important; max-width: none !important; }
+      #tab_po { display: block !important; }
+      .po-sheet { box-shadow: none !important; border: none !important; padding: 0 !important; max-width: none !important; color: #000 !important; }
+      .po-table th, .po-table td { border-color: #000 !important; }
+      .po-remark { border-bottom: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div>
+        <div class="menu-label">เมนูหลัก</div>
+        <button type="button" id="tBtn_order" onclick="switchTab('order')" class="nav-item active">📋 เลือกรายการสั่งซื้อ</button>
+        <button type="button" id="tBtn_po" onclick="switchTab('po')" class="nav-item">📄 ใบสั่งซื้อ (A4) (<span id="badgeCount">0</span>)</button>
+        <button type="button" id="tBtn_history" onclick="switchTab('history')" class="nav-item">🕒 ประวัติการสั่งยา</button>
+        <button type="button" id="tBtn_tracking" onclick="switchTab('tracking')" class="nav-item">📦 ติดตามสถานะการสั่งยา</button>
+        <button type="button" id="tBtn_dashboard" onclick="switchTab('dashboard')" class="nav-item">📊 Dashboard ยานอก VMI</button>
+        <button type="button" id="tBtn_vmi_dashboard" onclick="switchTab('vmi_dashboard')" class="nav-item">💊 Dashboard ยา VMI</button>
+      </div>
+
+      <div>
+        <div class="menu-label">ระบบที่เชื่อมต่อ</div>
+        <a href="https://docs.google.com/spreadsheets/d/1qfJYh6Fuc8VJkCmCfkUcsT6764IFo3o14_Kxm35g8-k/edit?gid=0#gid=0" target="_blank" class="nav-item">📗 อนุมัติหลักการ GPO 70</a>
+        <a href="https://docs.google.com/spreadsheets/d/1m_E-gn9TVIQ4lJvLj6YhRy1v_hq2ootWtO1fdc8QC14/edit?gid=818636122#gid=818636122" target="_blank" class="nav-item">📘 ตามงาน รพจ.70</a>
+        <a href="https://docs.google.com/spreadsheets/d/1nMCbRkML0fEim_O7qhD8RCAqmdWwuhEP/edit?gid=2139036780#gid=2139036780" target="_blank" class="nav-item">📙 รายการซื้อ ยา GPO</a>
+        <a href="https://docs.google.com/spreadsheets/d/1pNUM8Ex-YzjfLMGwL6djari4rtGMBXmykRPCll8fa8k/edit?usp=sharing" target="_blank" class="nav-item">📒 list gpo 70</a>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <div class="hero-banner">
+        <div>
+          <h1>ระบบสั่งยา "องค์การเภสัชกรรม [CKP]"</h1>
+          <p>by Arissara.k</p>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <button type="button" onclick="switchTab('dashboard')" class="hero-btn">📊 Dashboard ยานอก VMI</button>
+          <button type="button" onclick="switchTab('vmi_dashboard')" class="hero-btn">💊 Dashboard ยา VMI</button>
+          <button type="button" onclick="switchTab('history')" class="hero-btn">🕒 ประวัติการสั่งยา</button>
+          <button type="button" onclick="switchTab('tracking')" class="hero-btn">📦 ติดตามสถานะการสั่งยา</button>
+          <button type="button" onclick="openPO()" class="hero-btn">เตรียมใบสั่งซื้อ</button>
+          <button type="button" id="refreshDataBtn" onclick="loadInitialData(true)" class="hero-btn" title="ดึงข้อมูลล่าสุดจาก Google Sheets">🔄 รีเฟรชข้อมูล</button>
+          <button type="button" id="refreshUiBtn" onclick="refreshUi()" class="hero-btn" title="ดึงโค้ดหน้าเว็บล่าสุดจาก GitHub">🌐 อัปเดตหน้าเว็บ</button>
+        </div>
+      </div>
+
+      <div id="errorBanner" class="error-banner hidden"></div>
+      <div id="uiUpdateBanner" class="info-banner hidden"></div>
+
+      <!-- TAB 1: ORDER -->
+      <div id="tab_order" class="content-grid">
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div class="card form-card">
+            <h2>ตั้งค่าใบสั่งซื้อ</h2>
+            <div class="field">
+              <label>เลือก Sheet</label>
+              <select id="sheetSelector" onchange="renderOrderTable()" class="select">
+                <option value="">กำลังโหลดรายชื่อ Sheet...</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>(เรียน เจ้าหน้าที่...)</label>
+              <input id="companyName" type="text" value="องค์การเภสัชกรรม" oninput="markDirty()" class="input" />
+            </div>
+            <div class="field">
+              <label>ข้อความหมายเหตุ / เวลาส่งยา</label>
+              <input id="noticeText" type="text" value="***ส่งยาได้ทุกวัน ตั้งแต่ 08.00-15.00 ยกเว้นวันหยุดราชการ***" class="input" style="font-size:12.5px;" />
+            </div>
+            <div class="field">
+              <label>ชื่อ-นามสกุล ผู้สั่งของ</label>
+              <input id="signerName" type="text" value="นางสาวอริศรา เกตดี" oninput="markDirty()" class="input" />
+            </div>
+            <div class="field">
+              <label>ตำแหน่ง ผู้สั่งของ</label>
+              <input id="signerPosition" type="text" value="เจ้าพนักงานเภสัชกรรมชำนาญงาน" class="input" />
+            </div>
+          </div>
+          <button type="button" onclick="openPO()" class="btn btn-primary" style="padding:12px 18px; font-size:15px;">
+            เตรียมใบสั่งซื้อ
+          </button>
+        </div>
+
+        <div class="card" style="overflow:hidden;">
+          <div class="table-header">
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+              <span style="font-size:16px; font-weight:700; color:var(--text-title);">รายการยา: <span id="sheetTitle" style="color:var(--blue);">-</span></span>
+              <input id="searchBox" type="text" oninput="renderOrderTable()" placeholder="ค้นหารายการยา..." class="input" style="width:210px; padding:7px 12px; font-size:13px;" />
+              <span id="syncStatusPill" class="sync-pill">⏳ กำลังเตรียมข้อมูล...</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span id="selectedBadge" class="pill">เลือกแล้ว 0 รายการ</span>
+              <button type="button" id="clearSelectionBtn" onclick="clearAllSelections()" class="btn-clear" disabled>ยกเลิกการเลือกทั้งหมด</button>
+            </div>
+          </div>
+          <div class="scroll-box">
+            <table class="clean-table">
+              <thead>
+                <tr>
+                  <th class="text-center" style="width:52px;">เลือก</th>
+                  <th>รหัส</th>
+                  <th>รายการ</th>
+                  <th class="text-center">packing</th>
+                  <th class="text-right">จำนวน</th>
+                  <th class="text-right">ราคา/หน่วย</th>
+                  <th class="text-right">รวมเงิน</th>
+                </tr>
+              </thead>
+              <tbody id="orderTableBody">
+                <tr><td colspan="7" class="text-center" style="padding:36px;color:var(--text-muted);">กำลังเตรียมรายการยา...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: PO -->
+      <div id="tab_po" class="hidden stack-col">
+        <div class="card no-print" style="padding:14px 20px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <span style="font-size:13px; color:var(--text-muted);">ตัวอย่างเอกสาร A4 สำหรับพิมพ์ / ดาวน์โหลด PDF</span>
+            <span id="poSaveStatus" style="font-size:12.5px; color:var(--green); font-weight:600;"></span>
+          </div>
+          <div style="display:flex; flex-wrap:wrap; gap:10px;">
+            <button type="button" id="btnDownloadPdfLog" onclick="downloadAndLogPO()" class="btn btn-green">ดาวน์โหลด PDF และลง Log</button>
+            <button type="button" onclick="window.print()" class="btn">🖨️ พิมพ์ A4</button>
+            <button type="button" onclick="switchTab('order')" class="btn">กลับไปแก้ไข</button>
+          </div>
+        </div>
+
+        <div class="po-sheet">
+          <div style="font-weight:700; margin-bottom:4px;">ร.พ.เจริญกรุงประชารักษ์ กลุ่มงานเภสัชกรรม ชั้น 4 ตึกอนุสรณ์ 20 ปี TEL : 02-289-7843</div>
+          <div id="poDateLbl" style="margin-bottom:4px;">วันที่ -</div>
+          <div id="poCompanyLbl" style="margin-bottom:6px;">เรียน เจ้าหน้าที่ออก ORDER องค์การเภสัชกรรม</div>
+          <div style="margin-bottom:8px;">กรุณาส่งยา/เวชภัณฑ์ ที่มีกำหนดอายุ มากกว่า 1 ปีขึ้นไป (หากมีปัญหา โปรดโทรแจ้ง ก่อน)</div>
+          <div id="poNoticeLbl" style="text-align:center; font-weight:700; color:#dc2626; margin:10px 0;">***ส่งยาได้ทุกวัน ตั้งแต่ 08.00-15.00 ยกเว้นวันหยุดราชการ***</div>
+          <table class="po-table">
+            <colgroup>
+              <col style="width:6.5%;">
+              <col style="width:7.5%;">
+              <col style="width:38%;">
+              <col style="width:9.5%;">
+              <col style="width:8%;">
+              <col style="width:9.5%;">
+              <col style="width:10.5%;">
+              <col style="width:10.5%;">
+            </colgroup>
+            <thead>
+              <tr>
+                <th>ลำดับ</th>
+                <th>รหัส</th>
+                <th>รายการ</th>
+                <th>packing</th>
+                <th>จำนวน</th>
+                <th>ราคา/<br>หน่วย</th>
+                <th>รวมเงิน</th>
+                <th>หมายเหตุ</th>
+              </tr>
+            </thead>
+            <tbody id="poPrintBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 3: HISTORY (ประวัติการสั่งยา) -->
+      <div id="tab_history" class="hidden">
+        <div class="card" style="overflow:hidden;">
+          <div class="table-header">
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:10px;">
+              <span style="font-size:16px; font-weight:700; color:var(--text-title);">ประวัติการสั่งยา (ทั้งหมดใน Log_PO)</span>
+              <input id="historySearch" type="text" oninput="renderHistory()" placeholder="ค้นหาชื่อยา..." class="input" style="width:220px; padding:6px 12px; font-size:13px;" />
+            </div>
+            <span id="logStatusMsg" style="font-size:13px; color:var(--blue); font-weight:500;">กำลังเตรียมข้อมูล...</span>
+          </div>
+          <div class="scroll-box" style="max-height:580px;">
+            <table class="clean-table">
+              <thead>
+                <tr>
+                  <th>วัน-เวลาที่สั่ง</th>
+                  <th>รายการยา</th>
+                  <th class="text-center">Packing</th>
+                  <th class="text-right">จำนวน</th>
+                  <th class="text-right">รวมเงิน</th>
+                  <th class="text-center">วันที่รับยา</th>
+                  <th class="text-center">ลิงก์บิล</th>
+                  <th class="text-center">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="historyBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 3.5: TRACKING (ติดตามสถานะการสั่งยา 3 กล่อง) -->
+      <div id="tab_tracking" class="hidden stack-col">
+        <div class="card" style="padding:14px 20px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px;">
+          <div>
+            <span style="font-size:16px; font-weight:700; color:var(--text-title);">ติดตามสถานะการสั่งยา (ชีต Log_PO)</span>
+            <div id="trackingSummaryMsg" style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">แสดงเฉพาะรายการที่ยังรอดำเนินการ</div>
+          </div>
+          <input id="trackingSearch" type="text" oninput="renderTracking()" placeholder="ค้นหาชื่อยา..." class="input" style="width:240px; padding:7px 12px; font-size:13px;" />
+        </div>
+
+        <!-- กล่อง 1: รอจัดส่ง (คอลัมน์ K วันที่รับยา ว่าง) -->
+        <div class="card" style="overflow:hidden;">
+          <div class="table-header" style="background:#fffbeb;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span style="font-size:15px; font-weight:700; color:#b45309;">🚚 1. รายการยารอจัดส่ง</span>
+              <span style="font-size:12px; color:var(--text-muted);">(คอลัมน์ K: วันที่รับยา ว่าง)</span>
+            </div>
+            <span id="trackShipBadge" class="pill" style="background:#fef3c7;color:#b45309;">0 รายการ</span>
+          </div>
+          <div class="scroll-box" style="max-height:300px;">
+            <table class="clean-table">
+              <thead>
+                <tr>
+                  <th>วัน-เวลาที่สั่ง</th>
+                  <th>รายการยา</th>
+                  <th class="text-center">Packing</th>
+                  <th class="text-right">จำนวน</th>
+                  <th class="text-right">รวมเงิน</th>
+                  <th class="text-center">วันที่รับยา (K)</th>
+                  <th class="text-center">ลิงก์บิล (L)</th>
+                  <th class="text-center">บันทึก</th>
+                </tr>
+              </thead>
+              <tbody id="trackShipBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- กล่อง 2: รอใบเสนอราคา (คอลัมน์ M ยังไม่ติ๊ก/ว่าง) -->
+        <div class="card" style="overflow:hidden;">
+          <div class="table-header" style="background:#eff6ff;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span style="font-size:15px; font-weight:700; color:var(--blue);">📄 2. รายการรอใบเสนอราคา</span>
+              <span style="font-size:12px; color:var(--text-muted);">(คอลัมน์ M: รอใบเสนอราคา ยังไม่ติ๊ก/ว่าง)</span>
+            </div>
+            <span id="trackQuoteBadge" class="pill">0 รายการ</span>
+          </div>
+          <div class="scroll-box" style="max-height:300px;">
+            <table class="clean-table">
+              <thead>
+                <tr>
+                  <th>วัน-เวลาที่สั่ง</th>
+                  <th>รายการยา</th>
+                  <th class="text-center">Packing</th>
+                  <th class="text-right">จำนวน</th>
+                  <th class="text-right">รวมเงิน</th>
+                  <th class="text-center">PO / บิลยา</th>
+                  <th class="text-center">สถานะ (คอลัมน์ M)</th>
+                </tr>
+              </thead>
+              <tbody id="trackQuoteBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- กล่อง 3: รอใบแจ้งหนี้ (คอลัมน์ N ยังไม่ติ๊ก/ว่าง) -->
+        <div class="card" style="overflow:hidden;">
+          <div class="table-header" style="background:#fef2f2;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span style="font-size:15px; font-weight:700; color:#be123c;">🧾 3. รายการรอใบแจ้งหนี้</span>
+              <span style="font-size:12px; color:var(--text-muted);">(คอลัมน์ N: รอใบแจ้งหนี้ ยังไม่ติ๊ก/ว่าง)</span>
+            </div>
+            <span id="trackInvBadge" class="pill" style="background:#ffe4e6;color:#be123c;">0 รายการ</span>
+          </div>
+          <div class="scroll-box" style="max-height:300px;">
+            <table class="clean-table">
+              <thead>
+                <tr>
+                  <th>วัน-เวลาที่สั่ง</th>
+                  <th>รายการยา</th>
+                  <th class="text-center">Packing</th>
+                  <th class="text-right">จำนวน</th>
+                  <th class="text-right">รวมเงิน</th>
+                  <th class="text-center">PO / บิลยา</th>
+                  <th class="text-center">สถานะ (คอลัมน์ N)</th>
+                </tr>
+              </thead>
+              <tbody id="trackInvBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: DASHBOARD นอก VMI (Log_PO) -->
+      <div id="tab_dashboard" class="hidden stack-col">
+        <div class="kpi-grid" id="dashKpiGrid"></div>
+
+        <div class="dash-charts-grid">
+          <div class="card chart-card">
+            <div>
+              <h3 class="chart-title">ยอดสั่งซื้อนอก VMI รายเดือน</h3>
+              <p class="chart-sub">สรุปมูลค่ารวมและจำนวนรายการสั่งซื้อจากชีต Log_PO</p>
+            </div>
+            <div class="vchart" id="dashMonthlyChart"></div>
+          </div>
+
+          <div class="card chart-card">
+            <div>
+              <h3 class="chart-title">Top 5 รายการยานอก VMI มูลค่าสูงสุด</h3>
+              <p class="chart-sub">เรียงตามมูลค่าสั่งซื้อสะสม (รวมทุกครั้งที่สั่ง)</p>
+            </div>
+            <div class="hbar-list" id="dashTopDrugs"></div>
+          </div>
+        </div>
+
+        <div class="card" style="overflow:hidden;">
+          <div class="table-header">
+            <div>
+              <span style="font-size:16px; font-weight:700; color:var(--text-title);">ประวัติรายการสั่งซื้อนอก VMI (Log_PO)</span>
+              <div id="dashSubtitle" style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">กรองเฉพาะรายการที่ไม่อยู่ในชีต VMI70</div>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+              <input id="dashSearch" type="text" oninput="renderNonVmiDashboard()" placeholder="ค้นหาชื่อยา / หมายเหตุ..." class="input" style="width:190px; padding:6px 11px; font-size:13px;" />
+              <select id="dashMonthFilter" onchange="renderNonVmiDashboard()" class="select" style="width:145px; padding:6px 10px; font-size:13px;">
+                <option value="ALL">ทุกเดือน</option>
+              </select>
+              <select id="dashStatusFilter" onchange="renderNonVmiDashboard()" class="select" style="width:155px; padding:6px 10px; font-size:13px;">
+                <option value="ALL">ทุกสถานะ</option>
+                <option value="DONE">รับยาแล้ว (มีบิล)</option>
+                <option value="WAIT">รอรับยา</option>
+                <option value="CANCEL">ยกเลิก / ไม่มีบิล</option>
+              </select>
+            </div>
+          </div>
+          <div class="scroll-box" style="max-height:480px;">
+            <table class="clean-table">
+              <thead>
+                <tr>
+                  <th>วันที่สั่ง</th>
+                  <th>รายการยา</th>
+                  <th class="text-center">ขนาดบรรจุ</th>
+                  <th class="text-right">จำนวน</th>
+                  <th class="text-right">ราคา/หน่วย</th>
+                  <th class="text-right">รวมเงิน</th>
+                  <th>หมายเหตุ</th>
+                  <th class="text-center">ลิงก์ PO</th>
+                  <th class="text-center">วันที่รับยา</th>
+                  <th class="text-center">สถานะ / บิลยา</th>
+                </tr>
+              </thead>
+              <tbody id="dashTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 5: DASHBOARD ยา VMI (VMI70) -->
+      <div id="tab_vmi_dashboard" class="hidden stack-col">
+        <div class="kpi-grid" id="vmiKpiGrid"></div>
+
+        <div class="dash-charts-grid">
+          <div class="card chart-card">
+            <div>
+              <h3 class="chart-title">ยอดสั่งซื้อยา VMI รายเดือน</h3>
+              <p class="chart-sub">สรุปมูลค่ารวมและจำนวนรายการสั่งซื้อจากชีต VMI70</p>
+            </div>
+            <div class="vchart" id="vmiMonthlyChart"></div>
+          </div>
+
+          <div class="card chart-card">
+            <div>
+              <h3 class="chart-title">Top 5 รายการยา VMI มูลค่าสูงสุด</h3>
+              <p class="chart-sub">เรียงตามมูลค่าสั่งซื้อสะสมจากชีต VMI70</p>
+            </div>
+            <div class="hbar-list" id="vmiTopDrugs"></div>
+          </div>
+        </div>
+
+        <div class="card" style="overflow:hidden;">
+          <div class="table-header">
+            <div>
+              <span style="font-size:16px; font-weight:700; color:var(--text-title);">รายการยา VMI (ชีต VMI70)</span>
+              <div id="vmiSubtitle" style="font-size:12.5px; color:var(--text-muted); margin-top:2px;">ข้อมูลทั้งหมดจากชีต VMI70</div>
+            </div>
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">
+              <input id="vmiSearch" type="text" oninput="renderVmiDashboard()" placeholder="ค้นหาชื่อยา / รหัส / ใบแจ้งหนี้..." class="input" style="width:220px; padding:6px 11px; font-size:13px;" />
+              <select id="vmiMonthFilter" onchange="renderVmiDashboard()" class="select" style="width:145px; padding:6px 10px; font-size:13px;">
+                <option value="ALL">ทุกเดือน</option>
+              </select>
+              <select id="vmiStatusFilter" onchange="renderVmiDashboard()" class="select" style="width:170px; padding:6px 10px; font-size:13px;">
+                <option value="ALL">ทุกสถานะ</option>
+                <option value="WAIT_SHIP">รอจัดส่ง</option>
+                <option value="WAIT_INV">รอใบแจ้งหนี้</option>
+                <option value="DONE">ครบแล้ว (มีบิล/แจ้งหนี้)</option>
+              </select>
+            </div>
+          </div>
+          <div class="scroll-box" style="max-height:480px;">
+            <table class="clean-table">
+              <thead>
+                <tr>
+                  <th>วันที่สั่ง</th>
+                  <th>รหัส</th>
+                  <th>รายการยา</th>
+                  <th class="text-center">Packing</th>
+                  <th class="text-center">หน่วย</th>
+                  <th class="text-right">จำนวน</th>
+                  <th class="text-right">ราคา/หน่วย</th>
+                  <th class="text-right">รวมเงิน</th>
+                  <th>ใบแจ้งหนี้</th>
+                  <th class="text-center">สถานะ / บิลยา</th>
+                </tr>
+              </thead>
+              <tbody id="vmiTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ข้อมูลที่เซิร์ฟเวอร์ฝังมาให้ทันทีในรอบแรก (ลดเวลาโหลดซ้ำ) -->
+  <script id="initPayload" type="application/json"><?!= initialJson ?></script>
+
+  <script>
+    const LOCAL_CACHE_KEY = 'ck_po_local_cache_v4';
+    let SHEETS_DATA = {};
+    let SHEET_NAMES = [];
+    let logRows = [];
+    let selectedMap = new Map();
+    let hasLoggedCurrentPO = false;
+    let expandedSet = new Set([0]);
+    let currentHistoryOrders = [];
+    let currentFilteredOrderItems = [];
+    let lastGeneratedPdf = null;
+
+    function showError(msg) {
+      const el = document.getElementById('errorBanner');
+      if (!el) return;
+      if (msg) {
+        el.textContent = '⚠️ ' + msg;
+        el.classList.remove('hidden');
+      } else {
+        el.classList.add('hidden');
+      }
+    }
+
+    window.onerror = function(message) {
+      showError('เกิดข้อผิดพลาดในหน้าเว็บ: ' + message);
+    };
+
+    function esc(s) {
+      return String(s || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function fmtNum(val, decimals) {
+      if (val === null || val === undefined || String(val).trim() === '') return '-';
+      const n = Number(String(val).replace(/,/g, ''));
+      if (isNaN(n)) return esc(val);
+      return decimals
+        ? n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+        : n.toLocaleString('en-US');
+    }
+
+    function getTodayThaiDate() {
+      const d = new Date();
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear() + 543;
+      return dd + '/' + mm + '/' + yyyy;
+    }
+
+    function saveLocalCache(data) {
+      try {
+        localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify({
+          sheets: data.sheets,
+          sheetNames: data.sheetNames,
+          log: data.log,
+          savedAt: Date.now()
+        }));
+      } catch (e) {}
+    }
+
+    function applyLoadedData(data, sourceText) {
+      if (data && data.error) {
+        showError('โหลดข้อมูลจาก Google Sheets ไม่สำเร็จ: ' + data.error);
+      } else {
+        showError('');
+      }
+
+      SHEETS_DATA = (data && data.sheets) ? data.sheets : {};
+      SHEET_NAMES = (data && data.sheetNames && data.sheetNames.length) ? data.sheetNames : Object.keys(SHEETS_DATA);
+      logRows = (data && data.log) ? data.log : [];
+
+      const sel = document.getElementById('sheetSelector');
+      const prevSheet = sel.value;
+      if (SHEET_NAMES.length) {
+        sel.innerHTML = SHEET_NAMES.map(function(name) {
+          const cnt = (SHEETS_DATA[name] || []).length;
+          return '<option value="' + esc(name) + '">' + esc(name) + ' (' + cnt + ' รายการ)</option>';
+        }).join('');
+        if (prevSheet && SHEETS_DATA[prevSheet]) sel.value = prevSheet;
+        else sel.value = SHEET_NAMES[0];
+      } else {
+        sel.innerHTML = '<option value="">ไม่พบชีตข้อมูล</option>';
+      }
+
+      document.getElementById('logStatusMsg').textContent = 'แสดงข้อมูลล่าสุด ' + logRows.length + ' รายการจาก Log_PO';
+      const pill = document.getElementById('syncStatusPill');
+      if (pill && sourceText) pill.textContent = sourceText;
+
+      renderOrderTable();
+      if (!document.getElementById('tab_history').classList.contains('hidden')) renderHistory();
+      if (!document.getElementById('tab_tracking').classList.contains('hidden')) renderTracking();
+      if (!document.getElementById('tab_dashboard').classList.contains('hidden')) renderNonVmiDashboard();
+      if (!document.getElementById('tab_vmi_dashboard').classList.contains('hidden')) renderVmiDashboard();
+    }
+
+    function loadInitialData(forceRefresh) {
+      if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+      const btn = document.getElementById('refreshDataBtn');
+      const pill = document.getElementById('syncStatusPill');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังโหลด...'; }
+      if (pill) pill.textContent = forceRefresh ? '🔄 กำลังดึงสดจาก Google Sheets...' : '🔄 กำลังซิงค์ข้อมูลล่าสุด...';
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          saveLocalCache(res);
+          const sec = res && res.serverMs ? (res.serverMs / 1000).toFixed(2) : '0.1';
+          const tag = res && res.fromCache ? ('⚡ พร้อมใช้งาน (' + sec + ' วิ)') : ('✓ อัปเดตล่าสุดแล้ว (' + sec + ' วิ)');
+          applyLoadedData(res, tag);
+          if (btn) { btn.disabled = false; btn.textContent = '🔄 รีเฟรชข้อมูล'; }
+        })
+        .withFailureHandler(function(err) {
+          if (pill) pill.textContent = '⚠️ ซิงค์ไม่สำเร็จ';
+          if (btn) { btn.disabled = false; btn.textContent = '🔄 รีเฟรชข้อมูล'; }
+          showError('โหลดข้อมูลไม่สำเร็จ: ' + (err && err.message ? err.message : err));
+        })
+        .getInitialData(!!forceRefresh);
+    }
+
+    function refreshUi() {
+      if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        showError('ใช้งานปุ่มนี้ได้เฉพาะเมื่อเปิดผ่านลิงก์ Google Apps Script');
+        return;
+      }
+      const btn = document.getElementById('refreshUiBtn');
+      const banner = document.getElementById('uiUpdateBanner');
+      showError('');
+      if (banner) banner.classList.add('hidden');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังอัปเดตหน้าเว็บ...'; }
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (btn) { btn.disabled = false; btn.textContent = '🌐 อัปเดตหน้าเว็บ'; }
+          const kb = res && res.bytes ? (res.bytes / 1024).toFixed(1) : '-';
+          const appUrl = res && res.appUrl ? res.appUrl : '';
+          if (banner) {
+            const linkHtml = /^https?:\/\//i.test(appUrl)
+              ? '<a href="' + esc(appUrl) + '" target="_top" class="btn btn-green" style="text-decoration:none;padding:6px 14px;font-size:13px;">เปิดหน้าเว็บใหม่ทันที</a>'
+              : '<span style="font-size:12.5px;">กรุณากดปุ่ม Refresh (F5) ของเบราว์เซอร์เพื่อโหลดหน้าใหม่</span>';
+            banner.innerHTML = '<span>✓ ดึงหน้าเว็บล่าสุดจาก GitHub สำเร็จแล้ว (' + kb + ' KB)</span>' + linkHtml;
+            banner.classList.remove('hidden');
+          }
+        })
+        .withFailureHandler(function(err) {
+          if (btn) { btn.disabled = false; btn.textContent = '🌐 อัปเดตหน้าเว็บ'; }
+          showError('อัปเดตหน้าเว็บไม่สำเร็จ: ' + (err && err.message ? err.message : err));
+        })
+        .refreshUiFromGitHub();
+    }
+
+    function bootstrapApp() {
+      document.getElementById('poDateLbl').textContent = 'วันที่ ' + getTodayThaiDate();
+
+      // 1) ใช้ข้อมูลที่เซิร์ฟเวอร์ฝังมากับหน้าเว็บทันที (ไม่ต้องรอ RPC รอบ 2)
+      let hasPreloaded = false;
+      try {
+        const el = document.getElementById('initPayload');
+        const raw = el ? (el.textContent || '').trim() : '';
+        if (raw && raw.charAt(0) === '{') {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.sheets) {
+            hasPreloaded = true;
+            saveLocalCache(parsed);
+            const sec = parsed.serverMs ? (parsed.serverMs / 1000).toFixed(2) : '0.1';
+            const tag = parsed.fromCache ? ('⚡ โหลดทันทีจาก Cache (' + sec + ' วิ)') : ('✓ โหลดข้อมูลล่าสุดแล้ว (' + sec + ' วิ)');
+            applyLoadedData(parsed, tag);
+          }
+        }
+      } catch (e) {}
+
+      // 2) กรณีไม่ได้ฝังข้อมูล (Fallback) ให้โหลดจาก localStorage + google.script.run
+      if (!hasPreloaded) {
+        try {
+          const cachedRaw = localStorage.getItem(LOCAL_CACHE_KEY);
+          if (cachedRaw) {
+            const localData = JSON.parse(cachedRaw);
+            if (localData && localData.sheets) {
+              applyLoadedData(localData, '⚡ แสดงผลจากเครื่อง (กำลังซิงค์...)');
+            }
+          }
+        } catch (e) {}
+        loadInitialData(false);
+      }
+    }
+
+    function switchTab(tab) {
+      const tabs = ['order', 'po', 'history', 'tracking', 'dashboard', 'vmi_dashboard'];
+      for (let i = 0; i < tabs.length; i++) {
+        const t = tabs[i];
+        const panel = document.getElementById('tab_' + t);
+        const btn = document.getElementById('tBtn_' + t);
+        if (panel) panel.classList.toggle('hidden', t !== tab);
+        if (btn) btn.className = t === tab ? 'nav-item active' : 'nav-item';
+      }
+      try {
+        if (tab === 'po') renderPO();
+        if (tab === 'history') renderHistory();
+        if (tab === 'tracking') renderTracking();
+        if (tab === 'dashboard') renderNonVmiDashboard();
+        if (tab === 'vmi_dashboard') renderVmiDashboard();
+      } catch (err) {
+        showError('แสดงผลหน้า ' + tab + ' ไม่สำเร็จ: ' + (err && err.message ? err.message : err));
+      }
+    }
+
+    function markDirty() {
+      hasLoggedCurrentPO = false;
+      const st = document.getElementById('poSaveStatus');
+      if (st) st.innerHTML = '';
+      updateDownloadBtn();
+    }
+
+    function updateDownloadBtn() {
+      const btn = document.getElementById('btnDownloadPdfLog');
+      if (btn) btn.textContent = hasLoggedCurrentPO ? 'ดาวน์โหลด PDF อีกครั้ง (ลง Log แล้ว)' : 'ดาวน์โหลด PDF และลง Log';
+    }
+
+    function renderOrderTable() {
+      const sheet = document.getElementById('sheetSelector').value;
+      const query = (document.getElementById('searchBox').value || '').toLowerCase().trim();
+      document.getElementById('sheetTitle').textContent = sheet || '-';
+      const tbody = document.getElementById('orderTableBody');
+
+      const items = (SHEETS_DATA[sheet] || []).filter(function(item) {
+        return !query || String(item.name || '').toLowerCase().indexOf(query) !== -1 || String(item.code || '').toLowerCase().indexOf(query) !== -1;
+      });
+      currentFilteredOrderItems = items;
+
+      if (!items.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center" style="padding:32px;color:var(--text-muted);">ไม่พบรายการยา</td></tr>';
+        updateCount();
+        return;
+      }
+
+      const htmlParts = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const key = sheet + '_' + item.id;
+        const checked = selectedMap.has(key);
+        htmlParts.push(
+          '<tr data-idx="' + i + '" style="cursor:pointer;">' +
+            '<td class="text-center"><input type="checkbox" ' + (checked ? 'checked' : '') + ' style="width:17px;height:17px;accent-color:#2563eb;" /></td>' +
+            '<td style="font-family:ui-monospace,monospace;font-size:12px;color:var(--text-muted);">' + esc(item.code) + '</td>' +
+            '<td style="font-weight:500;color:var(--text-title);">' + esc(item.name) + '</td>' +
+            '<td class="text-center">' + esc(item.packing) + '</td>' +
+            '<td class="text-right" style="color:var(--blue);font-weight:600;">' + fmtNum(item.qty) + '</td>' +
+            '<td class="text-right">' + fmtNum(item.price, 2) + '</td>' +
+            '<td class="text-right" style="color:var(--green);font-weight:700;">' + fmtNum(item.total, 2) + '</td>' +
+          '</tr>'
+        );
+      }
+      tbody.innerHTML = htmlParts.join('');
+      updateCount();
+    }
+
+    document.getElementById('orderTableBody').addEventListener('click', function(e) {
+      const tr = e.target.closest('tr[data-idx]');
+      if (!tr) return;
+      const item = currentFilteredOrderItems[Number(tr.getAttribute('data-idx'))];
+      if (!item) return;
+      const sheet = document.getElementById('sheetSelector').value;
+      const key = sheet + '_' + item.id;
+      const cb = tr.querySelector('input[type="checkbox"]');
+      if (e.target.tagName !== 'INPUT') cb.checked = !cb.checked;
+      if (cb.checked) selectedMap.set(key, Object.assign({ sheetName: sheet, remark: '' }, item));
+      else selectedMap.delete(key);
+      markDirty();
+      updateCount();
+    });
+
+    function updateCount() {
+      document.getElementById('selectedBadge').textContent = 'เลือกแล้ว ' + selectedMap.size + ' รายการ';
+      document.getElementById('badgeCount').textContent = selectedMap.size;
+      const clearBtn = document.getElementById('clearSelectionBtn');
+      if (clearBtn) clearBtn.disabled = selectedMap.size === 0;
+    }
+
+    function clearAllSelections() {
+      if (selectedMap.size === 0) return;
+      selectedMap.clear();
+      markDirty();
+      renderOrderTable();
+    }
+
+    function openPO() {
+      if (selectedMap.size === 0) {
+        alert('กรุณาเลือกรายการยาอย่างน้อย 1 รายการ');
+        return;
+      }
+      switchTab('po');
+    }
+
+    function renderPO() {
+      const company = document.getElementById('companyName').value || '.......................';
+      const notice = document.getElementById('noticeText').value || '';
+      const sName = document.getElementById('signerName').value || '';
+      const sPos = document.getElementById('signerPosition').value || '';
+      document.getElementById('poDateLbl').textContent = 'วันที่ ' + getTodayThaiDate();
+      document.getElementById('poCompanyLbl').textContent = 'เรียน เจ้าหน้าที่ออก ORDER  ' + company;
+      document.getElementById('poNoticeLbl').textContent = notice;
+
+      const tbody = document.getElementById('poPrintBody');
+      tbody.innerHTML = '';
+      let idx = 1;
+
+      selectedMap.forEach(function(item) {
+        const tr = document.createElement('tr');
+        tr.innerHTML =
+          '<td class="text-center">' + (idx++) + '</td>' +
+          '<td class="text-center" style="font-size:12px;">' + esc(item.code || '-') + '</td>' +
+          '<td>' + esc(item.name) + ' <span style="color:#475569;font-size:11.5px;">(' + esc(item.sheetName) + ')</span></td>' +
+          '<td class="text-center">' + esc(item.packing) + '</td>' +
+          '<td class="text-center">' + fmtNum(item.qty) + '</td>' +
+          '<td class="text-right">' + fmtNum(item.price, 2) + '</td>' +
+          '<td class="text-right">' + fmtNum(item.total, 2) + '</td>' +
+          '<td><input type="text" value="' + esc(item.remark) + '" placeholder="หมายเหตุ..." class="po-remark" /></td>';
+        tr.querySelector('input').addEventListener('input', function(e) {
+          item.remark = e.target.value;
+          markDirty();
+        });
+        tbody.appendChild(tr);
+      });
+
+      const remain = Math.max(0, 10 - selectedMap.size);
+      for (let i = 0; i < remain; i++) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td class="text-center" style="color:#94a3b8;height:30px;">' + (idx++) + '</td><td class="text-center">-</td><td></td><td></td><td></td><td></td><td></td><td></td>';
+        tbody.appendChild(tr);
+      }
+
+      const signTr = document.createElement('tr');
+      signTr.innerHTML =
+        '<td colspan="5" style="border-right:none;"></td>' +
+        '<td colspan="3" class="text-center" style="border-left:none;padding:24px 8px 16px;">' +
+        '<div style="font-weight:700;">(' + esc(sName) + ')</div>' +
+        '<div style="font-weight:700;font-size:12.5px;">' + esc(sPos) + '</div>' +
+        '<div style="font-weight:700;margin-top:4px;">ผู้สั่งของ</div></td>';
+      tbody.appendChild(signTr);
+      updateDownloadBtn();
+    }
+
+    function triggerPdfDownload(base64, fileName) {
+      const bin = atob(base64);
+      const arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      const blob = new Blob([arr], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName || 'PO.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
+    }
+
+    async function generatePoPdfBase64FromDom() {
+      if (!window.html2canvas || !window.jspdf || !window.jspdf.jsPDF) return '';
+      const sheetEl = document.querySelector('#tab_po .po-sheet');
+      if (!sheetEl) return '';
+
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#ffffff;z-index:-1;';
+      const clone = sheetEl.cloneNode(true);
+      clone.style.boxShadow = 'none';
+      clone.style.border = 'none';
+      clone.style.borderRadius = '0';
+      clone.style.maxWidth = 'none';
+      clone.style.width = '794px';
+      clone.style.margin = '0';
+      clone.style.padding = '32px 36px';
+      clone.style.color = '#000000';
+      clone.style.fontFamily = "'Sarabun', 'Leelawadee UI', 'Noto Sans Thai', 'Segoe UI', Tahoma, sans-serif";
+      clone.style.fontSize = '14px';
+      clone.style.lineHeight = '1.5';
+
+      const origInputs = sheetEl.querySelectorAll('.po-remark');
+      const cloneInputs = clone.querySelectorAll('.po-remark');
+      for (let i = 0; i < cloneInputs.length; i++) {
+        const span = document.createElement('span');
+        span.style.fontSize = '12.5px';
+        span.style.color = '#000000';
+        span.textContent = origInputs[i] ? (origInputs[i].value || '') : '';
+        cloneInputs[i].parentNode.replaceChild(span, cloneInputs[i]);
+      }
+
+      wrap.appendChild(clone);
+      document.body.appendChild(wrap);
+      try {
+        if (document.fonts && document.fonts.ready) {
+          await document.fonts.ready;
+        }
+        const canvas = await window.html2canvas(clone, {
+          scale: 3,
+          backgroundColor: '#ffffff',
+          useCORS: true,
+          logging: false
+        });
+
+        const jsPDF = window.jspdf.jsPDF;
+        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
+        const margin = 8;
+        const pageW = pdf.internal.pageSize.getWidth() - margin * 2;
+        const pageH = pdf.internal.pageSize.getHeight() - margin * 2;
+        const imgH = (canvas.height * pageW) / canvas.width;
+
+        if (imgH <= pageH) {
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, pageW, imgH, undefined, 'FAST');
+        } else {
+          const pagePxH = Math.floor((canvas.width * pageH) / pageW);
+          let yOffset = 0;
+          let pageIdx = 0;
+          while (yOffset < canvas.height) {
+            const sliceH = Math.min(pagePxH, canvas.height - yOffset);
+            const sliceCanvas = document.createElement('canvas');
+            sliceCanvas.width = canvas.width;
+            sliceCanvas.height = sliceH;
+            const ctx = sliceCanvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, sliceCanvas.width, sliceH);
+            ctx.drawImage(canvas, 0, yOffset, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+            if (pageIdx > 0) pdf.addPage();
+            const sliceMmH = (sliceH * pageW) / canvas.width;
+            pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, margin, pageW, sliceMmH, undefined, 'FAST');
+            yOffset += sliceH;
+            pageIdx++;
+          }
+        }
+        const dataUri = pdf.output('datauristring');
+        return dataUri ? dataUri.split(',')[1] : '';
+      } finally {
+        wrap.remove();
+      }
+    }
+
+    async function downloadAndLogPO() {
+      if (hasLoggedCurrentPO) {
+        if (lastGeneratedPdf) triggerPdfDownload(lastGeneratedPdf.base64, lastGeneratedPdf.fileName);
+        else window.print();
+        return;
+      }
+      if (selectedMap.size === 0) return;
+
+      const btn = document.getElementById('btnDownloadPdfLog');
+      btn.disabled = true;
+      btn.textContent = '⏳ กำลังสร้าง PDF และลง Log...';
+
+      let clientPdfBase64 = '';
+      try {
+        clientPdfBase64 = await generatePoPdfBase64FromDom();
+      } catch (e) {
+        clientPdfBase64 = '';
+      }
+
+      const payload = {
+        thaiDate: getTodayThaiDate(),
+        company: document.getElementById('companyName').value || 'ไม่ระบุ',
+        notice: document.getElementById('noticeText').value || '',
+        signerName: document.getElementById('signerName').value || '',
+        signerPosition: document.getElementById('signerPosition').value || '',
+        items: Array.from(selectedMap.values()),
+        pdfBase64: clientPdfBase64
+      };
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          hasLoggedCurrentPO = true;
+          btn.disabled = false;
+          updateDownloadBtn();
+
+          const stEl = document.getElementById('poSaveStatus');
+          if (res && res.poUrl) {
+            if (stEl) {
+              stEl.style.color = 'var(--green)';
+              stEl.innerHTML = '✓ บันทึกไฟล์ PO ลง Google Drive และคอลัมน์ J แล้ว: <a href="' + esc(res.poUrl) + '" target="_blank" style="color:var(--blue);text-decoration:underline;">เปิดไฟล์ PO</a>';
+            }
+          } else if (res && res.pdfError) {
+            if (stEl) {
+              stEl.style.color = '#dc2626';
+              stEl.textContent = '⚠️ ลง Log แล้ว แต่สร้างไฟล์ Drive ไม่สำเร็จ: ' + res.pdfError;
+            }
+          }
+
+          const finalB64 = clientPdfBase64 || (res && res.pdfBase64) || '';
+          if (finalB64) {
+            lastGeneratedPdf = { base64: finalB64, fileName: (res && res.fileName) || 'PO.pdf' };
+            triggerPdfDownload(finalB64, lastGeneratedPdf.fileName);
+          } else {
+            window.print();
+          }
+          loadInitialData(true);
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          updateDownloadBtn();
+          alert('บันทึก Log ไม่สำเร็จ: ' + (err && err.message ? err.message : err));
+        })
+        .logPurchaseOrder(payload);
+    }
+
+    function buildBillPreviewHtml(billUrl) {
+      if (/^https?:\/\//i.test(billUrl)) {
+        return '<a href="' + esc(billUrl) + '" target="_blank" style="color:var(--blue);font-size:12px;text-decoration:underline;">ดูบิลยา</a>';
+      }
+      return '<div style="font-size:11.5px;color:var(--text-muted);">' + esc(billUrl) + '</div>';
+    }
+
+    function renderHistory() {
+      const qEl = document.getElementById('historySearch');
+      const query = (qEl ? qEl.value : '').toLowerCase().trim();
+      const rows = logRows.slice().reverse().filter(function(item) {
+        return !query || String(item.name || '').toLowerCase().indexOf(query) !== -1;
+      });
+      const tbody = document.getElementById('historyBody');
+
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center" style="padding:32px;color:var(--text-muted);">' +
+          (query ? 'ไม่พบรายการยาที่ค้นหา' : 'ยังไม่มีประวัติการสั่งซื้อใน Log_PO') + '</td></tr>';
+        return;
+      }
+
+      const html = rows.map(function(item) {
+        const poBadge = /^https?:\/\//i.test(item.poUrl)
+          ? '<div style="margin-top:2px;"><a href="' + esc(item.poUrl) + '" target="_blank" style="font-size:12px;color:var(--blue);text-decoration:underline;font-weight:600;">เปิด PO</a></div>'
+          : '';
+        return (
+          '<tr style="background:' + (item.receiveDate ? '#f8fbff' : '#ffffff') + ';">' +
+            '<td style="white-space:nowrap;font-weight:600;color:' + (item.receiveDate ? 'var(--green)' : 'var(--text-title)') + ';">' +
+              esc(item.orderDate) + poBadge +
+            '</td>' +
+            '<td style="font-weight:500;color:var(--text-title);">' + esc(item.name) + '</td>' +
+            '<td class="text-center">' + esc(item.packing) + '</td>' +
+            '<td class="text-right" style="color:var(--blue);font-weight:600;">' + fmtNum(item.qty) + '</td>' +
+            '<td class="text-right">' + fmtNum(item.total, 2) + '</td>' +
+            '<td class="text-center"><input id="h_date_' + item.rowIndex + '" type="date" value="' + esc(item.receiveDate) + '" class="input-sm" /></td>' +
+            '<td class="text-center">' +
+              '<input id="h_url_' + item.rowIndex + '" type="text" value="' + esc(item.billUrl) + '" placeholder="วางลิงก์บิล..." class="input-sm" style="width:140px;" />' +
+              '<div id="h_link_' + item.rowIndex + '">' + buildBillPreviewHtml(item.billUrl) + '</div>' +
+            '</td>' +
+            '<td class="text-center" style="white-space:nowrap;">' +
+              '<div style="display:inline-flex;align-items:center;gap:6px;">' +
+                '<button type="button" onclick="saveHistoryRow(' + item.rowIndex + ', this)" class="btn btn-green" style="padding:6px 12px;font-size:12px;">บันทึก</button>' +
+                '<button type="button" title="ลบรายการ" onclick="deleteHistoryRow(' + item.rowIndex + ', this)" class="btn-del-x">✕</button>' +
+              '</div>' +
+            '</td>' +
+          '</tr>'
+        );
+      }).join('');
+
+      tbody.innerHTML = html;
+    }
+
+    function saveHistoryRow(rowIndex, btn) {
+      const dateVal = document.getElementById('h_date_' + rowIndex).value.trim();
+      const urlVal = document.getElementById('h_url_' + rowIndex).value.trim();
+      btn.textContent = 'กำลังบันทึก...';
+      btn.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function() {
+          const target = logRows.find(function(r) { return r.rowIndex === rowIndex; });
+          if (target) { target.receiveDate = dateVal; target.billUrl = urlVal; }
+          saveLocalCache({ sheets: SHEETS_DATA, sheetNames: SHEET_NAMES, log: logRows });
+          document.getElementById('logStatusMsg').textContent = '✓ บันทึกแถว ' + rowIndex + ' ลงคอลัมน์ K และ L สำเร็จ';
+          renderHistory();
+        })
+        .withFailureHandler(function(err) {
+          btn.textContent = 'บันทึก';
+          btn.disabled = false;
+          alert('บันทึกไม่สำเร็จ: ' + (err && err.message ? err.message : err));
+        })
+        .updateLogHistory({ rowIndex: rowIndex, receiveDate: dateVal, billUrl: urlVal });
+    }
+
+    function deleteHistoryRow(rowIndex, btn) {
+      const item = logRows.find(function(r) { return r.rowIndex === rowIndex; });
+      if (!item) return;
+      if (!confirm('ยืนยันลบรายการ "' + item.name + '"\nวันที่สั่ง: ' + item.orderDate + '\nออกจากชีต Log_PO หรือไม่?')) return;
+
+      btn.disabled = true;
+      btn.textContent = '…';
+      const payload = [{ rowIndex: item.rowIndex, name: item.name }];
+
+      google.script.run
+        .withSuccessHandler(function(res) {
+          logRows = logRows.filter(function(r) { return r.rowIndex !== rowIndex; });
+          document.getElementById('logStatusMsg').textContent = '✓ ลบรายการเรียบร้อยแล้ว (' + res.deletedCount + ' รายการ)';
+          renderHistory();
+          loadInitialData(true);
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = '✕';
+          alert('ลบไม่สำเร็จ: ' + (err && err.message ? err.message : err));
+        })
+        .deletePurchaseOrder(payload);
+    }
+
+    // ==========================================
+    // TRACKING (ติดตามสถานะการสั่งยา 3 กล่อง)
+    // ==========================================
+    function buildDocLinksHtml(item) {
+      const parts = [];
+      if (/^https?:\/\//i.test(item.poUrl)) {
+        parts.push('<a href="' + esc(item.poUrl) + '" target="_blank" style="font-size:12px;color:var(--blue);text-decoration:underline;font-weight:600;">เปิด PO</a>');
+      }
+      if (/^https?:\/\//i.test(item.billUrl)) {
+        parts.push('<a href="' + esc(item.billUrl) + '" target="_blank" style="font-size:12px;color:var(--green);text-decoration:underline;font-weight:600;">ดูบิลยา</a>');
+      }
+      return parts.length ? parts.join(' &bull; ') : '<span style="color:var(--text-muted);">-</span>';
+    }
+
+    function renderTracking() {
+      const qEl = document.getElementById('trackingSearch');
+      const query = (qEl ? qEl.value : '').toLowerCase().trim();
+      const baseRows = logRows.slice().reverse().filter(function(item) {
+        return !query || String(item.name || '').toLowerCase().indexOf(query) !== -1;
+      });
+
+      const shipRows = baseRows.filter(function(item) {
+        return !String(item.receiveDate || '').trim();
+      });
+      const quoteRows = baseRows.filter(function(item) {
+        return !item.hasQuote;
+      });
+      const invRows = baseRows.filter(function(item) {
+        return !item.hasInvoice;
+      });
+
+      document.getElementById('trackShipBadge').textContent = shipRows.length + ' รายการ';
+      document.getElementById('trackQuoteBadge').textContent = quoteRows.length + ' รายการ';
+      document.getElementById('trackInvBadge').textContent = invRows.length + ' รายการ';
+      document.getElementById('trackingSummaryMsg').textContent =
+        'รอจัดส่ง ' + shipRows.length + ' • รอใบเสนอราคา ' + quoteRows.length + ' • รอใบแจ้งหนี้ ' + invRows.length + ' รายการ';
+
+      document.getElementById('trackShipBody').innerHTML = shipRows.length
+        ? shipRows.map(function(item) {
+            const poBadge = /^https?:\/\//i.test(item.poUrl)
+              ? '<div style="margin-top:2px;"><a href="' + esc(item.poUrl) + '" target="_blank" style="font-size:12px;color:var(--blue);text-decoration:underline;font-weight:600;">เปิด PO</a></div>'
+              : '';
+            return (
+              '<tr>' +
+                '<td style="white-space:nowrap;font-weight:600;">' + esc(item.orderDate) + poBadge + '</td>' +
+                '<td style="font-weight:500;color:var(--text-title);">' + esc(item.name) + '</td>' +
+                '<td class="text-center">' + esc(item.packing) + '</td>' +
+                '<td class="text-right" style="color:var(--blue);font-weight:600;">' + fmtNum(item.qty) + '</td>' +
+                '<td class="text-right">' + fmtNum(item.total, 2) + '</td>' +
+                '<td class="text-center"><input id="ts_date_' + item.rowIndex + '" type="date" value="' + esc(item.receiveDate) + '" class="input-sm" /></td>' +
+                '<td class="text-center"><input id="ts_url_' + item.rowIndex + '" type="text" value="' + esc(item.billUrl) + '" placeholder="วางลิงก์บิล..." class="input-sm" style="width:140px;" /></td>' +
+                '<td class="text-center"><button type="button" onclick="saveTrackShipRow(' + item.rowIndex + ', this)" class="btn btn-green" style="padding:6px 12px;font-size:12px;">บันทึก</button></td>' +
+              '</tr>'
+            );
+          }).join('')
+        : '<tr><td colspan="8" class="text-center" style="padding:22px;color:var(--text-muted);">ไม่มีรายการรอจัดส่ง</td></tr>';
+
+      document.getElementById('trackQuoteBody').innerHTML = quoteRows.length
+        ? quoteRows.map(function(item) {
+            return (
+              '<tr>' +
+                '<td style="white-space:nowrap;font-weight:500;">' + esc(item.orderDate) + '</td>' +
+                '<td style="font-weight:500;color:var(--text-title);">' + esc(item.name) + '</td>' +
+                '<td class="text-center">' + esc(item.packing) + '</td>' +
+                '<td class="text-right" style="color:var(--blue);font-weight:600;">' + fmtNum(item.qty) + '</td>' +
+                '<td class="text-right">' + fmtNum(item.total, 2) + '</td>' +
+                '<td class="text-center">' + buildDocLinksHtml(item) + '</td>' +
+                '<td class="text-center">' +
+                  '<button type="button" onclick="toggleTrackFlag(' + item.rowIndex + ', \'hasQuote\', true, this)" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">✓ ได้รับแล้ว</button>' +
+                '</td>' +
+              '</tr>'
+            );
+          }).join('')
+        : '<tr><td colspan="7" class="text-center" style="padding:22px;color:var(--text-muted);">ไม่มีรายการรอใบเสนอราคา</td></tr>';
+
+      document.getElementById('trackInvBody').innerHTML = invRows.length
+        ? invRows.map(function(item) {
+            return (
+              '<tr>' +
+                '<td style="white-space:nowrap;font-weight:500;">' + esc(item.orderDate) + '</td>' +
+                '<td style="font-weight:500;color:var(--text-title);">' + esc(item.name) + '</td>' +
+                '<td class="text-center">' + esc(item.packing) + '</td>' +
+                '<td class="text-right" style="color:var(--blue);font-weight:600;">' + fmtNum(item.qty) + '</td>' +
+                '<td class="text-right">' + fmtNum(item.total, 2) + '</td>' +
+                '<td class="text-center">' + buildDocLinksHtml(item) + '</td>' +
+                '<td class="text-center">' +
+                  '<button type="button" onclick="toggleTrackFlag(' + item.rowIndex + ', \'hasInvoice\', true, this)" class="btn btn-green" style="padding:5px 12px;font-size:12px;">✓ ได้รับแล้ว</button>' +
+                '</td>' +
+              '</tr>'
+            );
+          }).join('')
+        : '<tr><td colspan="7" class="text-center" style="padding:22px;color:var(--text-muted);">ไม่มีรายการรอใบแจ้งหนี้</td></tr>';
+    }
+
+    function saveTrackShipRow(rowIndex, btn) {
+      const dateVal = document.getElementById('ts_date_' + rowIndex).value.trim();
+      const urlVal = document.getElementById('ts_url_' + rowIndex).value.trim();
+      btn.textContent = 'กำลังบันทึก...';
+      btn.disabled = true;
+
+      google.script.run
+        .withSuccessHandler(function() {
+          const target = logRows.find(function(r) { return r.rowIndex === rowIndex; });
+          if (target) { target.receiveDate = dateVal; target.billUrl = urlVal; }
+          saveLocalCache({ sheets: SHEETS_DATA, sheetNames: SHEET_NAMES, log: logRows });
+          renderTracking();
+        })
+        .withFailureHandler(function(err) {
+          btn.textContent = 'บันทึก';
+          btn.disabled = false;
+          alert('บันทึกไม่สำเร็จ: ' + (err && err.message ? err.message : err));
+        })
+        .updateLogHistory({ rowIndex: rowIndex, receiveDate: dateVal, billUrl: urlVal });
+    }
+
+    function toggleTrackFlag(rowIndex, field, val, btn) {
+      btn.disabled = true;
+      btn.textContent = 'กำลังบันทึก...';
+      const payload = { rowIndex: rowIndex };
+      payload[field] = val;
+
+      google.script.run
+        .withSuccessHandler(function() {
+          const target = logRows.find(function(r) { return r.rowIndex === rowIndex; });
+          if (target) target[field] = Boolean(val);
+          saveLocalCache({ sheets: SHEETS_DATA, sheetNames: SHEET_NAMES, log: logRows });
+          renderTracking();
+        })
+        .withFailureHandler(function(err) {
+          btn.disabled = false;
+          btn.textContent = '✓ ได้รับแล้ว';
+          alert('อัปเดตสถานะไม่สำเร็จ: ' + (err && err.message ? err.message : err));
+        })
+        .updateLogHistory(payload);
+    }
+
+    // ==========================================
+    // DASHBOARD นอก VMI (Log_PO)
+    // ==========================================
+    function normalizeDrugName(name) {
+      return String(name || '').replace(/\(VMI\)/gi, '').replace(/\s+/g, ' ').trim().toUpperCase();
+    }
+
+    function parseNum(val) {
+      const n = Number(String(val || '').replace(/,/g, '').trim());
+      return isNaN(n) ? 0 : n;
+    }
+
+    function parseOrderYearMonth(orderDate) {
+      const m = String(orderDate || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (!m) return { key: 'unknown', label: 'ไม่ระบุ' };
+      const month = Number(m[2]);
+      let year = Number(m[3]);
+      if (year < 2400) year += 543;
+      const thMonths = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+      return {
+        key: year + '-' + String(month).padStart(2, '0'),
+        label: (thMonths[month] || month) + ' ' + String(year).slice(-2)
+      };
+    }
+
+    function getItemStatusType(item) {
+      const url = String(item.billUrl || '').trim();
+      const rem = String(item.remark || '').trim();
+      if (/^https?:\/\//i.test(url)) return 'DONE';
+      if (url === '-' || /ยกเลิก|เลิกจำหน่าย/i.test(url + ' ' + rem)) return 'CANCEL';
+      if (!item.receiveDate) return 'WAIT';
+      return 'DONE';
+    }
+
+    function renderNonVmiDashboard() {
+      const vmiSet = new Set((SHEETS_DATA['VMI70'] || []).map(function(x) { return normalizeDrugName(x.name); }));
+      const nonVmiItems = logRows.filter(function(r) { return !vmiSet.has(normalizeDrugName(r.name)); });
+
+      const monthSel = document.getElementById('dashMonthFilter');
+      const curMonth = monthSel.value || 'ALL';
+      const monthMap = new Map();
+      nonVmiItems.forEach(function(r) {
+        const ym = parseOrderYearMonth(r.orderDate);
+        if (!monthMap.has(ym.key)) monthMap.set(ym.key, { key: ym.key, label: ym.label, total: 0, count: 0 });
+        monthMap.get(ym.key).total += parseNum(r.total);
+        monthMap.get(ym.key).count += 1;
+      });
+      const sortedMonths = Array.from(monthMap.values()).sort(function(a, b) { return a.key.localeCompare(b.key); });
+      monthSel.innerHTML = '<option value="ALL">ทุกเดือน</option>' +
+        sortedMonths.slice().reverse().map(function(m) {
+          return '<option value="' + esc(m.key) + '">' + esc(m.label) + ' (' + m.count + ')</option>';
+        }).join('');
+      if (Array.from(monthSel.options).some(function(o) { return o.value === curMonth; })) monthSel.value = curMonth;
+
+      const query = (document.getElementById('dashSearch').value || '').toLowerCase().trim();
+      const statusFilter = document.getElementById('dashStatusFilter').value;
+      const monthFilter = monthSel.value;
+
+      const filtered = nonVmiItems.filter(function(r) {
+        const matchQ = !query || String(r.name || '').toLowerCase().indexOf(query) !== -1 || String(r.remark || '').toLowerCase().indexOf(query) !== -1;
+        const matchM = monthFilter === 'ALL' || parseOrderYearMonth(r.orderDate).key === monthFilter;
+        const matchS = statusFilter === 'ALL' || getItemStatusType(r) === statusFilter;
+        return matchQ && matchM && matchS;
+      });
+
+      const totalSpend = filtered.reduce(function(s, r) { return s + parseNum(r.total); }, 0);
+      const uniqueDrugs = new Set(filtered.map(function(r) { return normalizeDrugName(r.name); })).size;
+      const doneCount = filtered.filter(function(r) { return getItemStatusType(r) === 'DONE'; }).length;
+      const waitCount = filtered.filter(function(r) { return getItemStatusType(r) === 'WAIT'; }).length;
+      const cancelCount = filtered.filter(function(r) { return getItemStatusType(r) === 'CANCEL'; }).length;
+      const pctDone = filtered.length ? Math.round((doneCount / filtered.length) * 100) : 0;
+      const peakMonth = sortedMonths.slice().sort(function(a, b) { return b.total - a.total; })[0];
+
+      document.getElementById('dashKpiGrid').innerHTML =
+        '<div class="kpi-card">' +
+          '<div class="kpi-label"><span>รายการสั่งซื้อนอก VMI</span><span>📦</span></div>' +
+          '<div class="kpi-val" style="color:var(--blue);">' + filtered.length + ' <span style="font-size:14px;font-weight:600;color:var(--text-muted);">รายการ</span></div>' +
+          '<div class="kpi-sub">ครอบคลุม ' + uniqueDrugs + ' ชนิดยา (จาก Log_PO)</div>' +
+        '</div>' +
+        '<div class="kpi-card">' +
+          '<div class="kpi-label"><span>ยอดสั่งซื้อรวม (นอก VMI)</span><span>💰</span></div>' +
+          '<div class="kpi-val" style="color:var(--green);">' + fmtNum(totalSpend, 2) + '</div>' +
+          '<div class="kpi-sub">บาท (ไม่รวมรายการที่ยกเลิกจำหน่าย)</div>' +
+        '</div>' +
+        '<div class="kpi-card">' +
+          '<div class="kpi-label"><span>สถานะรับยา / แนบบิล</span><span>✅</span></div>' +
+          '<div class="kpi-val">' + doneCount + ' <span style="font-size:14px;font-weight:600;color:var(--text-muted);">/ ' + filtered.length + ' (' + pctDone + '%)</span></div>' +
+          '<div class="kpi-sub">รอรับ ' + waitCount + ' • ยกเลิก/ไม่มีบิล ' + cancelCount + '</div>' +
+        '</div>' +
+        '<div class="kpi-card">' +
+          '<div class="kpi-label"><span>เดือนที่ยอดสั่งซื้อสูงสุด</span><span>📈</span></div>' +
+          '<div class="kpi-val" style="font-size:21px;">' + (peakMonth ? esc(peakMonth.label) : '-') + '</div>' +
+          '<div class="kpi-sub">' + (peakMonth ? (fmtNum(peakMonth.total, 2) + ' บาท (' + peakMonth.count + ' รายการ)') : 'ไม่มีข้อมูล') + '</div>' +
+        '</div>';
+
+      const maxM = Math.max.apply(null, [1].concat(sortedMonths.map(function(m) { return m.total; })));
+      document.getElementById('dashMonthlyChart').innerHTML = sortedMonths.length
+        ? sortedMonths.map(function(m) {
+            const hPct = Math.max(6, Math.round((m.total / maxM) * 100));
+            const shortAmt = m.total >= 1000 ? (m.total / 1000).toFixed(0) + 'k' : fmtNum(m.total, 0);
+            return (
+              '<div class="vbar-col" title="' + esc(m.label) + ': ' + fmtNum(m.total, 2) + ' บาท (' + m.count + ' รายการ)">' +
+                '<div class="vbar-amt">' + shortAmt + '</div>' +
+                '<div class="vbar-fill" style="height:' + hPct + '%;"></div>' +
+                '<div class="vbar-lbl">' + esc(m.label) + '</div>' +
+                '<div class="vbar-cnt">' + m.count + ' รายการ</div>' +
+              '</div>'
+            );
+          }).join('')
+        : '<div style="margin:auto;color:var(--text-muted);">ยังไม่มีข้อมูลรายเดือน</div>';
+
+      const drugMap = new Map();
+      filtered.forEach(function(r) {
+        const key = normalizeDrugName(r.name);
+        if (!drugMap.has(key)) drugMap.set(key, { name: r.name, total: 0, qty: 0, count: 0 });
+        const d = drugMap.get(key);
+        d.total += parseNum(r.total);
+        d.qty += parseNum(r.qty);
+        d.count += 1;
+      });
+      const top5 = Array.from(drugMap.values()).sort(function(a, b) { return b.total - a.total; }).slice(0, 5);
+      const maxDrug = Math.max.apply(null, [1].concat(top5.map(function(d) { return d.total; })));
+
+      document.getElementById('dashTopDrugs').innerHTML = top5.length
+        ? top5.map(function(d, idx) {
+            const wPct = Math.max(4, Math.round((d.total / maxDrug) * 100));
+            return (
+              '<div>' +
+                '<div class="hbar-head">' +
+                  '<span class="hbar-name">' + (idx + 1) + '. ' + esc(d.name) + ' <span style="color:var(--text-muted);font-weight:500;">(' + d.count + ' ครั้ง • ' + fmtNum(d.qty) + ' หน่วย)</span></span>' +
+                  '<span class="hbar-val">' + fmtNum(d.total, 2) + ' ฿</span>' +
+                '</div>' +
+                '<div class="hbar-track"><div class="hbar-fill" style="width:' + wPct + '%;"></div></div>' +
+              '</div>'
+            );
+          }).join('')
+        : '<div style="color:var(--text-muted);padding:20px 0;">ไม่พบรายการที่ตรงกับเงื่อนไข</div>';
+
+      document.getElementById('dashSubtitle').textContent =
+        'พบ ' + filtered.length + ' จากทั้งหมด ' + nonVmiItems.length + ' รายการนอก VMI ในชีต Log_PO';
+
+      const tbody = document.getElementById('dashTableBody');
+      const tableHtml = filtered.slice().reverse().map(function(item) {
+        const st = getItemStatusType(item);
+        const poCell = /^https?:\/\//i.test(item.poUrl)
+          ? '<a href="' + esc(item.poUrl) + '" target="_blank" style="color:var(--blue);font-weight:600;text-decoration:underline;">เปิด PO</a>'
+          : '<span style="color:var(--text-muted);">-</span>';
+        let billCell = '';
+        if (st === 'DONE' && /^https?:\/\//i.test(item.billUrl)) {
+          billCell = '<a href="' + esc(item.billUrl) + '" target="_blank" class="status-tag status-ok" style="text-decoration:none;">✓ ดูบิลยา</a>';
+        } else if (st === 'CANCEL') {
+          billCell = '<span class="status-tag status-cancel">' + esc(item.billUrl || 'ไม่มีบิล') + '</span>';
+        } else {
+          billCell = '<span class="status-tag status-wait">รอรับยา</span>';
+        }
+        return (
+          '<tr>' +
+            '<td style="white-space:nowrap;font-weight:500;">' + esc(String(item.orderDate || '').replace(' 00:00 น.', '')) + '</td>' +
+            '<td style="font-weight:600;color:var(--text-title);max-width:260px;">' + esc(item.name) + '</td>' +
+            '<td class="text-center">' + esc(item.packing) + '</td>' +
+            '<td class="text-right" style="color:var(--blue);font-weight:600;">' + fmtNum(item.qty) + '</td>' +
+            '<td class="text-right">' + fmtNum(item.price, 2) + '</td>' +
+            '<td class="text-right" style="color:var(--green);font-weight:700;">' + fmtNum(item.total, 2) + '</td>' +
+            '<td style="font-size:12.5px;color:' + (item.remark ? '#b45309' : 'var(--text-muted)') + ';">' + esc(item.remark || '-') + '</td>' +
+            '<td class="text-center">' + poCell + '</td>' +
+            '<td class="text-center" style="white-space:nowrap;font-size:12.5px;">' + esc(item.receiveDate || '-') + '</td>' +
+            '<td class="text-center">' + billCell + '</td>' +
+          '</tr>'
+        );
+      }).join('');
+
+      tbody.innerHTML = tableHtml || '<tr><td colspan="10" class="text-center" style="padding:28px;color:var(--text-muted);">ไม่พบรายการนอก VMI ที่ตรงกับตัวกรอง</td></tr>';
+    }
+
+    // ==========================================
+    // DASHBOARD ยา VMI (ชีต VMI70)
+    // ==========================================
+    function hasVmiInvoice(item) {
+      const inv = String(item.invoiceNo || '').trim();
+      return inv !== '' && inv !== '-';
+    }
+
+    function hasVmiBill(item) {
+      const url = String(item.billUrl || '').trim();
+      return url !== '' && url !== '-';
+    }
+
+    function isVmiDone(item) {
+      return hasVmiInvoice(item) && hasVmiBill(item);
+    }
+
+    function renderVmiDashboard() {
+      const vmiItems = SHEETS_DATA['VMI70'] || [];
+
+      const monthSel = document.getElementById('vmiMonthFilter');
+      const curMonth = monthSel.value || 'ALL';
+      const monthMap = new Map();
+      vmiItems.forEach(function(r) {
+        const ym = parseOrderYearMonth(r.orderDate);
+        if (!monthMap.has(ym.key)) monthMap.set(ym.key, { key: ym.key, label: ym.label, total: 0, count: 0 });
+        monthMap.get(ym.key).total += parseNum(r.total);
+        monthMap.get(ym.key).count += 1;
+      });
+      const sortedMonths = Array.from(monthMap.values()).sort(function(a, b) { return a.key.localeCompare(b.key); });
+      monthSel.innerHTML = '<option value="ALL">ทุกเดือน</option>' +
+        sortedMonths.slice().reverse().map(function(m) {
+          return '<option value="' + esc(m.key) + '">' + esc(m.label) + ' (' + m.count + ')</option>';
+        }).join('');
+      if (Array.from(monthSel.options).some(function(o) { return o.value === curMonth; })) monthSel.value = curMonth;
+
+      const query = (document.getElementById('vmiSearch').value || '').toLowerCase().trim();
+      const statusFilter = document.getElementById('vmiStatusFilter').value;
+      const monthFilter = monthSel.value;
+
+      const filtered = vmiItems.filter(function(r) {
+        const matchQ = !query ||
+          String(r.name || '').toLowerCase().indexOf(query) !== -1 ||
+          String(r.code || '').toLowerCase().indexOf(query) !== -1 ||
+          String(r.invoiceNo || '').toLowerCase().indexOf(query) !== -1 ||
+          String(r.remark || '').toLowerCase().indexOf(query) !== -1;
+        const matchM = monthFilter === 'ALL' || parseOrderYearMonth(r.orderDate).key === monthFilter;
+        const hasInv = hasVmiInvoice(r);
+        const hasBill = hasVmiBill(r);
+        let matchS = true;
+        if (statusFilter === 'WAIT_SHIP') matchS = !hasBill;
+        else if (statusFilter === 'WAIT_INV') matchS = !hasInv;
+        else if (statusFilter === 'DONE') matchS = hasInv && hasBill;
+        return matchQ && matchM && matchS;
+      });
+
+      const totalSpend = filtered.reduce(function(s, r) { return s + parseNum(r.total); }, 0);
+      const uniqueDrugs = new Set(filtered.map(function(r) { return normalizeDrugName(r.name); })).size;
+      const doneCount = filtered.filter(isVmiDone).length;
+      const waitShipCount = filtered.filter(function(r) { return !hasVmiBill(r); }).length;
+      const waitInvCount = filtered.filter(function(r) { return !hasVmiInvoice(r); }).length;
+      const pctDone = filtered.length ? Math.round((doneCount / filtered.length) * 100) : 0;
+      const peakMonth = sortedMonths.slice().sort(function(a, b) { return b.total - a.total; })[0];
+
+      document.getElementById('vmiKpiGrid').innerHTML =
+        '<div class="kpi-card">' +
+          '<div class="kpi-label"><span>รายการสั่งซื้อยา VMI</span><span>💊</span></div>' +
+          '<div class="kpi-val" style="color:var(--blue);">' + filtered.length + ' <span style="font-size:14px;font-weight:600;color:var(--text-muted);">รายการ</span></div>' +
+          '<div class="kpi-sub">ครอบคลุม ' + uniqueDrugs + ' ชนิดยา (จากชีต VMI70)</div>' +
+        '</div>' +
+        '<div class="kpi-card">' +
+          '<div class="kpi-label"><span>ยอดสั่งซื้อรวม (VMI)</span><span>💰</span></div>' +
+          '<div class="kpi-val" style="color:var(--green);">' + fmtNum(totalSpend, 2) + '</div>' +
+          '<div class="kpi-sub">บาท (ตามชีต VMI70)</div>' +
+        '</div>' +
+        '<div class="kpi-card">' +
+          '<div class="kpi-label"><span>สถานะใบแจ้งหนี้ / แนบบิล</span><span>✅</span></div>' +
+          '<div class="kpi-val">' + doneCount + ' <span style="font-size:14px;font-weight:600;color:var(--text-muted);">/ ' + filtered.length + ' (' + pctDone + '%)</span></div>' +
+          '<div class="kpi-sub">รอจัดส่ง ' + waitShipCount + ' • รอใบแจ้งหนี้ ' + waitInvCount + '</div>' +
+        '</div>' +
+        '<div class="kpi-card">' +
+          '<div class="kpi-label"><span>เดือนที่ยอดสั่งซื้อสูงสุด</span><span>📈</span></div>' +
+          '<div class="kpi-val" style="font-size:21px;">' + (peakMonth ? esc(peakMonth.label) : '-') + '</div>' +
+          '<div class="kpi-sub">' + (peakMonth ? (fmtNum(peakMonth.total, 2) + ' บาท (' + peakMonth.count + ' รายการ)') : 'ไม่มีข้อมูล') + '</div>' +
+        '</div>';
+
+      const maxM = Math.max.apply(null, [1].concat(sortedMonths.map(function(m) { return m.total; })));
+      document.getElementById('vmiMonthlyChart').innerHTML = sortedMonths.length
+        ? sortedMonths.map(function(m) {
+            const hPct = Math.max(6, Math.round((m.total / maxM) * 100));
+            const shortAmt = m.total >= 1000 ? (m.total / 1000).toFixed(0) + 'k' : fmtNum(m.total, 0);
+            return (
+              '<div class="vbar-col" title="' + esc(m.label) + ': ' + fmtNum(m.total, 2) + ' บาท (' + m.count + ' รายการ)">' +
+                '<div class="vbar-amt">' + shortAmt + '</div>' +
+                '<div class="vbar-fill" style="height:' + hPct + '%;"></div>' +
+                '<div class="vbar-lbl">' + esc(m.label) + '</div>' +
+                '<div class="vbar-cnt">' + m.count + ' รายการ</div>' +
+              '</div>'
+            );
+          }).join('')
+        : '<div style="margin:auto;color:var(--text-muted);">ยังไม่มีข้อมูลรายเดือน</div>';
+
+      const drugMap = new Map();
+      filtered.forEach(function(r) {
+        const key = normalizeDrugName(r.name);
+        if (!drugMap.has(key)) drugMap.set(key, { name: r.name, total: 0, qty: 0, count: 0 });
+        const d = drugMap.get(key);
+        d.total += parseNum(r.total);
+        d.qty += parseNum(r.qty);
+        d.count += 1;
+      });
+      const top5 = Array.from(drugMap.values()).sort(function(a, b) { return b.total - a.total; }).slice(0, 5);
+      const maxDrug = Math.max.apply(null, [1].concat(top5.map(function(d) { return d.total; })));
+
+      document.getElementById('vmiTopDrugs').innerHTML = top5.length
+        ? top5.map(function(d, idx) {
+            const wPct = Math.max(4, Math.round((d.total / maxDrug) * 100));
+            return (
+              '<div>' +
+                '<div class="hbar-head">' +
+                  '<span class="hbar-name">' + (idx + 1) + '. ' + esc(d.name) + ' <span style="color:var(--text-muted);font-weight:500;">(' + d.count + ' ครั้ง • ' + fmtNum(d.qty) + ' หน่วย)</span></span>' +
+                  '<span class="hbar-val">' + fmtNum(d.total, 2) + ' ฿</span>' +
+                '</div>' +
+                '<div class="hbar-track"><div class="hbar-fill" style="width:' + wPct + '%;"></div></div>' +
+              '</div>'
+            );
+          }).join('')
+        : '<div style="color:var(--text-muted);padding:20px 0;">ไม่พบรายการที่ตรงกับเงื่อนไข</div>';
+
+      document.getElementById('vmiSubtitle').textContent =
+        'พบ ' + filtered.length + ' จากทั้งหมด ' + vmiItems.length + ' รายการในชีต VMI70';
+
+      const tbody = document.getElementById('vmiTableBody');
+      const tableHtml = filtered.slice().reverse().map(function(item) {
+        const billUrl = String(item.billUrl || '').trim();
+        const hasBill = hasVmiBill(item);
+        const hasInv = hasVmiInvoice(item);
+        const hasUrl = /^https?:\/\//i.test(billUrl);
+        let billCell = '';
+        if (!hasBill && !hasInv) {
+          billCell = '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">' +
+            '<span class="status-tag status-wait">รอจัดส่ง</span>' +
+            '<span class="status-tag status-cancel">รอใบแจ้งหนี้</span>' +
+          '</div>';
+        } else if (!hasBill) {
+          billCell = '<span class="status-tag status-wait">รอจัดส่ง</span>';
+        } else if (!hasInv) {
           const billLink = hasUrl
             ? '<div style="margin-top:3px;"><a href="' + esc(billUrl) + '" target="_blank" style="font-size:11.5px;color:var(--blue);text-decoration:underline;">ดูบิลยา</a></div>'
             : '';
@@ -25,10 +1970,11 @@
           '</tr>'
         );
       }).join('');
+
       tbody.innerHTML = tableHtml || '<tr><td colspan="10" class="text-center" style="padding:28px;color:var(--text-muted);">ไม่พบรายการยา VMI ที่ตรงกับตัวกรอง</td></tr>';
     }
+
     bootstrapApp();
   </script>
 </body>
 </html>
-Antigravity
