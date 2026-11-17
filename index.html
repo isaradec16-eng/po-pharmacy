@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ระบบสั่งยา "องค์การเภสัชกรรม [CKP]"</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
   <style>
     :root {
       --bg: #f4f7fc;
@@ -1201,7 +1203,82 @@
       setTimeout(function() { URL.revokeObjectURL(url); }, 5000);
     }
 
-    function downloadAndLogPO() {
+    async function generatePoPdfBase64FromDom() {
+      if (!window.html2canvas || !window.jspdf || !window.jspdf.jsPDF) return '';
+      const sheetEl = document.querySelector('#tab_po .po-sheet');
+      if (!sheetEl) return '';
+
+      const wrap = document.createElement('div');
+      wrap.style.cssText = 'position:fixed;left:-10000px;top:0;width:794px;background:#ffffff;z-index:-1;';
+      const clone = sheetEl.cloneNode(true);
+      clone.style.boxShadow = 'none';
+      clone.style.border = 'none';
+      clone.style.borderRadius = '0';
+      clone.style.maxWidth = 'none';
+      clone.style.width = '794px';
+      clone.style.margin = '0';
+      clone.style.padding = '36px 40px';
+      clone.style.color = '#000000';
+
+      const origInputs = sheetEl.querySelectorAll('.po-remark');
+      const cloneInputs = clone.querySelectorAll('.po-remark');
+      for (let i = 0; i < cloneInputs.length; i++) {
+        const span = document.createElement('span');
+        span.style.fontSize = '12.5px';
+        span.textContent = origInputs[i] ? (origInputs[i].value || '') : '';
+        cloneInputs[i].parentNode.replaceChild(span, cloneInputs[i]);
+      }
+
+      wrap.appendChild(clone);
+      document.body.appendChild(wrap);
+      try {
+        if (document.fonts && document.fonts.ready) {
+          await document.fonts.ready;
+        }
+        const canvas = await window.html2canvas(clone, {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          useCORS: true,
+          logging: false
+        });
+
+        const jsPDF = window.jspdf.jsPDF;
+        const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
+        const margin = 8;
+        const pageW = pdf.internal.pageSize.getWidth() - margin * 2;
+        const pageH = pdf.internal.pageSize.getHeight() - margin * 2;
+        const imgH = (canvas.height * pageW) / canvas.width;
+
+        if (imgH <= pageH) {
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, margin, pageW, imgH, undefined, 'FAST');
+        } else {
+          const pagePxH = Math.floor((canvas.width * pageH) / pageW);
+          let yOffset = 0;
+          let pageIdx = 0;
+          while (yOffset < canvas.height) {
+            const sliceH = Math.min(pagePxH, canvas.height - yOffset);
+            const sliceCanvas = document.createElement('canvas');
+            sliceCanvas.width = canvas.width;
+            sliceCanvas.height = sliceH;
+            const ctx = sliceCanvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, sliceCanvas.width, sliceH);
+            ctx.drawImage(canvas, 0, yOffset, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+            if (pageIdx > 0) pdf.addPage();
+            const sliceMmH = (sliceH * pageW) / canvas.width;
+            pdf.addImage(sliceCanvas.toDataURL('image/png'), 'PNG', margin, margin, pageW, sliceMmH, undefined, 'FAST');
+            yOffset += sliceH;
+            pageIdx++;
+          }
+        }
+        const dataUri = pdf.output('datauristring');
+        return dataUri ? dataUri.split(',')[1] : '';
+      } finally {
+        wrap.remove();
+      }
+    }
+
+    async function downloadAndLogPO() {
       if (hasLoggedCurrentPO) {
         if (lastGeneratedPdf) triggerPdfDownload(lastGeneratedPdf.base64, lastGeneratedPdf.fileName);
         else window.print();
@@ -1213,13 +1290,21 @@
       btn.disabled = true;
       btn.textContent = '⏳ กำลังสร้าง PDF และลง Log...';
 
+      let clientPdfBase64 = '';
+      try {
+        clientPdfBase64 = await generatePoPdfBase64FromDom();
+      } catch (e) {
+        clientPdfBase64 = '';
+      }
+
       const payload = {
         thaiDate: getTodayThaiDate(),
         company: document.getElementById('companyName').value || 'ไม่ระบุ',
         notice: document.getElementById('noticeText').value || '',
         signerName: document.getElementById('signerName').value || '',
         signerPosition: document.getElementById('signerPosition').value || '',
-        items: Array.from(selectedMap.values())
+        items: Array.from(selectedMap.values()),
+        pdfBase64: clientPdfBase64
       };
 
       google.script.run
@@ -1241,9 +1326,10 @@
             }
           }
 
-          if (res && res.pdfBase64) {
-            lastGeneratedPdf = { base64: res.pdfBase64, fileName: res.fileName };
-            triggerPdfDownload(res.pdfBase64, res.fileName);
+          const finalB64 = clientPdfBase64 || (res && res.pdfBase64) || '';
+          if (finalB64) {
+            lastGeneratedPdf = { base64: finalB64, fileName: (res && res.fileName) || 'PO.pdf' };
+            triggerPdfDownload(finalB64, lastGeneratedPdf.fileName);
           } else {
             window.print();
           }
