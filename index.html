@@ -413,6 +413,7 @@
     .subtable td { padding: 9px 10px; border-top: 1px solid #f1f5f9; }
     .input-sm { font-family: inherit; font-size: 12.5px; color: var(--text-title); background: #f8fafd; border: 1px solid #dbe3ef; border-radius: 8px; padding: 5px 8px; outline: none; }
     .input-sm:focus { border-color: var(--blue); background: #ffffff; }
+    .input-sm:disabled { background: #f1f5f9; color: var(--text-muted); cursor: not-allowed; opacity: 0.85; }
 
     .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
     @media (max-width: 1120px) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
@@ -475,6 +476,16 @@
       .po-table th, .po-table td { border-color: #000 !important; }
       .po-remark { border-bottom: none !important; }
     }
+
+    .app-pending-mode .app-shell { visibility: hidden; }
+    .tracking-only-mode .app-shell { grid-template-columns: 1fr; }
+    .tracking-only-mode .sidebar { display: none !important; }
+    .tracking-only-mode .main-area { max-width: 1200px; width: 100%; margin: 0 auto; }
+    .readonly-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(255, 255, 255, 0.22); border: 1px solid rgba(255, 255, 255, 0.36);
+      color: #ffffff; padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -503,9 +514,9 @@
       <div class="hero-banner">
         <div>
           <h1>ระบบสั่งยา "องค์การเภสัชกรรม [CKP]"</h1>
-          <p>by Arissara.k</p>
+          <p id="heroSubtitle">by Arissara.k</p>
         </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <div id="heroActions" style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
           <button type="button" onclick="switchTab('dashboard')" class="hero-btn">📊 Dashboard ยานอก VMI</button>
           <button type="button" onclick="switchTab('vmi_dashboard')" class="hero-btn">💊 Dashboard ยา VMI</button>
           <button type="button" onclick="switchTab('history')" class="hero-btn">🕒 ประวัติการสั่งยา</button>
@@ -684,7 +695,7 @@
           </div>
           <div class="scroll-box" style="max-height:300px;">
             <table class="clean-table">
-              <thead>
+              <thead id="trackShipHead">
                 <tr>
                   <th>วัน-เวลาที่สั่ง</th>
                   <th>รายการยา</th>
@@ -712,7 +723,7 @@
           </div>
           <div class="scroll-box" style="max-height:300px;">
             <table class="clean-table">
-              <thead>
+              <thead id="trackQuoteHead">
                 <tr>
                   <th>วัน-เวลาที่สั่ง</th>
                   <th>รายการยา</th>
@@ -739,7 +750,7 @@
           </div>
           <div class="scroll-box" style="max-height:300px;">
             <table class="clean-table">
-              <thead>
+              <thead id="trackInvHead">
                 <tr>
                   <th>วัน-เวลาที่สั่ง</th>
                   <th>รายการยา</th>
@@ -889,6 +900,7 @@
 
   <script>
     const LOCAL_CACHE_KEY = 'ck_po_local_cache_v4';
+    let IS_TRACKING_ONLY = false;
     let SHEETS_DATA = {};
     let SHEET_NAMES = [];
     let logRows = [];
@@ -898,6 +910,63 @@
     let currentHistoryOrders = [];
     let currentFilteredOrderItems = [];
     let lastGeneratedPdf = null;
+
+    function isTrackingParamObj(params, hash) {
+      if (params) {
+        const v = String(params.view || params.mode || params.page || '').toLowerCase().trim();
+        if (v === 'tracking' || v === 'track' || v === 'readonly') return true;
+        if (String(params.readonly || '') === '1' || String(params.readonly || '').toLowerCase() === 'true') return true;
+      }
+      const h = String(hash || '').toLowerCase().replace(/^#/, '').trim();
+      return h === 'tracking' || h === 'view=tracking';
+    }
+
+    function detectSyncTrackingOnly(parsedPayload) {
+      try {
+        const sp = new URLSearchParams(window.location.search || '');
+        if (isTrackingParamObj({
+          view: sp.get('view'),
+          mode: sp.get('mode'),
+          page: sp.get('page'),
+          readonly: sp.get('readonly')
+        }, window.location.hash)) {
+          return true;
+        }
+      } catch (e) {}
+      if (parsedPayload && (
+        parsedPayload.readOnly === true ||
+        String(parsedPayload.view || parsedPayload.mode || '').toLowerCase() === 'tracking'
+      )) {
+        return true;
+      }
+      return false;
+    }
+
+    function activateTrackingOnlyMode() {
+      if (IS_TRACKING_ONLY) return;
+      IS_TRACKING_ONLY = true;
+      document.body.classList.add('tracking-only-mode');
+
+      const sidebar = document.querySelector('.sidebar');
+      if (sidebar) sidebar.remove();
+
+      ['order', 'po', 'history', 'dashboard', 'vmi_dashboard'].forEach(function(t) {
+        const el = document.getElementById('tab_' + t);
+        if (el) el.remove();
+      });
+
+      const sub = document.getElementById('heroSubtitle');
+      if (sub) sub.textContent = 'ติดตามสถานะการสั่งยา (ดูได้อย่างเดียว) • by Arissara.k';
+
+      const actions = document.getElementById('heroActions');
+      if (actions) {
+        actions.innerHTML =
+          '<span class="readonly-pill">👁️ โหมดดูอย่างเดียว (เฉพาะติดตามสถานะ)</span>' +
+          '<button type="button" id="refreshDataBtn" onclick="loadInitialData(true)" class="hero-btn" title="ดึงข้อมูลล่าสุดจาก Google Sheets">🔄 รีเฟรชข้อมูล</button>';
+      }
+
+      switchTab('tracking');
+    }
 
     function showError(msg) {
       const el = document.getElementById('errorBanner');
@@ -962,28 +1031,40 @@
       SHEET_NAMES = (data && data.sheetNames && data.sheetNames.length) ? data.sheetNames : Object.keys(SHEETS_DATA);
       logRows = (data && data.log) ? data.log : [];
 
-      const sel = document.getElementById('sheetSelector');
-      const prevSheet = sel.value;
-      if (SHEET_NAMES.length) {
-        sel.innerHTML = SHEET_NAMES.map(function(name) {
-          const cnt = (SHEETS_DATA[name] || []).length;
-          return '<option value="' + esc(name) + '">' + esc(name) + ' (' + cnt + ' รายการ)</option>';
-        }).join('');
-        if (prevSheet && SHEETS_DATA[prevSheet]) sel.value = prevSheet;
-        else sel.value = SHEET_NAMES[0];
-      } else {
-        sel.innerHTML = '<option value="">ไม่พบชีตข้อมูล</option>';
+      if (IS_TRACKING_ONLY) {
+        renderTracking();
+        return;
       }
 
-      document.getElementById('logStatusMsg').textContent = 'แสดงข้อมูลล่าสุด ' + logRows.length + ' รายการจาก Log_PO';
+      const sel = document.getElementById('sheetSelector');
+      if (sel) {
+        const prevSheet = sel.value;
+        if (SHEET_NAMES.length) {
+          sel.innerHTML = SHEET_NAMES.map(function(name) {
+            const cnt = (SHEETS_DATA[name] || []).length;
+            return '<option value="' + esc(name) + '">' + esc(name) + ' (' + cnt + ' รายการ)</option>';
+          }).join('');
+          if (prevSheet && SHEETS_DATA[prevSheet]) sel.value = prevSheet;
+          else sel.value = SHEET_NAMES[0];
+        } else {
+          sel.innerHTML = '<option value="">ไม่พบชีตข้อมูล</option>';
+        }
+      }
+
+      const logMsg = document.getElementById('logStatusMsg');
+      if (logMsg) logMsg.textContent = 'แสดงข้อมูลล่าสุด ' + logRows.length + ' รายการจาก Log_PO';
       const pill = document.getElementById('syncStatusPill');
       if (pill && sourceText) pill.textContent = sourceText;
 
       renderOrderTable();
-      if (!document.getElementById('tab_history').classList.contains('hidden')) renderHistory();
-      if (!document.getElementById('tab_tracking').classList.contains('hidden')) renderTracking();
-      if (!document.getElementById('tab_dashboard').classList.contains('hidden')) renderNonVmiDashboard();
-      if (!document.getElementById('tab_vmi_dashboard').classList.contains('hidden')) renderVmiDashboard();
+      const tHist = document.getElementById('tab_history');
+      const tTrack = document.getElementById('tab_tracking');
+      const tDash = document.getElementById('tab_dashboard');
+      const tVmi = document.getElementById('tab_vmi_dashboard');
+      if (tHist && !tHist.classList.contains('hidden')) renderHistory();
+      if (tTrack && !tTrack.classList.contains('hidden')) renderTracking();
+      if (tDash && !tDash.classList.contains('hidden')) renderNonVmiDashboard();
+      if (tVmi && !tVmi.classList.contains('hidden')) renderVmiDashboard();
     }
 
     function loadInitialData(forceRefresh) {
@@ -995,7 +1076,7 @@
 
       google.script.run
         .withSuccessHandler(function(res) {
-          saveLocalCache(res);
+          if (!IS_TRACKING_ONLY) saveLocalCache(res);
           const sec = res && res.serverMs ? (res.serverMs / 1000).toFixed(2) : '0.1';
           const tag = res && res.fromCache ? ('⚡ พร้อมใช้งาน (' + sec + ' วิ)') : ('✓ อัปเดตล่าสุดแล้ว (' + sec + ' วิ)');
           applyLoadedData(res, tag);
@@ -1010,6 +1091,7 @@
     }
 
     function refreshUi() {
+      if (IS_TRACKING_ONLY) return;
       if (typeof google === 'undefined' || !google.script || !google.script.run) {
         showError('ใช้งานปุ่มนี้ได้เฉพาะเมื่อเปิดผ่านลิงก์ Google Apps Script');
         return;
@@ -1040,42 +1122,84 @@
         .refreshUiFromGitHub();
     }
 
-    function bootstrapApp() {
-      document.getElementById('poDateLbl').textContent = 'วันที่ ' + getTodayThaiDate();
-
-      // 1) ใช้ข้อมูลที่เซิร์ฟเวอร์ฝังมากับหน้าเว็บทันที (ไม่ต้องรอ RPC รอบ 2)
+    function finishBootstrap(parsed) {
       let hasPreloaded = false;
-      try {
-        const el = document.getElementById('initPayload');
-        const raw = el ? (el.textContent || '').trim() : '';
-        if (raw && raw.charAt(0) === '{') {
-          const parsed = JSON.parse(raw);
-          if (parsed && parsed.sheets) {
-            hasPreloaded = true;
-            saveLocalCache(parsed);
-            const sec = parsed.serverMs ? (parsed.serverMs / 1000).toFixed(2) : '0.1';
-            const tag = parsed.fromCache ? ('⚡ โหลดทันทีจาก Cache (' + sec + ' วิ)') : ('✓ โหลดข้อมูลล่าสุดแล้ว (' + sec + ' วิ)');
-            applyLoadedData(parsed, tag);
-          }
-        }
-      } catch (e) {}
+      if (parsed && (parsed.sheets || parsed.log)) {
+        hasPreloaded = true;
+        if (!IS_TRACKING_ONLY) saveLocalCache(parsed);
+        const sec = parsed.serverMs ? (parsed.serverMs / 1000).toFixed(2) : '0.1';
+        const tag = parsed.fromCache ? ('⚡ โหลดทันทีจาก Cache (' + sec + ' วิ)') : ('✓ โหลดข้อมูลล่าสุดแล้ว (' + sec + ' วิ)');
+        applyLoadedData(parsed, tag);
+      }
 
-      // 2) กรณีไม่ได้ฝังข้อมูล (Fallback) ให้โหลดจาก localStorage + google.script.run
       if (!hasPreloaded) {
         try {
           const cachedRaw = localStorage.getItem(LOCAL_CACHE_KEY);
           if (cachedRaw) {
             const localData = JSON.parse(cachedRaw);
-            if (localData && localData.sheets) {
+            if (localData && (localData.sheets || localData.log)) {
               applyLoadedData(localData, '⚡ แสดงผลจากเครื่อง (กำลังซิงค์...)');
             }
           }
         } catch (e) {}
         loadInitialData(false);
       }
+
+      if (IS_TRACKING_ONLY) renderTracking();
+    }
+
+    function bootstrapApp() {
+      const poDateLbl = document.getElementById('poDateLbl');
+      if (poDateLbl) poDateLbl.textContent = 'วันที่ ' + getTodayThaiDate();
+
+      let parsed = null;
+      try {
+        const el = document.getElementById('initPayload');
+        const raw = el ? (el.textContent || '').trim() : '';
+        if (raw && raw.charAt(0) === '{') {
+          parsed = JSON.parse(raw);
+        }
+      } catch (e) {}
+
+      if (detectSyncTrackingOnly(parsed)) {
+        activateTrackingOnlyMode();
+        finishBootstrap(parsed);
+        return;
+      }
+
+      // ใน Google Apps Script HtmlService: อ่านพารามิเตอร์ URL จริงผ่าน google.script.url.getLocation
+      if (typeof google !== 'undefined' && google.script && google.script.url && typeof google.script.url.getLocation === 'function') {
+        document.body.classList.add('app-pending-mode');
+        let resolved = false;
+        const done = function(isTrackOnly) {
+          if (resolved) return;
+          resolved = true;
+          if (isTrackOnly) activateTrackingOnlyMode();
+          document.body.classList.remove('app-pending-mode');
+          finishBootstrap(parsed);
+        };
+        const timer = setTimeout(function() { done(false); }, 400);
+        try {
+          google.script.url.getLocation(function(loc) {
+            clearTimeout(timer);
+            const matched = !!(loc && (
+              isTrackingParamObj(loc.parameter, loc.hash) ||
+              isTrackingParamObj(loc.parameters, loc.hash)
+            ));
+            done(matched);
+          });
+        } catch (e) {
+          clearTimeout(timer);
+          done(false);
+        }
+        return;
+      }
+
+      finishBootstrap(parsed);
     }
 
     function switchTab(tab) {
+      if (IS_TRACKING_ONLY) tab = 'tracking';
       const tabs = ['order', 'po', 'history', 'tracking', 'dashboard', 'vmi_dashboard'];
       for (let i = 0; i < tabs.length; i++) {
         const t = tabs[i];
@@ -1108,10 +1232,13 @@
     }
 
     function renderOrderTable() {
-      const sheet = document.getElementById('sheetSelector').value;
+      if (IS_TRACKING_ONLY) return;
+      const sel = document.getElementById('sheetSelector');
+      const tbody = document.getElementById('orderTableBody');
+      if (!sel || !tbody) return;
+      const sheet = sel.value;
       const query = (document.getElementById('searchBox').value || '').toLowerCase().trim();
       document.getElementById('sheetTitle').textContent = sheet || '-';
-      const tbody = document.getElementById('orderTableBody');
 
       const items = (SHEETS_DATA[sheet] || []).filter(function(item) {
         return !query || String(item.name || '').toLowerCase().indexOf(query) !== -1 || String(item.code || '').toLowerCase().indexOf(query) !== -1;
@@ -1145,36 +1272,43 @@
       updateCount();
     }
 
-    document.getElementById('orderTableBody').addEventListener('click', function(e) {
-      const tr = e.target.closest('tr[data-idx]');
-      if (!tr) return;
-      const item = currentFilteredOrderItems[Number(tr.getAttribute('data-idx'))];
-      if (!item) return;
-      const sheet = document.getElementById('sheetSelector').value;
-      const key = sheet + '_' + item.id;
-      const cb = tr.querySelector('input[type="checkbox"]');
-      if (e.target.tagName !== 'INPUT') cb.checked = !cb.checked;
-      if (cb.checked) selectedMap.set(key, Object.assign({ sheetName: sheet, remark: '' }, item));
-      else selectedMap.delete(key);
-      markDirty();
-      updateCount();
-    });
+    const orderTableBodyEl = document.getElementById('orderTableBody');
+    if (orderTableBodyEl) {
+      orderTableBodyEl.addEventListener('click', function(e) {
+        if (IS_TRACKING_ONLY) return;
+        const tr = e.target.closest('tr[data-idx]');
+        if (!tr) return;
+        const item = currentFilteredOrderItems[Number(tr.getAttribute('data-idx'))];
+        if (!item) return;
+        const sheet = document.getElementById('sheetSelector').value;
+        const key = sheet + '_' + item.id;
+        const cb = tr.querySelector('input[type="checkbox"]');
+        if (e.target.tagName !== 'INPUT') cb.checked = !cb.checked;
+        if (cb.checked) selectedMap.set(key, Object.assign({ sheetName: sheet, remark: '' }, item));
+        else selectedMap.delete(key);
+        markDirty();
+        updateCount();
+      });
+    }
 
     function updateCount() {
-      document.getElementById('selectedBadge').textContent = 'เลือกแล้ว ' + selectedMap.size + ' รายการ';
-      document.getElementById('badgeCount').textContent = selectedMap.size;
+      const sb = document.getElementById('selectedBadge');
+      const bc = document.getElementById('badgeCount');
+      if (sb) sb.textContent = 'เลือกแล้ว ' + selectedMap.size + ' รายการ';
+      if (bc) bc.textContent = selectedMap.size;
       const clearBtn = document.getElementById('clearSelectionBtn');
       if (clearBtn) clearBtn.disabled = selectedMap.size === 0;
     }
 
     function clearAllSelections() {
-      if (selectedMap.size === 0) return;
+      if (IS_TRACKING_ONLY || selectedMap.size === 0) return;
       selectedMap.clear();
       markDirty();
       renderOrderTable();
     }
 
     function openPO() {
+      if (IS_TRACKING_ONLY) return;
       if (selectedMap.size === 0) {
         alert('กรุณาเลือกรายการยาอย่างน้อย 1 รายการ');
         return;
@@ -1183,6 +1317,7 @@
     }
 
     function renderPO() {
+      if (IS_TRACKING_ONLY) return;
       const company = document.getElementById('companyName').value || '.......................';
       const notice = document.getElementById('noticeText').value || '';
       const sName = document.getElementById('signerName').value || '';
@@ -1326,6 +1461,7 @@
     }
 
     async function downloadAndLogPO() {
+      if (IS_TRACKING_ONLY) return;
       if (hasLoggedCurrentPO) {
         if (lastGeneratedPdf) triggerPdfDownload(lastGeneratedPdf.base64, lastGeneratedPdf.fileName);
         else window.print();
@@ -1398,6 +1534,7 @@
     }
 
     function renderHistory() {
+      if (IS_TRACKING_ONLY) return;
       const qEl = document.getElementById('historySearch');
       const query = (qEl ? qEl.value : '').toLowerCase().trim();
       const rows = logRows.slice().reverse().filter(function(item) {
@@ -1443,6 +1580,7 @@
     }
 
     function saveHistoryRow(rowIndex, btn) {
+      if (IS_TRACKING_ONLY) return;
       const dateVal = document.getElementById('h_date_' + rowIndex).value.trim();
       const urlVal = document.getElementById('h_url_' + rowIndex).value.trim();
       btn.textContent = 'กำลังบันทึก...';
@@ -1465,6 +1603,7 @@
     }
 
     function deleteHistoryRow(rowIndex, btn) {
+      if (IS_TRACKING_ONLY) return;
       const item = logRows.find(function(r) { return r.rowIndex === rowIndex; });
       if (!item) return;
       if (!confirm('ยืนยันลบรายการ "' + item.name + '"\nวันที่สั่ง: ' + item.orderDate + '\nออกจากชีต Log_PO หรือไม่?')) return;
@@ -1523,12 +1662,18 @@
       document.getElementById('trackQuoteBadge').textContent = quoteRows.length + ' รายการ';
       document.getElementById('trackInvBadge').textContent = invRows.length + ' รายการ';
       document.getElementById('trackingSummaryMsg').textContent =
+        (IS_TRACKING_ONLY ? 'โหมดดูอย่างเดียว (ไม่มีสิทธิ์แก้ไข) • ' : '') +
         'รอจัดส่ง ' + shipRows.length + ' • รอใบเสนอราคา ' + quoteRows.length + ' • รอใบแจ้งหนี้ ' + invRows.length + ' รายการ';
+
+      const roAttr = IS_TRACKING_ONLY ? ' disabled title="ไม่มีสิทธิ์แก้ไข (โหมดดูอย่างเดียว)"' : '';
 
       document.getElementById('trackShipBody').innerHTML = shipRows.length
         ? shipRows.map(function(item) {
             const poBadge = /^https?:\/\//i.test(item.poUrl)
               ? '<div style="margin-top:2px;"><a href="' + esc(item.poUrl) + '" target="_blank" style="font-size:12px;color:var(--blue);text-decoration:underline;font-weight:600;">เปิด PO</a></div>'
+              : '';
+            const billLinkHtml = /^https?:\/\//i.test(item.billUrl)
+              ? '<div style="margin-top:3px;">' + buildBillPreviewHtml(item.billUrl) + '</div>'
               : '';
             return (
               '<tr>' +
@@ -1537,9 +1682,16 @@
                 '<td class="text-center">' + esc(item.packing) + '</td>' +
                 '<td class="text-right" style="color:var(--blue);font-weight:600;">' + fmtNum(item.qty) + '</td>' +
                 '<td class="text-right">' + fmtNum(item.total, 2) + '</td>' +
-                '<td class="text-center"><input id="ts_date_' + item.rowIndex + '" type="date" value="' + esc(item.receiveDate) + '" class="input-sm" /></td>' +
-                '<td class="text-center"><input id="ts_url_' + item.rowIndex + '" type="text" value="' + esc(item.billUrl) + '" placeholder="วางลิงก์บิล..." class="input-sm" style="width:140px;" /></td>' +
-                '<td class="text-center"><button type="button" onclick="saveTrackShipRow(' + item.rowIndex + ', this)" class="btn btn-green" style="padding:6px 12px;font-size:12px;">บันทึก</button></td>' +
+                '<td class="text-center"><input id="ts_date_' + item.rowIndex + '" type="date" value="' + esc(item.receiveDate) + '" class="input-sm"' + roAttr + ' /></td>' +
+                '<td class="text-center">' +
+                  '<input id="ts_url_' + item.rowIndex + '" type="text" value="' + esc(item.billUrl) + '" placeholder="' + (IS_TRACKING_ONLY ? '-' : 'วางลิงก์บิล...') + '" class="input-sm" style="width:140px;"' + roAttr + ' />' +
+                  billLinkHtml +
+                '</td>' +
+                '<td class="text-center">' +
+                  (IS_TRACKING_ONLY
+                    ? '<button type="button" disabled title="ไม่มีสิทธิ์แก้ไข" class="btn" style="padding:6px 12px;font-size:12px;">บันทึก</button>'
+                    : '<button type="button" onclick="saveTrackShipRow(' + item.rowIndex + ', this)" class="btn btn-green" style="padding:6px 12px;font-size:12px;">บันทึก</button>') +
+                '</td>' +
               '</tr>'
             );
           }).join('')
@@ -1556,7 +1708,9 @@
                 '<td class="text-right">' + fmtNum(item.total, 2) + '</td>' +
                 '<td class="text-center">' + buildDocLinksHtml(item) + '</td>' +
                 '<td class="text-center">' +
-                  '<button type="button" onclick="toggleTrackFlag(' + item.rowIndex + ', \'hasQuote\', true, this)" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">✓ ได้รับแล้ว</button>' +
+                  (IS_TRACKING_ONLY
+                    ? '<button type="button" disabled title="ไม่มีสิทธิ์แก้ไข" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">✓ ได้รับแล้ว</button>'
+                    : '<button type="button" onclick="toggleTrackFlag(' + item.rowIndex + ', \'hasQuote\', true, this)" class="btn btn-primary" style="padding:5px 12px;font-size:12px;">✓ ได้รับแล้ว</button>') +
                 '</td>' +
               '</tr>'
             );
@@ -1574,7 +1728,9 @@
                 '<td class="text-right">' + fmtNum(item.total, 2) + '</td>' +
                 '<td class="text-center">' + buildDocLinksHtml(item) + '</td>' +
                 '<td class="text-center">' +
-                  '<button type="button" onclick="toggleTrackFlag(' + item.rowIndex + ', \'hasInvoice\', true, this)" class="btn btn-green" style="padding:5px 12px;font-size:12px;">✓ ได้รับแล้ว</button>' +
+                  (IS_TRACKING_ONLY
+                    ? '<button type="button" disabled title="ไม่มีสิทธิ์แก้ไข" class="btn btn-green" style="padding:5px 12px;font-size:12px;">✓ ได้รับแล้ว</button>'
+                    : '<button type="button" onclick="toggleTrackFlag(' + item.rowIndex + ', \'hasInvoice\', true, this)" class="btn btn-green" style="padding:5px 12px;font-size:12px;">✓ ได้รับแล้ว</button>') +
                 '</td>' +
               '</tr>'
             );
@@ -1583,6 +1739,7 @@
     }
 
     function saveTrackShipRow(rowIndex, btn) {
+      if (IS_TRACKING_ONLY) return;
       const dateVal = document.getElementById('ts_date_' + rowIndex).value.trim();
       const urlVal = document.getElementById('ts_url_' + rowIndex).value.trim();
       btn.textContent = 'กำลังบันทึก...';
@@ -1604,6 +1761,7 @@
     }
 
     function toggleTrackFlag(rowIndex, field, val, btn) {
+      if (IS_TRACKING_ONLY) return;
       btn.disabled = true;
       btn.textContent = 'กำลังบันทึก...';
       const payload = { rowIndex: rowIndex };
@@ -1659,6 +1817,7 @@
     }
 
     function renderNonVmiDashboard() {
+      if (IS_TRACKING_ONLY) return;
       const vmiSet = new Set((SHEETS_DATA['VMI70'] || []).map(function(x) { return normalizeDrugName(x.name); }));
       const nonVmiItems = logRows.filter(function(r) { return !vmiSet.has(normalizeDrugName(r.name)); });
 
@@ -1816,6 +1975,7 @@
     }
 
     function renderVmiDashboard() {
+      if (IS_TRACKING_ONLY) return;
       const vmiItems = SHEETS_DATA['VMI70'] || [];
 
       const monthSel = document.getElementById('vmiMonthFilter');
