@@ -765,6 +765,36 @@
             </table>
           </div>
         </div>
+
+        <!-- กล่อง 4: รายการยา VMI รอจัดส่ง (ชีต VMI70) -->
+        <div class="card" style="overflow:hidden;">
+          <div class="table-header" style="background:#f5f3ff;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <span style="font-size:15px; font-weight:700; color:#6d28d9;">💊 4. รายการยา VMI รอจัดส่ง (ชีต VMI70)</span>
+              <span style="font-size:12px; color:var(--text-muted);">(แสดงเฉพาะรายการที่ยังไม่มีบิล/รอจัดส่งจากชีต VMI70)</span>
+            </div>
+            <span id="trackVmiShipBadge" class="pill" style="background:#ede9fe;color:#6d28d9;">0 รายการ</span>
+          </div>
+          <div class="scroll-box" style="max-height:340px;">
+            <table class="clean-table">
+              <thead>
+                <tr>
+                  <th>วันที่สั่ง</th>
+                  <th>รหัส</th>
+                  <th>รายการยา</th>
+                  <th class="text-center">Packing</th>
+                  <th class="text-center">หน่วย</th>
+                  <th class="text-right">จำนวน</th>
+                  <th class="text-right">ราคา/หน่วย</th>
+                  <th class="text-right">รวมเงิน</th>
+                  <th>ใบแจ้งหนี้</th>
+                  <th class="text-center">สถานะ / บิลยา</th>
+                </tr>
+              </thead>
+              <tbody id="trackVmiShipBody"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- TAB 4: DASHBOARD นอก VMI (Log_PO) -->
@@ -1658,12 +1688,23 @@
         return !item.hasInvoice;
       });
 
+      const vmiShipRows = (SHEETS_DATA['VMI70'] || []).slice().reverse().filter(function(item) {
+        if (hasVmiBill(item)) return false;
+        if (!query) return true;
+        return String(item.name || '').toLowerCase().indexOf(query) !== -1 ||
+          String(item.code || '').toLowerCase().indexOf(query) !== -1 ||
+          String(item.invoiceNo || '').toLowerCase().indexOf(query) !== -1 ||
+          String(item.remark || '').toLowerCase().indexOf(query) !== -1;
+      });
+
       document.getElementById('trackShipBadge').textContent = shipRows.length + ' รายการ';
       document.getElementById('trackQuoteBadge').textContent = quoteRows.length + ' รายการ';
       document.getElementById('trackInvBadge').textContent = invRows.length + ' รายการ';
+      const vmiBadgeEl = document.getElementById('trackVmiShipBadge');
+      if (vmiBadgeEl) vmiBadgeEl.textContent = vmiShipRows.length + ' รายการ';
       document.getElementById('trackingSummaryMsg').textContent =
         (IS_TRACKING_ONLY ? 'โหมดดูอย่างเดียว (ไม่มีสิทธิ์แก้ไข) • ' : '') +
-        'รอจัดส่ง ' + shipRows.length + ' • รอใบเสนอราคา ' + quoteRows.length + ' • รอใบแจ้งหนี้ ' + invRows.length + ' รายการ';
+        'รอจัดส่ง ' + shipRows.length + ' • รอใบเสนอราคา ' + quoteRows.length + ' • รอใบแจ้งหนี้ ' + invRows.length + ' • ยา VMI รอจัดส่ง ' + vmiShipRows.length + ' รายการ';
 
       const roAttr = IS_TRACKING_ONLY ? ' disabled title="ไม่มีสิทธิ์แก้ไข (โหมดดูอย่างเดียว)"' : '';
 
@@ -1736,6 +1777,38 @@
             );
           }).join('')
         : '<tr><td colspan="7" class="text-center" style="padding:22px;color:var(--text-muted);">ไม่มีรายการรอใบแจ้งหนี้</td></tr>';
+
+      const trackVmiBodyEl = document.getElementById('trackVmiShipBody');
+      if (trackVmiBodyEl) {
+        trackVmiBodyEl.innerHTML = vmiShipRows.length
+          ? vmiShipRows.map(function(item) {
+              const hasInv = hasVmiInvoice(item);
+              const billCell = !hasInv
+                ? '<div style="display:flex;flex-direction:column;align-items:center;gap:3px;">' +
+                    '<span class="status-tag status-wait">รอจัดส่ง</span>' +
+                    '<span class="status-tag status-cancel">รอใบแจ้งหนี้</span>' +
+                  '</div>'
+                : '<span class="status-tag status-wait">รอจัดส่ง</span>';
+              const remarkTag = item.remark
+                ? '<div style="font-size:11.5px;color:#b45309;margin-top:2px;">' + esc(item.remark) + '</div>'
+                : '';
+              return (
+                '<tr>' +
+                  '<td style="white-space:nowrap;font-weight:500;">' + esc(item.orderDate || '-') + '</td>' +
+                  '<td style="font-family:ui-monospace,monospace;font-size:12px;color:var(--text-muted);">' + esc(item.code || '-') + '</td>' +
+                  '<td style="font-weight:600;color:var(--text-title);max-width:260px;">' + esc(item.name) + remarkTag + '</td>' +
+                  '<td class="text-center">' + esc(item.packing || '-') + '</td>' +
+                  '<td class="text-center">' + esc(item.unit || '-') + '</td>' +
+                  '<td class="text-right" style="color:var(--blue);font-weight:600;">' + fmtNum(item.qty) + '</td>' +
+                  '<td class="text-right">' + fmtNum(item.price, 2) + '</td>' +
+                  '<td class="text-right" style="color:var(--green);font-weight:700;">' + fmtNum(item.total, 2) + '</td>' +
+                  '<td style="font-size:12.5px;white-space:nowrap;">' + esc(item.invoiceNo || '-') + '</td>' +
+                  '<td class="text-center">' + billCell + '</td>' +
+                '</tr>'
+              );
+            }).join('')
+          : '<tr><td colspan="10" class="text-center" style="padding:22px;color:var(--text-muted);">ไม่มีรายการยา VMI รอจัดส่ง</td></tr>';
+      }
     }
 
     function saveTrackShipRow(rowIndex, btn) {
