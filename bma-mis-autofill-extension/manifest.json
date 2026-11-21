@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "BMA MIS Auto-Filler (ระบบกรอกข้อมูลจัดซื้อ/ตรวจรับ รพจ.)",
-  "version": "1.0.0",
-  "description": "ส่วนขยายบน Opera/Chrome สำหรับดึงข้อมูลจาก Google Sheets (Auto Crat-EGP70 & MISS70) กรอกลงระบบจัดซื้อ/เช่า กทม. (MIS) อัตโนมัติครบทั้ง 6 ขั้นตอน",
+  "version": "1.1.0",
+  "description": "ส่วนขยายบน Opera/Chrome สำหรับดึงข้อมูลจาก Google Sheets (Auto Crat-EGP70 & MISS70) กรอกลงระบบจัดซื้อ/เช่า กทม. (MIS) อัตโนมัติครบทั้ง 7 ขั้นตอน",
   "permissions": [
     "storage",
     "activeTab",
@@ -12,9 +12,8 @@
     "http://bmamisapp11.bma.go.th/*",
     "http://bmamisapp11.bma.go.th:7778/*",
     "http://misweb.bma.go.th/*",
-    "https://docs.google.com/*",
-    "https://script.google.com/*",
-    "https://script.googleusercontent.com/*"
+    "https://*.google.com/*",
+    "https://*.googleusercontent.com/*"
   ],
   "background": {
     "service_worker": "background.js"

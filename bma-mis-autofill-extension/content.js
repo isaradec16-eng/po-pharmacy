@@ -992,7 +992,7 @@
   }
 
   function fetchSheetsData() {
-    setStatus('⏳ กำลังดึงข้อมูลจาก Google Sheets...', '');
+    setStatus('⏳ กำลังซิงค์ข้อมูลจาก Google Sheets...', '');
     chrome.runtime.sendMessage(
       {
         type: 'FETCH_SHEETS_DATA',
@@ -1000,7 +1000,7 @@
       },
       (res) => {
         if (chrome.runtime.lastError) {
-          setStatus('⚠️ ไม่สามารถติดต่อ Background Script ได้', 'err');
+          setStatus('⚠️ ไม่สามารถติดต่อ Background Script ได้ กรุณากด Reload ส่วนขยายใน opera://extensions', 'err');
           return;
         }
         if (!res || !res.ok) {
@@ -1009,8 +1009,11 @@
         }
         state.items = res.items || [];
         saveState();
+        const cntLbl = panelEl ? panelEl.querySelector('#bma-sheet-count-lbl') : null;
+        if (cntLbl) cntLbl.textContent = `ค้นหาและเลือกรายการจาก Google Sheet (${state.items.length} รายการ)`;
         renderItemOptions();
-        setStatus(`✓ โหลดข้อมูลสำเร็จ ${state.items.length} รายการ จาก Google Sheets`, 'ok');
+        const srcText = res.source ? ` [${res.source}]` : '';
+        setStatus(`✓ พร้อมใช้งาน ${state.items.length} รายการ${srcText}`, 'ok');
       }
     );
   }
@@ -1043,9 +1046,9 @@
 
         <div class="bma-field-group">
           <div class="bma-label">
-            <span>ค้นหาและเลือกรายการจาก Google Sheet (${state.items.length})</span>
+            <span id="bma-sheet-count-lbl">ค้นหาและเลือกรายการจาก Google Sheet (${state.items.length} รายการ)</span>
           </div>
-          <input type="text" id="bma-search-input" class="bma-input" placeholder="ค้นหารหัส เช่น 7งบ, ชื่อยา, บริษัท..." value="${state.filterText || ''}" />
+          <input type="text" id="bma-search-input" class="bma-input" placeholder="ค้นหารหัส เช่น 1งบ, 7งบ, ชื่อยา, บริษัท..." value="${state.filterText || ''}" />
           <select id="bma-item-select" class="bma-select"></select>
         </div>
 
