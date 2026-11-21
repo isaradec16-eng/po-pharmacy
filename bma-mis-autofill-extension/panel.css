@@ -1,0 +1,273 @@
+#bma-mis-autofill-panel {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  width: 340px;
+  max-height: 92vh;
+  background: #ffffff;
+  border: 2px solid #2563eb;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22);
+  font-family: 'Sarabun', 'Leelawadee UI', 'Segoe UI', Tahoma, sans-serif;
+  font-size: 13px;
+  color: #1e293b;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: width 0.2s ease, height 0.2s ease;
+}
+
+#bma-mis-autofill-panel.minimized {
+  width: 210px;
+  max-height: 42px;
+}
+
+#bma-mis-autofill-panel * {
+  box-sizing: border-box;
+}
+
+.bma-panel-header {
+  background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
+  color: #ffffff;
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: move;
+  user-select: none;
+}
+
+.bma-panel-title {
+  font-weight: 700;
+  font-size: 13.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bma-panel-header-btns {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bma-icon-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: #ffffff;
+  border-radius: 6px;
+  padding: 3px 7px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.bma-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.bma-panel-body {
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#bma-mis-autofill-panel.minimized .bma-panel-body {
+  display: none;
+}
+
+.bma-page-badge {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1d4ed8;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bma-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bma-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #475569;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bma-input, .bma-select {
+  width: 100%;
+  padding: 6px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-family: inherit;
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.bma-input:focus, .bma-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.bma-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+}
+
+.bma-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.bma-summary-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.bma-summary-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.bma-summary-key {
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.bma-summary-val {
+  font-weight: 600;
+  color: #0f172a;
+  text-align: right;
+  word-break: break-word;
+}
+
+.bma-amount-highlight {
+  color: #16a34a;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.bma-btn {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #1e293b;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.15s ease;
+}
+
+.bma-btn:hover {
+  background: #f1f5f9;
+}
+
+.bma-btn-primary {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+.bma-btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.bma-btn-green {
+  background: #16a34a;
+  border-color: #16a34a;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.22);
+}
+
+.bma-btn-green:hover {
+  background: #15803d;
+}
+
+.bma-btn-amber {
+  background: #d97706;
+  border-color: #d97706;
+  color: #ffffff;
+}
+
+.bma-btn-amber:hover {
+  background: #b45309;
+}
+
+.bma-status-bar {
+  font-size: 11.5px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  color: #334155;
+  font-weight: 600;
+}
+
+.bma-status-bar.ok {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.bma-status-bar.err {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.bma-step-pills {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.bma-step-btn {
+  padding: 5px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #1e40af;
+  cursor: pointer;
+  text-align: center;
+}
+
+.bma-step-btn:hover {
+  background: #dbeafe;
+}
+
+@media print {
+  #bma-mis-autofill-panel {
+    display: none !important;
+  }
+}
