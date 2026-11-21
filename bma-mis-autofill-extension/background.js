@@ -797,7 +797,7 @@ const DEFAULT_CONFIG = {
   autocratGid: "0",
   miss70SheetId: "1tTaFrjVCPm8IrjJAg6e0Y27jIqoedLsmJz92py1O0lU",
   miss70Gid: "0",
-  gasWebAppUrl: ""
+  gasWebAppUrl: "https://script.google.com/macros/s/AKfycbyAvDPZrKrKK0B50nU84aK9bVTyLWT47YhjW2ppGiGPSFIrI3Lryu55CBbnPFKCXKMx/exec"
 };
 
 function thaiToArabic(str) {

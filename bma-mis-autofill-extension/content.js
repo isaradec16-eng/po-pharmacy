@@ -50,7 +50,7 @@
     rcvNo: '',
     filterText: '',
     minimized: false,
-    gasWebAppUrl: ''
+    gasWebAppUrl: 'https://script.google.com/macros/s/AKfycbyAvDPZrKrKK0B50nU84aK9bVTyLWT47YhjW2ppGiGPSFIrI3Lryu55CBbnPFKCXKMx/exec'
   };
 
   function getTargetDocs() {

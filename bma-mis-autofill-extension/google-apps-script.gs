@@ -127,7 +127,7 @@ function getCombinedMisData() {
       const amount = parseAmount(row[4]);
       const vendorShort = String(row[6] || '').trim();
       const orderSeq = String(row[8] || '').trim(); // ลำดับใบสั่งซื้อ (1, 2, 3...) ซึ่งตรงกับ 1งบ, 2งบ...
-      const subject = String(row[9] || '').trim();
+      const subject = thaiToArabic(String(row[9] || '').trim()).replace(/\s+/g, ' ').trim();
       if (orderSeq && (subject || purHireNo || amount > 0)) {
         missMap[orderSeq + 'งบ'] = {
           missRowIndex: r + 1,
