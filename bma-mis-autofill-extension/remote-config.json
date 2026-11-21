@@ -1,0 +1,60 @@
+{
+  "version": "1.2.0",
+  "updatedAt": "2026-11-21T15:32:00+07:00",
+  "gasWebAppUrl": "https://script.google.com/macros/s/AKfycbyAvDPZrKrKK0B50nU84aK9bVTyLWT47YhjW2ppGiGPSFIrI3Lryu55CBbnPFKCXKMx/exec",
+  "autocratSheetId": "1qFqdTqcP_d_nNLAX3AL0Gq21s2zjffXW2Czo3Jv1F_Y",
+  "miss70SheetId": "1tTaFrjVCPm8IrjJAg6e0Y27jIqoedLsmJz92py1O0lU",
+  "codeFilterRegex": "(งบ|งบเอดส์|เอดส์|aids)$",
+  "blockDuplicateEntry": true,
+  "duplicateAlertMessage": "มีประวัติการลงข้อมูลแล้ว",
+  "committeeThreshold": 100000,
+  "committeeSets": {
+    "1": {
+      "name": "ชุดที่ 1 (เบญญาภา / ละอองดาว / ปิยะ)",
+      "over100k": [
+        { "name": "นางสาวเบญญาภา จงชาญสิทโธ", "position": "เภสัชกรชำนาญการพิเศษ", "role": "ประธานกรรมการ" },
+        { "name": "นางสาวละอองดาว โคตรแสนลี", "position": "เจ้าพนักงานเภสัชกรรมชำนาญงาน", "role": "กรรมการ" },
+        { "name": "นายปิยะ บุญธรรม", "position": "เจ้าพนักงานเภสัชกรรมชำนาญงาน", "role": "กรรมการ" },
+        { "name": "นางสาวนัทธมน คำประดิษฐ์", "position": "เภสัชกรปฏิบัติการ", "role": "เจ้าหน้าที่พัสดุ" }
+      ],
+      "under100k": [
+        { "name": "นางสาวเบญญาภา จงชาญสิทโธ", "position": "เภสัชกรชำนาญการพิเศษ", "role": "" },
+        { "name": "นางสาวนัทธมน คำประดิษฐ์", "position": "เภสัชกรปฏิบัติการ", "role": "เจ้าหน้าที่พัสดุ" }
+      ]
+    },
+    "2": {
+      "name": "ชุดที่ 2 (วีรวิชญ์ / ธนาภรณ์ / ชิดชนก)",
+      "over100k": [
+        { "name": "นายวีรวิชญ์ เสาววัฒนพัฒน์", "position": "เภสัชกรปฏิบัติการ", "role": "ประธานกรรมการ" },
+        { "name": "นางสาวธนาภรณ์ พิมพาเรือ", "position": "เจ้าพนักงานเภสัชกรรมชำนาญงาน", "role": "กรรมการ" },
+        { "name": "นางสาวชิดชนก สุวรรณมณี", "position": "เจ้าพนักงานเภสัชกรรมชำนาญงาน", "role": "กรรมการ" },
+        { "name": "นางสาวนัทธมน คำประดิษฐ์", "position": "เภสัชกรปฏิบัติการ", "role": "เจ้าหน้าที่พัสดุ" }
+      ],
+      "under100k": [
+        { "name": "นายวีรวิชญ์ เสาววัฒนพัฒน์", "position": "เภสัชกรปฏิบัติการ", "role": "" },
+        { "name": "นางสาวนัทธมน คำประดิษฐ์", "position": "เภสัชกรปฏิบัติการ", "role": "เจ้าหน้าที่พัสดุ" }
+      ]
+    }
+  },
+  "defaults": {
+    "deptCode": "07070000",
+    "fiscalYear": "70",
+    "bmaProjectCode": "0620076",
+    "bmaExpenseCat": "03",
+    "bmaSubExpenseCat": "6-27",
+    "aidsBudgetType": "07",
+    "aidsBookNo": "00002",
+    "itemType": "11",
+    "itemCat": "09",
+    "itemMainCat": "02",
+    "itemSubCat": "06",
+    "itemCode": "09020600",
+    "fineText": "0.2 % ของราคาสินค้าที่ยังไม่ได้รับมอบ",
+    "reportCommand": "อนุมัติ ผว.กทม.",
+    "reportLocation": "โรงพยาบาลเจริญกรุงประชารักษ์",
+    "reportClause": "1",
+    "reportHandoverTo": "นางสาวนัทธมน คำประดิษฐ์",
+    "reportAffiliation": "กลุ่มงานเภสัชกรรม รพ.เจริญกรุงประชารักษ์ สำนักการแพทย์"
+  },
+  "customFieldOverrides": {}
+}

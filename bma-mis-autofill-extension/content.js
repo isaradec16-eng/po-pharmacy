@@ -1183,6 +1183,15 @@
           setStatus('⚠️ ' + (res && res.error ? res.error : 'โหลดข้อมูลไม่สำเร็จ'), 'err');
           return;
         }
+        if (res.remoteConfig) {
+          if (res.remoteConfig.committeeSets) {
+            Object.assign(COMMITTEE_SETS, res.remoteConfig.committeeSets);
+          }
+          if (res.remoteConfig.gasWebAppUrl) {
+            state.gasWebAppUrl = res.remoteConfig.gasWebAppUrl;
+          }
+          state.remoteVersion = res.remoteConfig.version || '1.2.0';
+        }
         state.items = res.items || [];
         saveState();
         const cntLbl = panelEl ? panelEl.querySelector('#bma-sheet-count-lbl') : null;
@@ -1190,7 +1199,8 @@
         renderItemOptions();
         const curItem = getSelectedItem();
         if (!isItemAlreadyRecorded(curItem)) {
-          const srcText = res.source ? ` [${res.source}]` : '';
+          const verTag = state.remoteVersion ? ` • GitHub v${state.remoteVersion}` : '';
+          const srcText = res.source ? ` [${res.source}${verTag}]` : '';
           setStatus(`✓ พร้อมใช้งาน ${state.items.length} รายการ${srcText}`, 'ok');
         }
       }

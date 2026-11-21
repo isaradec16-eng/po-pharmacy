@@ -1029,11 +1029,50 @@ async function fetchAllFromGoogleSheets(cfg) {
   return { items: SEED_ITEMS, source: "ฐานข้อมูลในตัว (1งบ-29งบ)" };
 }
 
+const GITHUB_REMOTE_CONFIG_URL =
+  "https://raw.githubusercontent.com/isaradec16-eng/po-pharmacy/main/bma-mis-autofill-extension/remote-config.json";
+
+async function fetchRemoteConfig() {
+  try {
+    const resp = await fetch(GITHUB_REMOTE_CONFIG_URL + "?t=" + Date.now(), { cache: "no-store" });
+    if (!resp.ok) return null;
+    return await resp.json();
+  } catch (e) {
+    return null;
+  }
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.type === "FETCH_SHEETS_DATA") {
-    fetchAllFromGoogleSheets(msg.config)
-      .then((res) => sendResponse({ ok: true, items: res.items, source: res.source }))
-      .catch(() => sendResponse({ ok: true, items: SEED_ITEMS, source: "ฐานข้อมูลในตัว (1งบ-29งบ)" }));
+    (async () => {
+      try {
+        const remoteConfig = await fetchRemoteConfig();
+        const mergedCfg = Object.assign({}, msg.config || {});
+        if (remoteConfig && remoteConfig.gasWebAppUrl) {
+          mergedCfg.gasWebAppUrl = remoteConfig.gasWebAppUrl;
+        }
+        if (remoteConfig && remoteConfig.autocratSheetId) {
+          mergedCfg.autocratSheetId = remoteConfig.autocratSheetId;
+        }
+        if (remoteConfig && remoteConfig.miss70SheetId) {
+          mergedCfg.miss70SheetId = remoteConfig.miss70SheetId;
+        }
+        const res = await fetchAllFromGoogleSheets(mergedCfg);
+        sendResponse({
+          ok: true,
+          items: res.items,
+          source: res.source,
+          remoteConfig: remoteConfig
+        });
+      } catch (err) {
+        sendResponse({
+          ok: true,
+          items: SEED_ITEMS,
+          source: "ฐานข้อมูลในตัว (1งบ-29งบ)",
+          remoteConfig: null
+        });
+      }
+    })();
     return true;
   }
 });
