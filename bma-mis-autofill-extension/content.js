@@ -98,10 +98,13 @@
       return { id: 'POPUP_SELECT_ORDER', title: '4.2 Popup เลือกรายการพัสดุ (ใบสั่งซื้อ)' };
     }
     if (/Rep_pur_rcv\.jsp/i.test(fullUrl) || fullText.includes('รายงานรายละเอียดการตรวจรับ')) {
-      return { id: 'STEP7_REP_RCV', title: 'ขั้นตอนที่ 7: ใบตรวจรับพัสดุ (รายงาน -> 13)' };
+      return { id: 'STEP8_REP_RCV', title: 'ขั้นตอนที่ 8: ใบตรวจรับพัสดุ (รายงาน -> 13)' };
     }
     if (/Frm_pur_hire_rcv_committee\.jsp/i.test(fullUrl) || fullText.includes('บันทึกข้อมูลคณะกรรมการตรวจรับ') || fullText.includes('รายชื่อคณะกรรมการตรวจรับ')) {
-      return { id: 'STEP6_COMMITTEE', title: 'ขั้นตอนที่ 6: คณะกรรมการตรวจรับ (ข้อมูลอื่นๆ -> 12)' };
+      return { id: 'STEP7_COMMITTEE', title: 'ขั้นตอนที่ 7: คณะกรรมการตรวจรับ (ข้อมูลอื่นๆ -> 12)' };
+    }
+    if (fullText.includes('บันทึกข้อมูลรายงานผลการตรวจรับจัดซื้อ') || /Frm_pur_receiveterm\.jsp|_receiveterm\.jsp/i.test(fullUrl)) {
+      return { id: 'STEP6_RCV_RESULT', title: 'ขั้นตอนที่ 6: รายงานผลการตรวจรับ (แบบงวดงาน)' };
     }
     if (/Frm_pur_prereceiveterm\.jsp/i.test(fullUrl) || fullText.includes('บันทึกข้อมูลการส่งมอบ')) {
       return { id: 'STEP5_DELIVERY', title: 'ขั้นตอนที่ 5: บันทึกการส่งมอบ' };
@@ -678,8 +681,75 @@
     return count;
   }
 
-  // ขั้นตอนที่ 5.2: บันทึกข้อมูลคณะกรรมการตรวจรับ (แยกตามยอดเงิน >= 100,000 และ < 100,000)
-  function fillStep5Committee(item) {
+  // ขั้นตอนที่ 6: รายงานผลตรวจรับ -> 1. บันทึกข้อมูลรายงานผลการตรวจรับจัดซื้อ แบบงวดงาน
+  function fillStep6RcvResult(item) {
+    let count = 0;
+    const rcvNo = state.rcvNo || (item && item.rcvNo) || state.poNo || (item && item.poNo) || state.purHireNo || (item && item.purHireNo) || '';
+
+    getTargetDocs().forEach((doc) => {
+      // 1. หน่วยงานตรวจรับ = 07070000
+      const deptInputs = findInputsAfterLabel(doc, 'หน่วยงานตรวจรับ');
+      if (deptInputs[0] && setInputValue(deptInputs[0], '07070000')) count++;
+
+      // 2. เลขที่ใบตรวจรับ* = [rcvNo] - [70]
+      const rcvInputs = findInputsAfterLabel(doc, 'เลขที่ใบตรวจรับ');
+      const textRcv = rcvInputs.filter((el) => el.type === 'text' || !el.type);
+      if (textRcv.length >= 1 && rcvNo) {
+        if (setInputValue(textRcv[0], rcvNo)) count++;
+        if (textRcv[1]) setInputValue(textRcv[1], state.fiscalYear || '70');
+      }
+
+      // 3. เอกสารการตรวจรับ: วันที่ส่งมอบ*, ใบตรวจรับลงวันที่*, วันที่ตรวจรับมีผล*
+      if (item && item.rcvDate) {
+        const sendDateInputs = findInputsAfterLabel(doc, 'วันที่ส่งมอบ');
+        if (sendDateInputs[0] && !sendDateInputs[0].value && setInputValue(sendDateInputs[0], item.rcvDate)) count++;
+
+        const rcvDocDateInputs = findInputsAfterLabel(doc, 'ใบตรวจรับลงวันที่');
+        if (rcvDocDateInputs[0] && setInputValue(rcvDocDateInputs[0], item.rcvDate)) count++;
+
+        const effDateInputs = findInputsAfterLabel(doc, 'วันที่ตรวจรับมีผล');
+        if (effDateInputs[0] && setInputValue(effDateInputs[0], item.rcvDate)) count++;
+      }
+
+      // 4. รายการตรวจรับ: งวดที่* = 1, ติ๊กถูก "การตรวจรับครั้งสุดท้ายของงวด", และกรอกจำนวน "ตรวจรับ*" = 1.00
+      const tables = Array.from(doc.querySelectorAll('table'));
+      tables.forEach((tbl) => {
+        const txt = tbl.innerText || '';
+        // ตารางงวดงาน (งวดที่* | วันที่สิ้นสุดงวด/สัญญา | ... | การตรวจรับครั้งสุดท้ายของงวด)
+        if (txt.includes('การตรวจรับครั้งสุดท้าย')) {
+          const sel = tbl.querySelector('select');
+          if (sel && setSelectByTextOrVal(sel, '1')) count++;
+          const cb = tbl.querySelector('input[type="checkbox"]');
+          if (cb && !cb.checked) {
+            cb.checked = true;
+            fireEvents(cb);
+            count++;
+          }
+        }
+
+        // ตารางรายการพัสดุตรวจรับ (รหัสพัสดุ | รายการ | ... | คงเหลือ | แจ้งส่ง | ตรวจรับ*)
+        if (txt.includes('แจ้งส่ง') && txt.includes('ตรวจรับ')) {
+          const rows = Array.from(tbl.querySelectorAll('tr'));
+          rows.forEach((tr) => {
+            const allInputs = Array.from(tr.querySelectorAll('input[type="text"]'));
+            const isMedRow = allInputs.some((inp) => /09020600|เวชภัณฑ์/.test(inp.value));
+            if (isMedRow) {
+              const editable = allInputs.filter((inp) => !inp.readOnly && !inp.disabled);
+              editable.forEach((inp) => {
+                if (!inp.value || inp.value === '0' || inp.value === '0.00') {
+                  if (setInputValue(inp, '1.00')) count++;
+                }
+              });
+            }
+          });
+        }
+      });
+    });
+    return count;
+  }
+
+  // ขั้นตอนที่ 7: ข้อมูลอื่นๆ -> 12. บันทึกข้อมูลคณะกรรมการตรวจรับ จัดซื้อ (Frm_pur_hire_rcv_committee.jsp)
+  function fillStep7Committee(item) {
     let count = 0;
     const amount = item ? Number(item.amount || 0) : 0;
     const isOver100k = amount >= 100000;
@@ -688,13 +758,29 @@
     const poNo = state.poNo || (item && item.poNo) || state.purHireNo || (item && item.purHireNo) || '';
 
     getTargetDocs().forEach((doc) => {
-      const poInputs = findInputsAfterLabel(doc, 'เลขที่ใบสั่งซื้อ/สัญญา');
-      const textPo = poInputs.filter((el) => el.type === 'text' || !el.type);
-      if (textPo.length >= 2 && poNo) {
-        setInputValue(textPo[1], poNo);
+      // 1. เลือกประเภทเอกสาร = 11 ใบสั่งซื้อ
+      const docTypeSelects = findInputsAfterLabel(doc, 'ประเภทเอกสาร');
+      if (docTypeSelects[0] && setSelectByTextOrVal(docTypeSelects[0], '11')) {
+        count++;
       }
 
-      // ค้นหาตารางรายชื่อคณะกรรมการตรวจรับ
+      // 2. กรอกเลขที่ใบสั่งซื้อ/สัญญา: [11] - [poNo] - [70]
+      const poInputs = findInputsAfterLabel(doc, 'เลขที่ใบสั่งซื้อ/สัญญา');
+      const textPo = poInputs.filter((el) => el.type === 'text' || !el.type);
+      if (textPo.length >= 2) {
+        if (!textPo[0].value || textPo[0].value === 'undefined') setInputValue(textPo[0], '11');
+        if (poNo && setInputValue(textPo[1], poNo)) count++;
+        if (textPo[2]) setInputValue(textPo[2], state.fiscalYear || '70');
+      }
+
+      // 3. ล้างคำว่า "undefined" ที่ระบบ MIS สร้างขึ้นในทุกช่อง input ของตารางก่อน
+      Array.from(doc.querySelectorAll('input[type="text"]')).forEach((inp) => {
+        if (inp.value && inp.value.trim().toLowerCase() === 'undefined') {
+          inp.value = '';
+        }
+      });
+
+      // 4. ค้นหาตารางรายชื่อคณะกรรมการตรวจรับแล้วกรอกตามเกณฑ์วงเงิน (>= 100,000 กรอก 4 แถว / < 100,000 กรอก 2 แถว)
       const tables = Array.from(doc.querySelectorAll('table'));
       tables.forEach((tbl) => {
         const txt = tbl.innerText || '';
@@ -703,7 +789,6 @@
             return tr.querySelectorAll('input[type="text"]').length >= 2 && tr.querySelector('select');
           });
 
-          // ล้างแถวทั้งหมดก่อนแล้วกรอกตามจำนวนกรรมการ (4 ท่าน หรือ 2 ท่าน)
           rows.forEach((tr, idx) => {
             const textInputs = Array.from(tr.querySelectorAll('input[type="text"]'));
             const selectEl = tr.querySelector('select');
@@ -725,8 +810,9 @@
               }
               count++;
             } else {
-              setInputValue(textInputs[0], '');
-              setInputValue(textInputs[1], '');
+              // ล้างแถวที่เหลือให้ว่างสะอาด (ไม่มีคำว่า undefined)
+              textInputs[0].value = '';
+              textInputs[1].value = '';
               setSelectByTextOrVal(selectEl, '');
               if (cb && cb.checked) {
                 cb.checked = false;
@@ -740,8 +826,8 @@
     return count;
   }
 
-  // ขั้นตอนที่ 6: รายงานรายละเอียดการตรวจรับ (Rep_pur_rcv.jsp)
-  function fillStep6ReportRcv(item) {
+  // ขั้นตอนที่ 8: รายงาน -> 13. ใบตรวจรับพัสดุ (Rep_pur_rcv.jsp)
+  function fillStep8ReportRcv(item) {
     let count = 0;
     const rcvNo = state.rcvNo || (item && item.rcvNo) || state.poNo || (item && item.poNo) || '';
     getTargetDocs().forEach((doc) => {
@@ -811,7 +897,7 @@
 
     // หน้า Popup บางหน้าไม่จำเป็นต้องเลือกรายการก่อนก็กรอกได้
     const noItemNeeded = ['POPUP_BUDGET_BMA', 'POPUP_BUDGET_ETC', 'POPUP_SEARCH_ITEM', 'POPUP_SELECT_ORDER'];
-    if (!item && !noItemNeeded.includes(page.id) && page.id !== 'STEP7_REP_RCV' && page.id !== 'STEP6_COMMITTEE') {
+    if (!item && !noItemNeeded.includes(page.id) && page.id !== 'STEP8_REP_RCV' && page.id !== 'STEP7_COMMITTEE') {
       setStatus('กรุณาเลือกรายการยาจาก Google Sheet ก่อนครับ', 'err');
       return;
     }
@@ -851,11 +937,14 @@
       case 'STEP5_DELIVERY':
         filled = fillStep5Delivery(item);
         break;
-      case 'STEP6_COMMITTEE':
-        filled = fillStep6Committee(item);
+      case 'STEP6_RCV_RESULT':
+        filled = fillStep6RcvResult(item);
         break;
-      case 'STEP7_REP_RCV':
-        filled = fillStep7ReportRcv(item);
+      case 'STEP7_COMMITTEE':
+        filled = fillStep7Committee(item);
+        break;
+      case 'STEP8_REP_RCV':
+        filled = fillStep8ReportRcv(item);
         break;
       default:
         if (item) {
@@ -863,9 +952,10 @@
           filled += fillStep3Approve(item);
           filled += fillStep4Contract(item);
           filled += fillStep5Delivery(item);
+          filled += fillStep6RcvResult(item);
         }
-        filled += fillStep6Committee(item);
-        filled += fillStep7ReportRcv(item);
+        filled += fillStep7Committee(item);
+        filled += fillStep8ReportRcv(item);
         break;
     }
 
@@ -1180,15 +1270,16 @@
         </button>
 
         <div class="bma-field-group">
-          <div class="bma-label"><span>หรือเลือกกดกรอกเฉพาะขั้นตอน (1-7):</span></div>
+          <div class="bma-label"><span>หรือเลือกกดกรอกเฉพาะขั้นตอน (1-8):</span></div>
           <div class="bma-step-pills">
             <button type="button" class="bma-step-btn" data-step="1">1. เห็นชอบ</button>
             <button type="button" class="bma-step-btn" data-step="2">2. เสนอราคา</button>
             <button type="button" class="bma-step-btn" data-step="3">3. อนุมัติ</button>
             <button type="button" class="bma-step-btn" data-step="4">4. สัญญา</button>
             <button type="button" class="bma-step-btn" data-step="5">5. ส่งมอบ</button>
-            <button type="button" class="bma-step-btn" data-step="6">6. กรรมการ (ข้อ12)</button>
-            <button type="button" class="bma-step-btn" data-step="7" style="grid-column: span 3;">7. พิมพ์ใบตรวจรับพัสดุ (รายงาน ข้อ13)</button>
+            <button type="button" class="bma-step-btn" data-step="6">6. รายงานผลตรวจรับ</button>
+            <button type="button" class="bma-step-btn" data-step="7">7. กรรมการ (ข้อ12)</button>
+            <button type="button" class="bma-step-btn" data-step="8" style="grid-column: span 2;">8. พิมพ์ใบตรวจรับ (ข้อ13)</button>
           </div>
         </div>
 
@@ -1276,10 +1367,12 @@
           filled += fillPopupSelectOrder();
         } else if (st === '5' && item) {
           filled += fillStep5Delivery(item);
-        } else if (st === '6') {
-          filled += fillStep6Committee(item);
+        } else if (st === '6' && item) {
+          filled += fillStep6RcvResult(item);
         } else if (st === '7') {
-          filled += fillStep7ReportRcv(item);
+          filled += fillStep7Committee(item);
+        } else if (st === '8') {
+          filled += fillStep8ReportRcv(item);
         }
         setStatus(filled > 0 ? `✓ กรอกขั้นตอนที่ ${st} สำเร็จ (${filled} จุด)` : `⚠️ ไม่พบช่องของขั้นตอนที่ ${st} ในหน้านี้`, filled > 0 ? 'ok' : 'err');
       });
