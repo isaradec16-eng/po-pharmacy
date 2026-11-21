@@ -189,8 +189,30 @@
   transition: all 0.15s ease;
 }
 
-.bma-btn:hover {
+.bma-btn:hover:not(:disabled) {
   background: #f1f5f9;
+}
+
+.bma-btn:disabled,
+.bma-step-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed !important;
+  background: #cbd5e1 !important;
+  border-color: #94a3b8 !important;
+  color: #475569 !important;
+  box-shadow: none !important;
+}
+
+.bma-dup-alert {
+  background: #fef2f2;
+  border: 2px solid #dc2626;
+  color: #b91c1c;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 12.5px;
+  text-align: center;
+  line-height: 1.4;
 }
 
 .bma-btn-primary {
@@ -200,7 +222,7 @@
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
 }
 
-.bma-btn-primary:hover {
+.bma-btn-primary:hover:not(:disabled) {
   background: #1d4ed8;
 }
 

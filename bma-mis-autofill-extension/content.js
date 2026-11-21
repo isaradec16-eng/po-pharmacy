@@ -778,14 +778,40 @@
     return count;
   }
 
+  function isItemAlreadyRecorded(item) {
+    if (!item) return false;
+    const p = String(item.purHireNo || '').trim();
+    const o = String(item.poNo || '').trim();
+    const r = String(item.rcvNo || '').trim();
+    return p !== '' && o !== '' && r !== '';
+  }
+
   function autoFillCurrentPage(subAction) {
     tryCaptureGeneratedCodes();
     const page = detectCurrentPage();
     const item = getSelectedItem();
 
+    if (item && isItemAlreadyRecorded(item)) {
+      setStatus('⛔ มีประวัติการลงข้อมูลแล้ว (ห้ามลงข้อมูลซ้ำเด็ดขาด)', 'err');
+      alert(
+        'มีประวัติการลงข้อมูลแล้ว\n\nรายการ [' +
+          item.code +
+          '] ' +
+          item.subject +
+          '\nมีข้อมูลใน MISS70 ครบแล้ว:\n- รหัสจัดซื้อ: ' +
+          item.purHireNo +
+          '\n- เลขที่ใบสั่งซื้อ: ' +
+          item.poNo +
+          '\n- เลขที่ใบตรวจรับ: ' +
+          item.rcvNo +
+          '\n\nห้ามลงข้อมูลซ้ำเด็ดขาด!'
+      );
+      return;
+    }
+
     // หน้า Popup บางหน้าไม่จำเป็นต้องเลือกรายการก่อนก็กรอกได้
     const noItemNeeded = ['POPUP_BUDGET_BMA', 'POPUP_BUDGET_ETC', 'POPUP_SEARCH_ITEM', 'POPUP_SELECT_ORDER'];
-    if (!item && !noItemNeeded.includes(page.id) && page.id !== 'STEP6_REP_RCV' && page.id !== 'STEP5_COMMITTEE') {
+    if (!item && !noItemNeeded.includes(page.id) && page.id !== 'STEP7_REP_RCV' && page.id !== 'STEP6_COMMITTEE') {
       setStatus('กรุณาเลือกรายการยาจาก Google Sheet ก่อนครับ', 'err');
       return;
     }
@@ -825,22 +851,21 @@
       case 'STEP5_DELIVERY':
         filled = fillStep5Delivery(item);
         break;
-      case 'STEP5_COMMITTEE':
-        filled = fillStep5Committee(item);
+      case 'STEP6_COMMITTEE':
+        filled = fillStep6Committee(item);
         break;
-      case 'STEP6_REP_RCV':
-        filled = fillStep6ReportRcv(item);
+      case 'STEP7_REP_RCV':
+        filled = fillStep7ReportRcv(item);
         break;
       default:
-        // พยายามกรอกทุกหน้าที่ตรงกับฟิลด์ที่มีอยู่ในหน้าจอ
         if (item) {
           filled += fillStep1Agree(item, subAction);
           filled += fillStep3Approve(item);
           filled += fillStep4Contract(item);
           filled += fillStep5Delivery(item);
         }
-        filled += fillStep5Committee(item);
-        filled += fillStep6ReportRcv(item);
+        filled += fillStep6Committee(item);
+        filled += fillStep7ReportRcv(item);
         break;
     }
 
@@ -892,6 +917,29 @@
     if (rIn && document.activeElement !== rIn) rIn.value = state.rcvNo || '';
   }
 
+  function updateButtonsLockState(item) {
+    if (!panelEl) return;
+    const recorded = isItemAlreadyRecorded(item);
+    const mainBtn = panelEl.querySelector('#bma-btn-autofill');
+    const stepBtns = panelEl.querySelectorAll('.bma-step-btn');
+
+    if (mainBtn) {
+      mainBtn.disabled = recorded;
+      mainBtn.textContent = recorded
+        ? '⛔ มีประวัติการลงข้อมูลแล้ว (ห้ามลงซ้ำ)'
+        : '⚡ กรอกข้อมูลหน้านี้ทันที (Auto-Fill)';
+    }
+    stepBtns.forEach((btn) => {
+      btn.disabled = recorded;
+    });
+
+    if (recorded) {
+      setStatus('⛔ มีประวัติการลงข้อมูลแล้ว (ห้ามลงข้อมูลซ้ำเด็ดขาด)', 'err');
+    } else if (item) {
+      setStatus(`✓ รายการ [${item.code}] พร้อมสำหรับลงข้อมูล`, 'ok');
+    }
+  }
+
   function renderItemOptions() {
     if (!panelEl) return;
     const sel = panelEl.querySelector('#bma-item-select');
@@ -930,6 +978,7 @@
     if (filtered.length === 0) {
       sel.innerHTML = '<option value="">-- ไม่พบรายการที่ค้นหา --</option>';
       renderSelectedSummary();
+      updateButtonsLockState(null);
       return;
     }
 
@@ -943,8 +992,9 @@
     sel.innerHTML = sorted
       .map((it) => {
         const tag = it.code ? `[${it.code}] ` : '';
-        const shortSubj = (it.subject || '').slice(0, 38);
-        return `<option value="${it.code}">${tag}${shortSubj} (${it.amountFormatted} ฿)</option>`;
+        const recPrefix = isItemAlreadyRecorded(it) ? '⛔ (ลงแล้ว) ' : '';
+        const shortSubj = (it.subject || '').slice(0, 32);
+        return `<option value="${it.code}">${recPrefix}${tag}${shortSubj} (${it.amountFormatted} ฿)</option>`;
       })
       .join('');
 
@@ -956,17 +1006,19 @@
     } else {
       sel.value = state.selectedCode;
       renderSelectedSummary();
+      updateButtonsLockState(getSelectedItem());
     }
   }
 
   function onItemSelectionChange(item) {
     if (!item) return;
-    if (item.purHireNo) state.purHireNo = item.purHireNo;
-    if (item.poNo) state.poNo = item.poNo;
-    if (item.rcvNo) state.rcvNo = item.rcvNo;
+    state.purHireNo = item.purHireNo || '';
+    state.poNo = item.poNo || '';
+    state.rcvNo = item.rcvNo || '';
     saveState();
     syncCodesToPanel();
     renderSelectedSummary();
+    updateButtonsLockState(item);
   }
 
   function renderSelectedSummary() {
@@ -979,12 +1031,21 @@
       return;
     }
 
+    const recorded = isItemAlreadyRecorded(item);
+    const dupAlertHtml = recorded
+      ? `<div class="bma-dup-alert" style="margin-bottom:8px;">
+           ⛔ มีประวัติการลงข้อมูลแล้ว<br/>
+           <span style="font-size:11.5px;font-weight:600;">(รหัสจัดซื้อ: ${item.purHireNo} • ใบสั่งซื้อ: ${item.poNo} • ใบตรวจรับ: ${item.rcvNo})<br/>ห้ามลงข้อมูลซ้ำเด็ดขาด</span>
+         </div>`
+      : '';
+
     const isOver100k = Number(item.amount || 0) >= 100000;
     const commBadge = isOver100k
       ? '<span style="color:#1d4ed8;font-weight:700;">>= 1 แสน (กรรมการ 3 + พัสดุ 1)</span>'
       : '<span style="color:#d97706;font-weight:700;">< 1 แสน (ผู้ตรวจรับ 1 + พัสดุ 1)</span>';
 
     box.innerHTML = `
+      ${dupAlertHtml}
       <div class="bma-summary-row">
         <span class="bma-summary-key">รหัส/เรื่อง:</span>
         <span class="bma-summary-val"><b>[${item.code}]</b> ${item.subject}</span>
@@ -1037,8 +1098,11 @@
         const cntLbl = panelEl ? panelEl.querySelector('#bma-sheet-count-lbl') : null;
         if (cntLbl) cntLbl.textContent = `ค้นหาและเลือกรายการจาก Google Sheet (${state.items.length} รายการ)`;
         renderItemOptions();
-        const srcText = res.source ? ` [${res.source}]` : '';
-        setStatus(`✓ พร้อมใช้งาน ${state.items.length} รายการ${srcText}`, 'ok');
+        const curItem = getSelectedItem();
+        if (!isItemAlreadyRecorded(curItem)) {
+          const srcText = res.source ? ` [${res.source}]` : '';
+          setStatus(`✓ พร้อมใช้งาน ${state.items.length} รายการ${srcText}`, 'ok');
+        }
       }
     );
   }
@@ -1190,6 +1254,11 @@
       btn.addEventListener('click', () => {
         const st = btn.getAttribute('data-step');
         const item = getSelectedItem();
+        if (item && isItemAlreadyRecorded(item)) {
+          setStatus('⛔ มีประวัติการลงข้อมูลแล้ว (ห้ามลงข้อมูลซ้ำเด็ดขาด)', 'err');
+          alert('มีประวัติการลงข้อมูลแล้ว\n\nห้ามลงข้อมูลซ้ำเด็ดขาด!');
+          return;
+        }
         let filled = 0;
         if (st === '1' && item) {
           filled += fillStep1Agree(item);
