@@ -898,15 +898,34 @@
     if (!sel) return;
 
     const q = (state.filterText || '').toLowerCase().trim();
-    const filtered = state.items.filter((it) => {
-      if (!q) return true;
-      return (
-        String(it.code || '').toLowerCase().includes(q) ||
-        String(it.subject || '').toLowerCase().includes(q) ||
-        String(it.vendorName || '').toLowerCase().includes(q) ||
-        String(it.amountFormatted || '').toLowerCase().includes(q)
-      );
+
+    // ตรวจสอบว่าผู้ใช้กำลังค้นหาด้วยรหัส ซ. หรือไม่ (เช่น "1งบ", "2งบ", "1งบเอดส์" หรือพิมพ์แค่ตัวเลข "1", "2")
+    const exactCodeMatch = state.items.filter((it) => {
+      const c = String(it.code || '').toLowerCase().trim();
+      const numOnly = c.replace(/[^0-9]/g, '');
+      return c === q || (q !== '' && /^\d+$/.test(q) && numOnly === q);
     });
+
+    let filtered = [];
+    if (q && exactCodeMatch.length > 0) {
+      // ถ้ารหัสตรงเป๊ะ (เช่น พิมพ์ "2งบ" หรือ "2") ให้แสดงเฉพาะ "2งบ" เท่านั้น ไม่เอา 12งบ, 22งบ มาปน
+      filtered = exactCodeMatch;
+    } else {
+      filtered = state.items.filter((it) => {
+        if (!q) return true;
+        const c = String(it.code || '').toLowerCase().trim();
+        // ถ้าระบุคำค้นที่มีคำว่า "งบ" เช่น "30งบ" ให้เทียบตรงตัวกับรหัสเท่านั้น
+        if (/^\d+\s*(งบ|งบเอดส์|เอดส์|aids)$/i.test(q)) {
+          return c === q.replace(/\s+/g, '');
+        }
+        return (
+          c === q ||
+          String(it.subject || '').toLowerCase().includes(q) ||
+          String(it.vendorName || '').toLowerCase().includes(q) ||
+          String(it.amountFormatted || '').toLowerCase().includes(q)
+        );
+      });
+    }
 
     if (filtered.length === 0) {
       sel.innerHTML = '<option value="">-- ไม่พบรายการที่ค้นหา --</option>';
@@ -914,8 +933,13 @@
       return;
     }
 
-    // เรียงลำดับรายการล่าสุดหรือรายการงบประมาณขึ้นก่อน
-    const sorted = filtered.slice().reverse();
+    // เรียงลำดับตามเลข ซ. จากน้อยไปมาก (1งบ, 2งบ, 3งบ...)
+    const sorted = filtered.slice().sort((a, b) => {
+      const na = parseInt(String(a.code || '').replace(/\D/g, ''), 10) || 0;
+      const nb = parseInt(String(b.code || '').replace(/\D/g, ''), 10) || 0;
+      return na - nb;
+    });
+
     sel.innerHTML = sorted
       .map((it) => {
         const tag = it.code ? `[${it.code}] ` : '';
@@ -924,14 +948,15 @@
       })
       .join('');
 
-    if (state.selectedCode && sorted.some((x) => x.code === state.selectedCode)) {
-      sel.value = state.selectedCode;
-    } else {
+    // ถ้าค้นหาแล้วเจอรายการเดียว หรือรายการที่เลือกไว้ไม่อยู่ในรายการที่กรอง ให้เลือกรายการแรกทันที
+    if (sorted.length === 1 || !state.selectedCode || !sorted.some((x) => x.code === state.selectedCode)) {
       state.selectedCode = sorted[0].code;
       sel.value = state.selectedCode;
       onItemSelectionChange(sorted[0]);
+    } else {
+      sel.value = state.selectedCode;
+      renderSelectedSummary();
     }
-    renderSelectedSummary();
   }
 
   function onItemSelectionChange(item) {
