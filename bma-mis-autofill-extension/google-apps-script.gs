@@ -145,11 +145,15 @@ function getVendorsRegistry() {
       let taxId = thaiToArabic(String(row[7] || '')).replace(/\D/g, ''); // Col H: เลขผู้เสียภาษี
       if (taxId === '000000') taxId = '';
 
+      const digitsOnly = acctMis2.replace(/\D/g, '');
+      const branchCode = digitsOnly.length >= 3 ? ('0' + digitsOnly.substring(0, 3)) : '';
+
       const profile = {
         company: company,
         bank: bank,
         bankCode: bankNameToCode(bank),
         branch: branch,
+        branchCode: branchCode,
         accountNo: acctMis2,
         address: address,
         taxId: taxId

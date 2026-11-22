@@ -342,6 +342,7 @@ $script:CalibDefinitions = @(
     @{ Key = "payTo";         Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'จ่ายให้'";                       Note = "ชื่อบริษัทจากคอลัมน์ A (ทะเบียนบริษัท)" },
     @{ Key = "assignTo";      Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'โดยมอบให้'";                     Note = "สำนักงานบริหารการเงินการคลังฯ โอนเข้าบัญชี รพจ." },
     @{ Key = "bankCode";      Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'รหัสธนาคาร' (3 หลัก)";           Note = "เช่น 004, 006, 014, 031 (จากคอลัมน์ B)" },
+    @{ Key = "branchCode";    Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'รหัสสาขา' (4 หลัก)";             Note = "เช่น 0001 (ดึงจาก 0+3 หลักแรกของบัญชี และจำค่าที่แก้ให้)" },
     @{ Key = "accountNo";     Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'เลขที่บัญชี'";                   Note = "เลขบัญชีจากคอลัมน์ E (MIs2)" },
     @{ Key = "tabDetail";     Group = "ขั้นที่ 3 (รายละเอียดเบิก)"; Label = "หัวแท็บ 'รายละเอียดเงินเบิกจ่าย'";      Note = "แท็บที่ 4 ของฟอร์ม FRM_PAY_DOC" },
     @{ Key = "requesterName"; Group = "ขั้นที่ 3 (รายละเอียดเบิก)"; Label = "ช่อง 'ชื่อผู้เบิก'";                    Note = "กล่องใหญ่ด้านล่างจำนวนเงินที่จ่าย" },
@@ -377,10 +378,11 @@ function Load-Config {
         stepDelayMs         = 220
         clearBeforePaste    = $true
         autoFillFields      = @{
-            payTo     = $true
-            assignTo  = $true
-            bankCode  = $true
-            accountNo = $true
+            payTo      = $true
+            assignTo   = $true
+            bankCode   = $true
+            branchCode = $true
+            accountNo  = $true
         }
         whtExemptKeywords   = @("สภากาชาด", "เอเบิ้ล", "เอเบิล", "A-ble", "Abel", "องค์การเภสัชกรรม", "GPO", "ยูนีซัน", "Unison")
         neverAutoSave       = $true
@@ -1407,7 +1409,7 @@ $lblPayeeNote.BackColor = [System.Drawing.Color]::FromArgb(241, 245, 249)
 $lblPayeeNote.ForeColor = [System.Drawing.Color]::FromArgb(71, 85, 105)
 $lblPayeeNote.Padding = New-Object System.Windows.Forms.Padding(6, 4, 6, 4)
 $lblPayeeNote.Font = New-Object System.Drawing.Font("Segoe UI", 8)
-$lblPayeeNote.Text = "* ชื่อเจ้าหนี้ / เลขผู้เสียภาษี / ทะเบียนการค้า / ที่อยู่ ระบบ MIS2 ขึ้นให้อัตโนมัติอยู่แล้ว`r`n  ด้านล่างคือ 4 ช่องที่ต้องกรอกเพิ่มจาก ทะเบียนบริษัท (EGP+MIS):"
+$lblPayeeNote.Text = "* ชื่อเจ้าหนี้ / เลขผู้เสียภาษี / ทะเบียนการค้า / ที่อยู่ ระบบ MIS2 ขึ้นให้อัตโนมัติอยู่แล้ว`r`n  ด้านล่างคือ 5 ช่องที่ต้องกรอกเพิ่มจาก ทะเบียนบริษัท (EGP+MIS):"
 $tab2.Controls.Add($lblPayeeNote)
 $t2y += 40
 
@@ -1431,9 +1433,10 @@ $tab2.Controls.Add($cmbAssign)
 Add-QuickPasteBtn $tab2 364 ($t2y - 1) $cmbAssign $false | Out-Null
 $t2y += 32
 
-# Bank Code + Account No + Branch Info Strip
-$rBankCode  = Add-PayeeRow "bankCode"  "รหัสธนาคาร (Col B)" $true $false
-$rAccountNo = Add-PayeeRow "accountNo" "เลขที่บัญชี (Col E)" $true $false
+# Bank Code + Branch Code + Account No + Branch Info Strip
+$rBankCode   = Add-PayeeRow "bankCode"   "รหัสธนาคาร (Col B)" $true $false
+$rBranchCode = Add-PayeeRow "branchCode" "รหัสสาขา (4 หลัก)"  $true $false
+$rAccountNo  = Add-PayeeRow "accountNo"  "เลขที่บัญชี (Col E)" $true $false
 
 $lblBankBranchInfo = New-Object System.Windows.Forms.Label
 $lblBankBranchInfo.Location = New-Object System.Drawing.Point(8, ($t2y + 2))
@@ -1445,12 +1448,12 @@ $lblBankBranchInfo.Padding = New-Object System.Windows.Forms.Padding(6, 4, 6, 4)
 $lblBankBranchInfo.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
 $lblBankBranchInfo.Text = "🏦 ธนาคาร (B): -  |  สาขา (C): -"
 $tab2.Controls.Add($lblBankBranchInfo)
-$t2y += 46
+$t2y += 44
 
 $btnRunStep2 = New-Object System.Windows.Forms.Button
-$btnRunStep2.Text = "⚡ ขั้นที่ 2: กรอกแท็บ 'ผู้รับเงิน' (4 ช่อง)"
-$btnRunStep2.Location = New-Object System.Drawing.Point(8, ($t2y + 6))
-$btnRunStep2.Size = New-Object System.Drawing.Size(390, 42)
+$btnRunStep2.Text = "⚡ ขั้นที่ 2: กรอกแท็บ 'ผู้รับเงิน' (5 ช่อง)"
+$btnRunStep2.Location = New-Object System.Drawing.Point(8, ($t2y + 4))
+$btnRunStep2.Size = New-Object System.Drawing.Size(390, 40)
 $btnRunStep2.BackColor = [System.Drawing.Color]::FromArgb(13, 148, 136)
 $btnRunStep2.ForeColor = [System.Drawing.Color]::White
 $btnRunStep2.Font = New-Object System.Drawing.Font("Segoe UI", 9.8, [System.Drawing.FontStyle]::Bold)
@@ -1657,11 +1660,44 @@ function Update-TaxFieldsFromCurrent([double]$amountVal, [string]$companyName) {
     }
 }
 
+$script:BranchOverridesPath = Join-Path $script:AppDir "branch-codes.json"
+$script:BranchOverrides = @{}
+if (Test-Path $script:BranchOverridesPath) {
+    try {
+        $boObj = ([System.IO.File]::ReadAllText($script:BranchOverridesPath, [System.Text.Encoding]::UTF8)) | ConvertFrom-Json
+        foreach ($p in $boObj.PSObject.Properties) { $script:BranchOverrides[$p.Name] = [string]$p.Value }
+    } catch {}
+}
+
+function Get-BranchCodeForVendor($v) {
+    if (-not $v) { return "" }
+    $cKey = ([string]$v.company).Trim()
+    if ($cKey -and $script:BranchOverrides.ContainsKey($cKey) -and $script:BranchOverrides[$cKey]) {
+        return $script:BranchOverrides[$cKey]
+    }
+    if ($v.PSObject.Properties["branchCode"] -and -not [string]::IsNullOrWhiteSpace([string]$v.branchCode)) {
+        return ([string]$v.branchCode).Trim()
+    }
+    $digits = [regex]::Replace((Convert-ThaiDigits ([string]$v.accountNo)), "\D", "")
+    if ($digits.Length -ge 3) { return ("0" + $digits.Substring(0, 3)) }
+    return ""
+}
+
+function Save-BranchCodeOverride([string]$company, [string]$code) {
+    if ([string]::IsNullOrWhiteSpace($company) -or [string]::IsNullOrWhiteSpace($code)) { return }
+    $script:BranchOverrides[$company.Trim()] = $code.Trim()
+    try {
+        $json = $script:BranchOverrides | ConvertTo-Json -Depth 3
+        [System.IO.File]::WriteAllText($script:BranchOverridesPath, $json, (New-Object System.Text.UTF8Encoding($false)))
+    } catch {}
+}
+
 function Apply-VendorToFields($v) {
     if (-not $v) { return }
     $script:SelectedVendor = $v
     $rPayTo.Box.Text      = [string]$v.company
     $rBankCode.Box.Text   = [string]$v.bankCode
+    $rBranchCode.Box.Text = Get-BranchCodeForVendor $v
     $rAccountNo.Box.Text  = [string]$v.accountNo
     $bName   = if ($v.bank) { $v.bank } else { "-" }
     $bBranch = if ($v.branch) { $v.branch } else { "-" }
@@ -1749,9 +1785,10 @@ function Apply-ItemToFields($item) {
             }
         }
     } else {
-        $rPayTo.Box.Text     = [string]$item.vendorName
-        $rBankCode.Box.Text  = ""
-        $rAccountNo.Box.Text = ""
+        $rPayTo.Box.Text      = [string]$item.vendorName
+        $rBankCode.Box.Text   = ""
+        $rBranchCode.Box.Text = ""
+        $rAccountNo.Box.Text  = ""
         $lblBankBranchInfo.Text = "⚠️ ไม่พบบริษัทนี้ในชีต 'ทะเบียนบริษัท' — ค้นหาและเลือกจากช่องบริษัทด้านบนได้"
     }
 }
@@ -1813,10 +1850,11 @@ function Persist-UserPreferences {
     $script:Config["defaultDocCount"]  = $txtDocCount.Text.Trim()
     $script:Config["fiscalYear"]       = $txtRcvYear.Text.Trim()
     $script:Config["autoFillFields"]   = @{
-        payTo     = $rPayTo.Check.Checked
-        assignTo  = $chkAssign.Checked
-        bankCode  = $rBankCode.Check.Checked
-        accountNo = $rAccountNo.Check.Checked
+        payTo      = $rPayTo.Check.Checked
+        assignTo   = $chkAssign.Checked
+        bankCode   = $rBankCode.Check.Checked
+        branchCode = $rBranchCode.Check.Checked
+        accountNo  = $rAccountNo.Check.Checked
     }
     Save-Config
 }
@@ -1953,14 +1991,18 @@ $btnRunStep16.Add_Click({
     }
 })
 
-# --- Step 2 Auto-Fill: แท็บผู้รับเงิน (เฉพาะ 4 ช่องที่ต้องกรอกเพิ่ม) ---
+# --- Step 2 Auto-Fill: แท็บผู้รับเงิน (5 ช่องที่ต้องกรอกเพิ่ม) ---
 $btnRunStep2.Add_Click({
     Persist-UserPreferences
+    if ($rPayTo.Box.Text.Trim() -and $rBranchCode.Box.Text.Trim()) {
+        Save-BranchCodeOverride -company $rPayTo.Box.Text.Trim() -code $rBranchCode.Box.Text.Trim()
+    }
     $queue = @()
-    if ($rPayTo.Check.Checked     -and $rPayTo.Box.Text.Trim())     { $queue += @{ Key="payTo";     Val=$rPayTo.Box.Text.Trim();     Multi=$false } }
-    if ($chkAssign.Checked        -and $cmbAssign.Text.Trim())      { $queue += @{ Key="assignTo";  Val=$cmbAssign.Text.Trim();      Multi=$false } }
-    if ($rBankCode.Check.Checked  -and $rBankCode.Box.Text.Trim())  { $queue += @{ Key="bankCode";  Val=$rBankCode.Box.Text.Trim();  Multi=$false } }
-    if ($rAccountNo.Check.Checked -and $rAccountNo.Box.Text.Trim()) { $queue += @{ Key="accountNo"; Val=$rAccountNo.Box.Text.Trim(); Multi=$false } }
+    if ($rPayTo.Check.Checked      -and $rPayTo.Box.Text.Trim())      { $queue += @{ Key="payTo";      Val=$rPayTo.Box.Text.Trim();      Multi=$false } }
+    if ($chkAssign.Checked         -and $cmbAssign.Text.Trim())       { $queue += @{ Key="assignTo";   Val=$cmbAssign.Text.Trim();       Multi=$false } }
+    if ($rBankCode.Check.Checked   -and $rBankCode.Box.Text.Trim())   { $queue += @{ Key="bankCode";   Val=$rBankCode.Box.Text.Trim();   Multi=$false } }
+    if ($rBranchCode.Check.Checked -and $rBranchCode.Box.Text.Trim()) { $queue += @{ Key="branchCode"; Val=$rBranchCode.Box.Text.Trim(); Multi=$false } }
+    if ($rAccountNo.Check.Checked  -and $rAccountNo.Box.Text.Trim())  { $queue += @{ Key="accountNo";  Val=$rAccountNo.Box.Text.Trim();  Multi=$false } }
 
     if ($queue.Count -eq 0) {
         [System.Windows.Forms.MessageBox]::Show("ไม่มีช่องที่ติ๊กถูกและมีข้อมูลให้กรอกในแท็บผู้รับเงินครับ", "แจ้งเตือน")

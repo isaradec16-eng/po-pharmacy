@@ -27,6 +27,7 @@
     "payTo": true,
     "assignTo": true,
     "bankCode": true,
+    "branchCode": true,
     "accountNo": true
   },
   "whtExemptKeywords": [
