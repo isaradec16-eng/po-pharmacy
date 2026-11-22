@@ -916,23 +916,48 @@ async function fetchSheetCsv(sheetId, gid) {
   throw lastErr || new Error("ไม่สามารถดึงข้อมูลสดจาก Google Sheet ได้");
 }
 
+function extractSheetId(idOrUrl) {
+  const s = String(idOrUrl || "").trim();
+  if (!s) return "";
+  const m = s.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : s;
+}
+
 async function fetchAllFromGoogleSheets(cfg) {
   const settings = Object.assign({}, DEFAULT_CONFIG, cfg || {});
+  const fy = String(settings.fiscalYear || "70").trim();
+  const acSheetId = extractSheetId(settings.autocratSheetId) || DEFAULT_CONFIG.autocratSheetId;
+  const missSheetId = extractSheetId(settings.missSheetId || settings.miss70SheetId) || DEFAULT_CONFIG.miss70SheetId;
+  const isCustomYearOrSheet =
+    fy !== "70" ||
+    acSheetId !== DEFAULT_CONFIG.autocratSheetId ||
+    missSheetId !== DEFAULT_CONFIG.miss70SheetId;
 
-  // 1. ถ้าระบุ Google Apps Script Web App URL ไว้ ให้ดึงผ่าน Web App ก่อน
+  // 1. ถ้าระบุไฟล์ของปีงบประมาณใหม่ไว้ หรือเป็นปีอื่นที่ไม่ใช่ 70 ให้ลองดึงสดจาก Google Sheets ของปีนั้นโดยตรงก่อน (และส่งพารามิเตอร์ไปที่ Apps Script ด้วย)
   if (settings.gasWebAppUrl && settings.gasWebAppUrl.startsWith("https://script.google.com/")) {
-    const r = await fetch(settings.gasWebAppUrl, { cache: "no-store" });
-    const data = await r.json();
-    if (data && data.ok && Array.isArray(data.items) && data.items.length > 0) {
-      return { items: data.items, source: "Apps Script Web App" };
-    }
+    try {
+      const qs = new URLSearchParams({
+        fiscalYear: fy,
+        autocratSheetId: acSheetId,
+        missSheetId: missSheetId,
+        t: String(Date.now())
+      });
+      const sep = settings.gasWebAppUrl.includes("?") ? "&" : "?";
+      const r = await fetch(settings.gasWebAppUrl + sep + qs.toString(), { cache: "no-store" });
+      const data = await r.json();
+      // ถ้า Apps Script ตอบกลับมาตรงกับ Sheet ID ที่ขอ (หรือเป็นปี 70) ให้ใช้ข้อมูลนั้นได้ทันที
+      const gasMatchedSheet = !data.autocratSheetId || data.autocratSheetId === acSheetId;
+      if (data && data.ok && Array.isArray(data.items) && data.items.length > 0 && (!isCustomYearOrSheet || gasMatchedSheet)) {
+        return { items: data.items, source: `Apps Script (ปีงบ ${fy})` };
+      }
+    } catch (e) {}
   }
 
-  // 2. ลองดึงสดจาก Google Sheets (Auto Crat-EGP70 และ MISS70)
+  // 2. ดึงสดโดยตรงจาก Google Sheets ตามไฟล์ปลายทางของปีงบประมาณที่เลือก (Auto Crat-EGPxx และ MISSxx)
   try {
     const [acRows, missRows] = await Promise.all([
-      fetchSheetCsv(settings.autocratSheetId, settings.autocratGid),
-      fetchSheetCsv(settings.miss70SheetId, settings.miss70Gid).catch(() => [])
+      fetchSheetCsv(acSheetId, settings.autocratGid),
+      fetchSheetCsv(missSheetId, settings.miss70Gid).catch(() => [])
     ]);
 
     const missMap = {};
@@ -1119,16 +1144,28 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     (async () => {
       try {
         const remoteConfig = await fetchRemoteConfig();
-        const mergedCfg = Object.assign({}, msg.config || {});
-        if (remoteConfig && remoteConfig.gasWebAppUrl) {
+        const userCfg = Object.assign({}, msg.config || {});
+        const fy = String(userCfg.fiscalYear || "70").trim();
+        const remoteFyMap = (remoteConfig && remoteConfig.fiscalYears) || {};
+        const remoteFyEntry = remoteFyMap[fy] || {};
+
+        const mergedCfg = Object.assign({}, userCfg);
+        if (!mergedCfg.gasWebAppUrl && remoteConfig && remoteConfig.gasWebAppUrl) {
           mergedCfg.gasWebAppUrl = remoteConfig.gasWebAppUrl;
         }
-        if (remoteConfig && remoteConfig.autocratSheetId) {
-          mergedCfg.autocratSheetId = remoteConfig.autocratSheetId;
+        if (!mergedCfg.autocratSheetId) {
+          mergedCfg.autocratSheetId =
+            remoteFyEntry.autocratSheetId ||
+            (fy === "70" && remoteConfig && remoteConfig.autocratSheetId) ||
+            DEFAULT_CONFIG.autocratSheetId;
         }
-        if (remoteConfig && remoteConfig.miss70SheetId) {
-          mergedCfg.miss70SheetId = remoteConfig.miss70SheetId;
+        if (!mergedCfg.missSheetId) {
+          mergedCfg.missSheetId =
+            remoteFyEntry.missSheetId ||
+            (fy === "70" && remoteConfig && remoteConfig.miss70SheetId) ||
+            DEFAULT_CONFIG.miss70SheetId;
         }
+
         const res = await fetchAllFromGoogleSheets(mergedCfg);
         sendResponse({
           ok: true,

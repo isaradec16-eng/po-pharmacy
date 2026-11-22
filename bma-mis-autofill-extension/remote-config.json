@@ -1,9 +1,19 @@
 {
-  "version": "1.2.0",
-  "updatedAt": "2026-11-21T15:32:00+07:00",
+  "version": "1.3.0",
+  "updatedAt": "2026-11-22T20:00:00+07:00",
   "gasWebAppUrl": "https://script.google.com/macros/s/AKfycbyAvDPZrKrKK0B50nU84aK9bVTyLWT47YhjW2ppGiGPSFIrI3Lryu55CBbnPFKCXKMx/exec",
   "autocratSheetId": "1qFqdTqcP_d_nNLAX3AL0Gq21s2zjffXW2Czo3Jv1F_Y",
   "miss70SheetId": "1tTaFrjVCPm8IrjJAg6e0Y27jIqoedLsmJz92py1O0lU",
+  "defaultFiscalYear": "70",
+  "fiscalYears": {
+    "70": {
+      "label": "ปีงบประมาณ 2570 (MISS70 / Auto Crat-EGP70)",
+      "autocratSheetId": "1qFqdTqcP_d_nNLAX3AL0Gq21s2zjffXW2Czo3Jv1F_Y",
+      "autocratTabName": "main",
+      "missSheetId": "1tTaFrjVCPm8IrjJAg6e0Y27jIqoedLsmJz92py1O0lU",
+      "missTabName": "ชีต1"
+    }
+  },
   "codeFilterRegex": "(งบ|งบเอดส์|เอดส์|aids)$",
   "blockDuplicateEntry": true,
   "duplicateAlertMessage": "มีประวัติการลงข้อมูลแล้ว",

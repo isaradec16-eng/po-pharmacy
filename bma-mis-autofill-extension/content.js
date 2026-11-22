@@ -39,11 +39,28 @@
     }
   };
 
+  const DEFAULT_FISCAL_YEARS = {
+    '70': {
+      label: 'ปีงบ 70 (MISS70 / Auto Crat-EGP70)',
+      autocratSheetId: '1qFqdTqcP_d_nNLAX3AL0Gq21s2zjffXW2Czo3Jv1F_Y',
+      missSheetId: '1tTaFrjVCPm8IrjJAg6e0Y27jIqoedLsmJz92py1O0lU'
+    }
+  };
+
+  function extractSheetId(idOrUrl) {
+    const s = String(idOrUrl || '').trim();
+    if (!s) return '';
+    const m = s.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    return m ? m[1] : s;
+  }
+
   let state = {
     items: [],
     selectedCode: '',
     committeeSet: '1',
     fiscalYear: '70',
+    fiscalYears: JSON.parse(JSON.stringify(DEFAULT_FISCAL_YEARS)),
+    showYearSettings: false,
     invoiceNo: '',
     purHireNo: '',
     poNo: '',
@@ -1445,12 +1462,71 @@
     `;
   }
 
+  function getCurrentFiscalYearEntry() {
+    if (!state.fiscalYears || typeof state.fiscalYears !== 'object') {
+      state.fiscalYears = JSON.parse(JSON.stringify(DEFAULT_FISCAL_YEARS));
+    }
+    if (!state.fiscalYears['70']) {
+      state.fiscalYears['70'] = JSON.parse(JSON.stringify(DEFAULT_FISCAL_YEARS['70']));
+    }
+    const fy = String(state.fiscalYear || '70').trim();
+    if (!state.fiscalYears[fy]) {
+      state.fiscalYears[fy] = {
+        label: `ปีงบ ${fy} (MISS${fy} / Auto Crat-EGP${fy})`,
+        autocratSheetId: DEFAULT_FISCAL_YEARS['70'].autocratSheetId,
+        missSheetId: DEFAULT_FISCAL_YEARS['70'].missSheetId
+      };
+    }
+    return state.fiscalYears[fy];
+  }
+
+  function renderFiscalYearDropdown() {
+    if (!panelEl) return;
+    getCurrentFiscalYearEntry();
+    const sel = panelEl.querySelector('#bma-fy-select');
+    if (!sel) return;
+    const years = Object.keys(state.fiscalYears).sort((a, b) => (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0));
+    sel.innerHTML = years
+      .map((y) => {
+        const info = state.fiscalYears[y] || {};
+        const lbl = info.label || `ปีงบ ${y} (MISS${y} / Auto Crat-EGP${y})`;
+        return `<option value="${y}" ${y === String(state.fiscalYear) ? 'selected' : ''}>${lbl}</option>`;
+      })
+      .join('');
+    sel.value = String(state.fiscalYear || '70');
+
+    // อัปเดตป้ายรหัส (1-X-YY) ตามปีงบประมาณที่เลือก
+    const fy = String(state.fiscalYear || '70');
+    const purLbl = panelEl.querySelector('#bma-pur-lbl');
+    const poLbl = panelEl.querySelector('#bma-po-lbl');
+    const rcvLbl = panelEl.querySelector('#bma-rcv-lbl');
+    if (purLbl) purLbl.textContent = `รหัสจัดซื้อ (1-X-${fy})`;
+    if (poLbl) poLbl.textContent = `เลขใบสั่งซื้อ (11-X-${fy})`;
+    if (rcvLbl) rcvLbl.textContent = `เลขใบตรวจรับ (X-${fy})`;
+
+    // อัปเดตช่องตั้งค่าไฟล์ปลายทาง
+    const entry = getCurrentFiscalYearEntry();
+    const fyInput = panelEl.querySelector('#bma-cfg-fy');
+    const acInput = panelEl.querySelector('#bma-cfg-autocrat');
+    const missInput = panelEl.querySelector('#bma-cfg-miss');
+    if (fyInput && document.activeElement !== fyInput) fyInput.value = fy;
+    if (acInput && document.activeElement !== acInput) acInput.value = entry.autocratSheetId || '';
+    if (missInput && document.activeElement !== missInput) missInput.value = entry.missSheetId || '';
+  }
+
   function fetchSheetsData() {
-    setStatus('⏳ กำลังซิงค์ข้อมูลจาก Google Sheets...', '');
+    const fy = String(state.fiscalYear || '70').trim();
+    const entry = getCurrentFiscalYearEntry();
+    setStatus(`⏳ กำลังซิงค์ข้อมูลปีงบประมาณ ${fy} (MISS${fy} / Auto Crat-EGP${fy})...`, '');
     chrome.runtime.sendMessage(
       {
         type: 'FETCH_SHEETS_DATA',
-        config: { gasWebAppUrl: state.gasWebAppUrl }
+        config: {
+          fiscalYear: fy,
+          autocratSheetId: extractSheetId(entry.autocratSheetId),
+          missSheetId: extractSheetId(entry.missSheetId),
+          gasWebAppUrl: state.gasWebAppUrl
+        }
       },
       (res) => {
         if (chrome.runtime.lastError) {
@@ -1468,18 +1544,26 @@
           if (res.remoteConfig.gasWebAppUrl) {
             state.gasWebAppUrl = res.remoteConfig.gasWebAppUrl;
           }
-          state.remoteVersion = res.remoteConfig.version || '1.2.0';
+          if (res.remoteConfig.fiscalYears && typeof res.remoteConfig.fiscalYears === 'object') {
+            Object.keys(res.remoteConfig.fiscalYears).forEach((k) => {
+              if (!state.fiscalYears[k]) {
+                state.fiscalYears[k] = res.remoteConfig.fiscalYears[k];
+              }
+            });
+          }
+          state.remoteVersion = res.remoteConfig.version || '1.3.0';
         }
         state.items = res.items || [];
         saveState();
+        renderFiscalYearDropdown();
         const cntLbl = panelEl ? panelEl.querySelector('#bma-sheet-count-lbl') : null;
-        if (cntLbl) cntLbl.textContent = `ค้นหาและเลือกรายการจาก Google Sheet (${state.items.length} รายการ)`;
+        if (cntLbl) cntLbl.textContent = `ค้นหาและเลือกรายการ ปีงบ ${fy} (${state.items.length} รายการ)`;
         renderItemOptions();
         const curItem = getSelectedItem();
         if (!isItemAlreadyRecorded(curItem)) {
           const verTag = state.remoteVersion ? ` • GitHub v${state.remoteVersion}` : '';
           const srcText = res.source ? ` [${res.source}${verTag}]` : '';
-          setStatus(`✓ พร้อมใช้งาน ${state.items.length} รายการ${srcText}`, 'ok');
+          setStatus(`✓ ปีงบ ${fy}: พร้อมใช้งาน ${state.items.length} รายการ${srcText}`, 'ok');
         }
       }
     );
@@ -1491,6 +1575,8 @@
     if (document.getElementById('bma-mis-autofill-panel')) return;
 
     const page = detectCurrentPage();
+    const fy = String(state.fiscalYear || '70');
+    const curEntry = getCurrentFiscalYearEntry();
     panelEl = document.createElement('div');
     panelEl.id = 'bma-mis-autofill-panel';
     if (state.minimized) panelEl.classList.add('minimized');
@@ -1512,9 +1598,47 @@
           <span id="bma-current-page-lbl">📍 ${page.title}</span>
         </div>
 
+        <div class="bma-field-group" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 9px;">
+          <div class="bma-label" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="color:#1e40af;font-weight:700;">📅 ปีงบประมาณ & ไฟล์ปลายทาง</span>
+            <button type="button" id="bma-btn-toggle-fy-cfg" style="background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:5px;padding:2px 7px;font-size:10.5px;font-weight:700;cursor:pointer;">
+              ➕ เพิ่มปีงบ / ตั้งค่าไฟล์
+            </button>
+          </div>
+          <select id="bma-fy-select" class="bma-select" style="border-color:#93c5fd;background:#fff;font-weight:700;color:#1e3a8a;"></select>
+
+          <div id="bma-fy-config-box" style="display:${state.showYearSettings ? 'block' : 'none'};margin-top:7px;padding-top:7px;border-top:1px dashed #93c5fd;font-size:11px;">
+            <div style="margin-bottom:5px;">
+              <div style="font-weight:700;color:#1e3a8a;margin-bottom:2px;">ปีงบประมาณ (เช่น 70, 71, 72):</div>
+              <div style="display:flex;gap:5px;">
+                <input type="text" id="bma-cfg-fy" class="bma-input" placeholder="เช่น 71" value="${fy}" style="width:70px;font-weight:700;" />
+                <button type="button" id="bma-btn-add-next-fy" style="flex:1;background:#fff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:5px;font-size:10.5px;font-weight:700;cursor:pointer;">
+                  ➕ สร้างปีถัดไปอัตโนมัติ
+                </button>
+              </div>
+            </div>
+            <div style="margin-bottom:5px;">
+              <div style="font-weight:700;color:#1e3a8a;margin-bottom:2px;">ลิงก์ / ID ไฟล์ Auto Crat-EGP (ปีที่เลือก):</div>
+              <input type="text" id="bma-cfg-autocrat" class="bma-input" placeholder="วางลิงก์ Google Sheet หรือ Spreadsheet ID..." value="${curEntry.autocratSheetId || ''}" style="font-size:10.5px;" />
+            </div>
+            <div style="margin-bottom:6px;">
+              <div style="font-weight:700;color:#1e3a8a;margin-bottom:2px;">ลิงก์ / ID ไฟล์ MISS (ปีที่เลือก):</div>
+              <input type="text" id="bma-cfg-miss" class="bma-input" placeholder="วางลิงก์ Google Sheet หรือ Spreadsheet ID..." value="${curEntry.missSheetId || ''}" style="font-size:10.5px;" />
+            </div>
+            <div style="display:flex;gap:5px;">
+              <button type="button" id="bma-btn-save-fy" style="flex:1;background:#1d4ed8;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;font-weight:700;cursor:pointer;">
+                💾 บันทึกปีงบ & โหลดไฟล์ใหม่
+              </button>
+              <button type="button" id="bma-btn-del-fy" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:5px;padding:5px 8px;font-size:11px;font-weight:700;cursor:pointer;" title="ลบปีงบนี้ (ลบไม่ได้ถ้าเป็นปี 70)">
+                🗑️
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div class="bma-field-group">
           <div class="bma-label">
-            <span id="bma-sheet-count-lbl">ค้นหาและเลือกรายการจาก Google Sheet (${state.items.length} รายการ)</span>
+            <span id="bma-sheet-count-lbl">ค้นหาและเลือกรายการ ปีงบ ${fy} (${state.items.length} รายการ)</span>
           </div>
           <input type="text" id="bma-search-input" class="bma-input" placeholder="ค้นหารหัส เช่น 1งบ, 7งบ, ชื่อยา, บริษัท..." value="${state.filterText || ''}" />
           <select id="bma-item-select" class="bma-select"></select>
@@ -1526,15 +1650,15 @@
           <div class="bma-label"><span>รหัสอ้างอิงในระบบ MIS (ดึงอัตโนมัติ / แก้ไขได้)</span></div>
           <div class="bma-grid-3">
             <div>
-              <div style="font-size:10.5px;color:#64748b;">รหัสจัดซื้อ (1-X-70)</div>
+              <div id="bma-pur-lbl" style="font-size:10.5px;color:#64748b;">รหัสจัดซื้อ (1-X-${fy})</div>
               <input type="text" id="bma-pur-no" class="bma-input" placeholder="เช่น 8" value="${state.purHireNo || ''}" />
             </div>
             <div>
-              <div style="font-size:10.5px;color:#64748b;">เลขใบสั่งซื้อ (11-X-70)</div>
+              <div id="bma-po-lbl" style="font-size:10.5px;color:#64748b;">เลขใบสั่งซื้อ (11-X-${fy})</div>
               <input type="text" id="bma-po-no" class="bma-input" placeholder="เช่น 8" value="${state.poNo || ''}" />
             </div>
             <div>
-              <div style="font-size:10.5px;color:#64748b;">เลขใบตรวจรับ (X-70)</div>
+              <div id="bma-rcv-lbl" style="font-size:10.5px;color:#64748b;">เลขใบตรวจรับ (X-${fy})</div>
               <input type="text" id="bma-rcv-no" class="bma-input" placeholder="เช่น 8" value="${state.rcvNo || ''}" />
             </div>
           </div>
@@ -1585,6 +1709,7 @@
     `;
 
     document.body.appendChild(panelEl);
+    renderFiscalYearDropdown();
 
     // ผูก Event ปุ่มต่างๆ
     panelEl.querySelector('#bma-btn-min').addEventListener('click', () => {
@@ -1595,6 +1720,77 @@
     });
 
     panelEl.querySelector('#bma-btn-reload').addEventListener('click', () => {
+      fetchSheetsData();
+    });
+
+    // Event สำหรับเปลี่ยนปีงบประมาณ และเพิ่มปีงบประมาณ + เปลี่ยนไฟล์ปลายทาง (MISSxx / Auto Crat-EGPxx)
+    panelEl.querySelector('#bma-fy-select').addEventListener('change', (e) => {
+      state.fiscalYear = String(e.target.value || '70').trim();
+      saveState();
+      renderFiscalYearDropdown();
+      fetchSheetsData();
+      if (state.autoFillOnLoad !== false) {
+        lastAutoFillSig = '';
+        triggerSmartAutoFill();
+      }
+    });
+
+    panelEl.querySelector('#bma-btn-toggle-fy-cfg').addEventListener('click', () => {
+      state.showYearSettings = !state.showYearSettings;
+      const box = panelEl.querySelector('#bma-fy-config-box');
+      if (box) box.style.display = state.showYearSettings ? 'block' : 'none';
+      renderFiscalYearDropdown();
+      saveState();
+    });
+
+    panelEl.querySelector('#bma-btn-add-next-fy').addEventListener('click', () => {
+      const years = Object.keys(state.fiscalYears || {}).map((y) => parseInt(y, 10) || 70);
+      const maxYr = years.length > 0 ? Math.max.apply(null, years) : 70;
+      const nextYr = String(maxYr + 1);
+      const fyInput = panelEl.querySelector('#bma-cfg-fy');
+      const acInput = panelEl.querySelector('#bma-cfg-autocrat');
+      const missInput = panelEl.querySelector('#bma-cfg-miss');
+      if (fyInput) fyInput.value = nextYr;
+      if (acInput) acInput.value = (state.fiscalYears[nextYr] && state.fiscalYears[nextYr].autocratSheetId) || '';
+      if (missInput) missInput.value = (state.fiscalYears[nextYr] && state.fiscalYears[nextYr].missSheetId) || '';
+      setStatus(`📅 เตรียมสร้างปีงบประมาณ ${nextYr} • กรุณาวางลิงก์ไฟล์ Auto Crat-EGP${nextYr} และ MISS${nextYr} แล้วกดบันทึก`, '');
+    });
+
+    panelEl.querySelector('#bma-btn-save-fy').addEventListener('click', () => {
+      const rawFy = (panelEl.querySelector('#bma-cfg-fy').value || '').replace(/\D/g, '').trim();
+      const fy = rawFy.length === 4 && rawFy.startsWith('25') ? rawFy.slice(2) : (rawFy || '70');
+      const rawAc = (panelEl.querySelector('#bma-cfg-autocrat').value || '').trim();
+      const rawMiss = (panelEl.querySelector('#bma-cfg-miss').value || '').trim();
+      const acId = extractSheetId(rawAc) || DEFAULT_FISCAL_YEARS['70'].autocratSheetId;
+      const missId = extractSheetId(rawMiss) || DEFAULT_FISCAL_YEARS['70'].missSheetId;
+
+      if (!state.fiscalYears || typeof state.fiscalYears !== 'object') {
+        state.fiscalYears = JSON.parse(JSON.stringify(DEFAULT_FISCAL_YEARS));
+      }
+      state.fiscalYears[fy] = {
+        label: `ปีงบ ${fy} (MISS${fy} / Auto Crat-EGP${fy})`,
+        autocratSheetId: acId,
+        missSheetId: missId
+      };
+      state.fiscalYear = fy;
+      state.showYearSettings = false;
+      const box = panelEl.querySelector('#bma-fy-config-box');
+      if (box) box.style.display = 'none';
+      saveState();
+      renderFiscalYearDropdown();
+      fetchSheetsData();
+    });
+
+    panelEl.querySelector('#bma-btn-del-fy').addEventListener('click', () => {
+      const curFy = String(state.fiscalYear || '70');
+      if (curFy === '70') {
+        alert('ไม่สามารถลบปีงบประมาณเริ่มต้น (ปีงบ 70) ได้ครับ');
+        return;
+      }
+      delete state.fiscalYears[curFy];
+      state.fiscalYear = '70';
+      saveState();
+      renderFiscalYearDropdown();
       fetchSheetsData();
     });
 

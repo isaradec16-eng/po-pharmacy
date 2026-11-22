@@ -34,11 +34,34 @@
     }
   };
 
+  var DEFAULT_FISCAL_YEARS = {
+    '70': {
+      label: 'ปีงบ 70 (MISS70 / Auto Crat-EGP70)',
+      autocratSheetId: '1qFqdTqcP_d_nNLAX3AL0Gq21s2zjffXW2Czo3Jv1F_Y',
+      missSheetId: '1tTaFrjVCPm8IrjJAg6e0Y27jIqoedLsmJz92py1O0lU'
+    }
+  };
+
+  function extractSheetId(idOrUrl) {
+    var s = String(idOrUrl || '').replace(/^\s+|\s+$/g, '');
+    if (!s) return '';
+    var m = s.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    return m ? m[1] : s;
+  }
+
   var state = {
     items: [],
     selectedCode: '',
     committeeSet: '1',
     fiscalYear: '70',
+    fiscalYears: {
+      '70': {
+        label: 'ปีงบ 70 (MISS70 / Auto Crat-EGP70)',
+        autocratSheetId: '1qFqdTqcP_d_nNLAX3AL0Gq21s2zjffXW2Czo3Jv1F_Y',
+        missSheetId: '1tTaFrjVCPm8IrjJAg6e0Y27jIqoedLsmJz92py1O0lU'
+      }
+    },
+    showYearSettings: false,
     invoiceNo: '',
     purHireNo: '',
     poNo: '',
@@ -616,10 +639,55 @@
   panel.id = 'bma-ie-panel';
   panel.style.cssText = 'position:fixed;top:10px;right:10px;width:330px;background:#ffffff;border:2px solid #2563eb;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.25);font-family:Tahoma,sans-serif;font-size:12px;color:#1e293b;z-index:2147483647;padding:10px;';
 
+  function getCurrentIeFyEntry() {
+    if (!state.fiscalYears || typeof state.fiscalYears !== 'object') {
+      state.fiscalYears = { '70': DEFAULT_FISCAL_YEARS['70'] };
+    }
+    if (!state.fiscalYears['70']) {
+      state.fiscalYears['70'] = DEFAULT_FISCAL_YEARS['70'];
+    }
+    var fy = String(state.fiscalYear || '70').replace(/^\s+|\s+$/g, '');
+    if (!state.fiscalYears[fy]) {
+      state.fiscalYears[fy] = {
+        label: 'ปีงบ ' + fy + ' (MISS' + fy + ' / Auto Crat-EGP' + fy + ')',
+        autocratSheetId: DEFAULT_FISCAL_YEARS['70'].autocratSheetId,
+        missSheetId: DEFAULT_FISCAL_YEARS['70'].missSheetId
+      };
+    }
+    return state.fiscalYears[fy];
+  }
+
+  var curIeEntry = getCurrentIeFyEntry();
+
   panel.innerHTML =
     '<div style="background:#1d4ed8;color:#fff;padding:7px 10px;border-radius:6px;font-weight:bold;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">' +
       '<span>💊 BMA MIS Auto-Filler <span style="font-size:10px;background:rgba(255,255,255,0.2);padding:1px 5px;border-radius:3px;">by ARISSARA.K</span></span>' +
       '<button id="bma-ie-sync" style="background:#3b82f6;color:#fff;border:none;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:11px;">🔄 ซิงค์</button>' +
+    '</div>' +
+    '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:6px;margin-bottom:6px;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
+        '<span style="color:#1e40af;font-weight:bold;font-size:11px;">📅 ปีงบประมาณ & ไฟล์ปลายทาง</span>' +
+        '<button id="bma-ie-fy-toggle" type="button" style="background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:bold;cursor:pointer;">➕ เพิ่มปีงบ / ตั้งค่าไฟล์</button>' +
+      '</div>' +
+      '<select id="bma-ie-fy-select" style="width:100%;padding:4px;border:1px solid #93c5fd;border-radius:4px;font-weight:bold;color:#1e3a8a;box-sizing:border-box;"></select>' +
+      '<div id="bma-ie-fy-box" style="display:none;margin-top:6px;padding-top:6px;border-top:1px dashed #93c5fd;font-size:11px;">' +
+        '<div style="margin-bottom:4px;">' +
+          '<div style="font-weight:bold;color:#1e3a8a;">ปีงบประมาณ (เช่น 70, 71, 72):</div>' +
+          '<div style="display:flex;gap:4px;">' +
+            '<input id="bma-ie-cfg-fy" type="text" value="' + state.fiscalYear + '" style="width:65px;padding:3px;border:1px solid #cbd5e1;border-radius:4px;font-weight:bold;" />' +
+            '<button id="bma-ie-add-next-fy" type="button" style="flex:1;background:#fff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:4px;font-size:10px;font-weight:bold;cursor:pointer;">➕ สร้างปีถัดไป</button>' +
+          '</div>' +
+        '</div>' +
+        '<div style="margin-bottom:4px;">' +
+          '<div style="font-weight:bold;color:#1e3a8a;">ลิงก์/ID ไฟล์ Auto Crat-EGP:</div>' +
+          '<input id="bma-ie-cfg-ac" type="text" value="' + (curIeEntry.autocratSheetId || '') + '" placeholder="วางลิงก์หรือ ID Google Sheet..." style="width:100%;padding:3px;border:1px solid #cbd5e1;border-radius:4px;font-size:10.5px;box-sizing:border-box;" />' +
+        '</div>' +
+        '<div style="margin-bottom:5px;">' +
+          '<div style="font-weight:bold;color:#1e3a8a;">ลิงก์/ID ไฟล์ MISS:</div>' +
+          '<input id="bma-ie-cfg-miss" type="text" value="' + (curIeEntry.missSheetId || '') + '" placeholder="วางลิงก์หรือ ID Google Sheet..." style="width:100%;padding:3px;border:1px solid #cbd5e1;border-radius:4px;font-size:10.5px;box-sizing:border-box;" />' +
+        '</div>' +
+        '<button id="bma-ie-save-fy" type="button" style="width:100%;background:#1d4ed8;color:#fff;border:none;border-radius:4px;padding:5px;font-size:11px;font-weight:bold;cursor:pointer;">💾 บันทึกปีงบ & โหลดไฟล์ใหม่</button>' +
+      '</div>' +
     '</div>' +
     '<div style="margin-bottom:6px;">' +
       '<input id="bma-ie-search" type="text" placeholder="ค้นหารหัส เช่น 1งบ, 7งบ, 30งบ..." style="width:100%;padding:5px;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:4px;box-sizing:border-box;" />' +
@@ -647,6 +715,38 @@
     '<div style="text-align:center;font-size:10.5px;color:#64748b;font-weight:bold;">ผู้พัฒนา: <span style="color:#1d4ed8;">ARISSARA.K</span> • กลุ่มงานเภสัชกรรม รพจ.</div>';
 
   document.body.appendChild(panel);
+
+  function renderIeFiscalYearDropdown() {
+    getCurrentIeFyEntry();
+    var sel = document.getElementById('bma-ie-fy-select');
+    if (!sel) return;
+    var yrs = [];
+    for (var k in state.fiscalYears) {
+      if (state.fiscalYears.hasOwnProperty(k)) yrs.push(k);
+    }
+    yrs.sort(function (a, b) {
+      return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0);
+    });
+    var html = '';
+    for (var i = 0; i < yrs.length; i++) {
+      var y = yrs[i];
+      var info = state.fiscalYears[y] || {};
+      var lbl = info.label || ('ปีงบ ' + y + ' (MISS' + y + ' / Auto Crat-EGP' + y + ')');
+      html += '<option value="' + y + '">' + lbl + '</option>';
+    }
+    sel.innerHTML = html;
+    sel.value = String(state.fiscalYear || '70');
+
+    var entry = getCurrentIeFyEntry();
+    var fyIn = document.getElementById('bma-ie-cfg-fy');
+    var acIn = document.getElementById('bma-ie-cfg-ac');
+    var msIn = document.getElementById('bma-ie-cfg-miss');
+    if (fyIn) fyIn.value = String(state.fiscalYear || '70');
+    if (acIn) acIn.value = entry.autocratSheetId || '';
+    if (msIn) msIn.value = entry.missSheetId || '';
+  }
+
+  renderIeFiscalYearDropdown();
 
   function renderIeList() {
     var q = String(document.getElementById('bma-ie-search').value || '').replace(/^\s+|\s+$/g, '').toLowerCase();
@@ -746,10 +846,18 @@
   }
 
   function loadDataViaXhr() {
+    var fy = String(state.fiscalYear || '70').replace(/^\s+|\s+$/g, '');
+    var entry = getCurrentIeFyEntry();
     var st = document.getElementById('bma-ie-status');
-    if (st) st.innerHTML = '⏳ กำลังดึงข้อมูลจาก Google Sheets...';
+    if (st) st.innerHTML = '⏳ กำลังดึงข้อมูลปีงบ ' + fy + ' (MISS' + fy + ' / Auto Crat-EGP' + fy + ')...';
+    var url =
+      GAS_URL +
+      '?fiscalYear=' + encodeURIComponent(fy) +
+      '&autocratSheetId=' + encodeURIComponent(extractSheetId(entry.autocratSheetId)) +
+      '&missSheetId=' + encodeURIComponent(extractSheetId(entry.missSheetId)) +
+      '&t=' + new Date().getTime();
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', GAS_URL + '?t=' + new Date().getTime(), true);
+    xhr.open('GET', url, true);
     xhr.onreadystatechange = function () {
       if (xhr.readyState === 4) {
         if (xhr.status >= 200 && xhr.status < 300) {
@@ -758,6 +866,7 @@
             if (res && res.items) {
               state.items = res.items;
               renderIeList();
+              if (st) st.innerHTML = '✓ ปีงบ ' + fy + ': โหลดสำเร็จ (' + state.items.length + ' รายการ)';
               return;
             }
           } catch (e) {}
@@ -767,6 +876,52 @@
     };
     xhr.send();
   }
+
+  document.getElementById('bma-ie-fy-select').onchange = function () {
+    state.fiscalYear = String(this.value || '70');
+    saveState();
+    renderIeFiscalYearDropdown();
+    loadDataViaXhr();
+  };
+
+  document.getElementById('bma-ie-fy-toggle').onclick = function () {
+    var box = document.getElementById('bma-ie-fy-box');
+    if (box) {
+      box.style.display = box.style.display === 'none' ? 'block' : 'none';
+      renderIeFiscalYearDropdown();
+    }
+  };
+
+  document.getElementById('bma-ie-add-next-fy').onclick = function () {
+    var maxYr = 70;
+    for (var k in state.fiscalYears) {
+      if (state.fiscalYears.hasOwnProperty(k)) {
+        var n = parseInt(k, 10) || 70;
+        if (n > maxYr) maxYr = n;
+      }
+    }
+    var nextYr = String(maxYr + 1);
+    document.getElementById('bma-ie-cfg-fy').value = nextYr;
+    document.getElementById('bma-ie-cfg-ac').value = '';
+    document.getElementById('bma-ie-cfg-miss').value = '';
+  };
+
+  document.getElementById('bma-ie-save-fy').onclick = function () {
+    var rawFy = String(document.getElementById('bma-ie-cfg-fy').value || '').replace(/\D/g, '');
+    var fy = (rawFy.length === 4 && rawFy.indexOf('25') === 0) ? rawFy.slice(2) : (rawFy || '70');
+    var acId = extractSheetId(document.getElementById('bma-ie-cfg-ac').value) || DEFAULT_FISCAL_YEARS['70'].autocratSheetId;
+    var msId = extractSheetId(document.getElementById('bma-ie-cfg-miss').value) || DEFAULT_FISCAL_YEARS['70'].missSheetId;
+    state.fiscalYears[fy] = {
+      label: 'ปีงบ ' + fy + ' (MISS' + fy + ' / Auto Crat-EGP' + fy + ')',
+      autocratSheetId: acId,
+      missSheetId: msId
+    };
+    state.fiscalYear = fy;
+    document.getElementById('bma-ie-fy-box').style.display = 'none';
+    saveState();
+    renderIeFiscalYearDropdown();
+    loadDataViaXhr();
+  };
 
   document.getElementById('bma-ie-search').onkeyup = renderIeList;
   document.getElementById('bma-ie-select').onchange = onIeItemChange;
