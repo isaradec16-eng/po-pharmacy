@@ -507,9 +507,19 @@
   function fillStep8(item) {
     var count = 0;
     var rcvNo = state.rcvNo || (item && item.rcvNo) || state.poNo || (item && item.poNo) || '';
+    var yr = state.fiscalYear || '70';
+    var code = (item && item.code) || state.selectedCode || '';
+    var pdfBaseName = 'ใบตรวจรับ_' + (rcvNo || 'X') + '-' + yr + (code ? '_' + code : '');
+    try {
+      document.title = pdfBaseName;
+    } catch (e) {}
+
     var docs = getTargetDocs();
     for (var d = 0; d < docs.length; d++) {
       var doc = docs[d];
+      try {
+        doc.title = pdfBaseName;
+      } catch (e2) {}
       var dept = findInputsAfterLabel(doc, 'หน่วยงานตรวจรับ');
       if (dept[0] && setInputValue(dept[0], '07070000')) count++;
       var rcv = findInputsAfterLabel(doc, 'เลขที่ใบตรวจรับ');

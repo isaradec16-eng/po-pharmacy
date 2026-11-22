@@ -1042,7 +1042,79 @@ async function fetchRemoteConfig() {
   }
 }
 
+let lastRcvPdfContext = {
+  rcvNo: "",
+  fiscalYear: "70",
+  code: "",
+  subject: "",
+  fileSeq: 0,
+  updatedAt: 0
+};
+
+function sanitizeFileName(name) {
+  return String(name || "")
+    .replace(/[\\/:*?"<>|]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// ดักจับการดาวน์โหลดไฟล์ PDF จากเว็บ MIS (ข้อ 13 ใบตรวจรับพัสดุ ซึ่งจะมี 2 ไฟล์ PDF เด้งขึ้นมา) แล้วเปลี่ยนชื่อไฟล์ตามชื่อ/เลขที่ใบตรวจรับอัตโนมัติ
+if (chrome.downloads && chrome.downloads.onDeterminingFilename) {
+  chrome.downloads.onDeterminingFilename.addListener((downloadItem, suggest) => {
+    const url = String(downloadItem.url || "");
+    const mime = String(downloadItem.mime || "");
+    const origName = String(downloadItem.filename || "");
+    const isMisHost = /bmamisapp11\.bma\.go\.th|misweb\.bma\.go\.th/i.test(url);
+    const isPdf = /pdf/i.test(mime) || /\.pdf$/i.test(origName) || /Rep_pur_rcv|report|servlet|pdf/i.test(url);
+
+    if (isMisHost && isPdf && (lastRcvPdfContext.rcvNo || lastRcvPdfContext.code)) {
+      lastRcvPdfContext.fileSeq = (lastRcvPdfContext.fileSeq % 2) + 1;
+      const rcvNo = lastRcvPdfContext.rcvNo || "X";
+      const yr = lastRcvPdfContext.fiscalYear || "70";
+      const codePart = lastRcvPdfContext.code ? `_${lastRcvPdfContext.code}` : "";
+      const baseTitle = sanitizeFileName(`ใบตรวจรับ_${rcvNo}-${yr}${codePart}`);
+      const newFileName = `${baseTitle}_ไฟล์ที่${lastRcvPdfContext.fileSeq}.pdf`;
+      suggest({ filename: newFileName, conflictAction: "uniquify" });
+      return;
+    }
+    suggest();
+  });
+}
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  if (msg && msg.type === "SET_RCV_PDF_CONTEXT") {
+    lastRcvPdfContext = {
+      rcvNo: String(msg.rcvNo || "").trim(),
+      fiscalYear: String(msg.fiscalYear || "70").trim(),
+      code: String(msg.code || "").trim(),
+      subject: String(msg.subject || "").trim(),
+      fileSeq: 0,
+      updatedAt: Date.now()
+    };
+    sendResponse({ ok: true, context: lastRcvPdfContext });
+    return true;
+  }
+
+  if (msg && msg.type === "DOWNLOAD_PDF_URLS") {
+    const urls = Array.isArray(msg.urls) ? msg.urls : [];
+    const rcvNo = String(msg.rcvNo || lastRcvPdfContext.rcvNo || "X").trim();
+    const yr = String(msg.fiscalYear || lastRcvPdfContext.fiscalYear || "70").trim();
+    const codePart = msg.code ? `_${msg.code}` : "";
+    const baseTitle = sanitizeFileName(`ใบตรวจรับ_${rcvNo}-${yr}${codePart}`);
+
+    urls.forEach((u, idx) => {
+      const fName = urls.length > 1 ? `${baseTitle}_ไฟล์ที่${idx + 1}.pdf` : `${baseTitle}.pdf`;
+      chrome.downloads.download({
+        url: u,
+        filename: fName,
+        conflictAction: "uniquify",
+        saveAs: false
+      });
+    });
+    sendResponse({ ok: true, count: urls.length, baseTitle });
+    return true;
+  }
+
   if (msg && msg.type === "FETCH_SHEETS_DATA") {
     (async () => {
       try {

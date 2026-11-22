@@ -827,11 +827,97 @@
     return count;
   }
 
+  function syncRcvPdfContext(item) {
+    const rcvNo = state.rcvNo || (item && item.rcvNo) || state.poNo || (item && item.poNo) || '';
+    const fiscalYear = state.fiscalYear || '70';
+    const code = (item && item.code) || state.selectedCode || '';
+    const subject = (item && item.subject) || '';
+    try {
+      chrome.runtime.sendMessage({
+        type: 'SET_RCV_PDF_CONTEXT',
+        rcvNo,
+        fiscalYear,
+        code,
+        subject
+      });
+    } catch (e) {}
+  }
+
+  function findEmbeddedPdfUrls() {
+    const urls = [];
+    if (/\.pdf(\?|$)|report|servlet/i.test(window.location.href) && document.contentType === 'application/pdf') {
+      urls.push(window.location.href);
+    }
+    getTargetDocs().forEach((doc) => {
+      try {
+        const embeds = doc.querySelectorAll('embed[src], iframe[src], object[data], a[href*=".pdf"], a[href*="report"], a[href*="Report"]');
+        embeds.forEach((el) => {
+          const rawUrl = el.getAttribute('src') || el.getAttribute('data') || el.getAttribute('href') || '';
+          if (rawUrl && (/\.pdf/i.test(rawUrl) || /report|servlet/i.test(rawUrl))) {
+            try {
+              const absUrl = new URL(rawUrl, doc.location.href).href;
+              if (!urls.includes(absUrl)) urls.push(absUrl);
+            } catch (e) {}
+          }
+        });
+      } catch (e) {}
+    });
+    return urls;
+  }
+
+  function saveCurrentRcvPdfs(item) {
+    const rcvNo = state.rcvNo || (item && item.rcvNo) || state.poNo || (item && item.poNo) || 'X';
+    const fiscalYear = state.fiscalYear || '70';
+    const code = (item && item.code) || state.selectedCode || '';
+    syncRcvPdfContext(item);
+
+    const pdfUrls = findEmbeddedPdfUrls();
+    const baseName = `ใบตรวจรับ_${rcvNo}-${fiscalYear}${code ? '_' + code : ''}`;
+
+    // ตั้งชื่อ Title ของหน้าเว็บให้ตรงกับชื่อใบตรวจรับ เวลาผู้ใช้กด Ctrl+S หรือ Save as PDF ชื่อไฟล์จะเป็นชื่อใบตรวจรับทันที
+    try {
+      document.title = baseName;
+    } catch (e) {}
+
+    if (pdfUrls.length > 0) {
+      chrome.runtime.sendMessage(
+        {
+          type: 'DOWNLOAD_PDF_URLS',
+          urls: pdfUrls,
+          rcvNo,
+          fiscalYear,
+          code
+        },
+        (res) => {
+          if (res && res.ok) {
+            setStatus(`✓ บันทึกไฟล์ PDF ตามชื่อ "${baseName}" (${res.count} ไฟล์) เรียบร้อย!`, 'ok');
+          }
+        }
+      );
+      return true;
+    }
+    return false;
+  }
+
   // ขั้นตอนที่ 8: รายงาน -> 13. ใบตรวจรับพัสดุ (Rep_pur_rcv.jsp)
   function fillStep8ReportRcv(item) {
     let count = 0;
     const rcvNo = state.rcvNo || (item && item.rcvNo) || state.poNo || (item && item.poNo) || '';
+    const fiscalYear = state.fiscalYear || '70';
+    const code = (item && item.code) || state.selectedCode || '';
+    const baseName = `ใบตรวจรับ_${rcvNo || 'X'}-${fiscalYear}${code ? '_' + code : ''}`;
+
+    // ส่งชื่อใบตรวจรับไปตั้งรอไว้ที่ Background Downloader ทันทีเผื่อกดปุ่ม [แสดงรายงาน] แล้วมี PDF 2 ไฟล์เด้งขึ้นมา
+    syncRcvPdfContext(item);
+    try {
+      document.title = baseName;
+    } catch (e) {}
+
     getTargetDocs().forEach((doc) => {
+      try {
+        doc.title = baseName;
+      } catch (e) {}
+
       const deptInputs = findInputsAfterLabel(doc, 'หน่วยงานตรวจรับ');
       if (deptInputs[0] && setInputValue(deptInputs[0], '07070000')) count++;
 
@@ -840,10 +926,10 @@
         if (rcvInputs[0].tagName === 'SELECT') {
           setSelectByTextOrVal(rcvInputs[0], 'จัดซื้อ');
           if (rcvNo && setInputValue(rcvInputs[1], rcvNo)) count++;
-          if (rcvInputs[2]) setInputValue(rcvInputs[2], state.fiscalYear || '70');
+          if (rcvInputs[2]) setInputValue(rcvInputs[2], fiscalYear);
         } else {
           if (rcvNo && setInputValue(rcvInputs[0], rcvNo)) count++;
-          if (rcvInputs[1]) setInputValue(rcvInputs[1], state.fiscalYear || '70');
+          if (rcvInputs[1]) setInputValue(rcvInputs[1], fiscalYear);
         }
       }
 
@@ -861,6 +947,15 @@
 
       const affInputs = findInputsAfterLabel(doc, 'สังกัดของเจ้าหน้าที่พัสดุ');
       if (affInputs[0] && setInputValue(affInputs[0], 'กลุ่มงานเภสัชกรรม รพ.เจริญกรุงประชารักษ์ สำนักการแพทย์')) count++;
+
+      // ผูก Event กับปุ่ม [แสดงรายงาน] เพื่อส่งชื่อไฟล์ใบตรวจรับไปตั้งชื่อ PDF ทั้ง 2 ไฟล์ทันทีที่กด
+      const showBtn = findButtonByText(doc, 'แสดงรายงาน');
+      if (showBtn && !showBtn.__bmaPdfHooked) {
+        showBtn.__bmaPdfHooked = true;
+        showBtn.addEventListener('click', () => {
+          syncRcvPdfContext(getSelectedItem());
+        });
+      }
     });
     return count;
   }
@@ -1112,12 +1207,22 @@
         navigateToMisStep(nextStepNum);
       };
     } else {
+      const rcvNo = state.rcvNo || (item && item.rcvNo) || state.poNo || (item && item.poNo) || 'X';
+      const yr = state.fiscalYear || '70';
+      const basePdf = `ใบตรวจรับ_${rcvNo}-${yr}_${item.code}`;
       titleEl.innerHTML = `🔔 รออนุมัติก่อนบันทึก (${page.title})`;
-      descEl.textContent = `ระบบกรอกข้อมูลลงช่องต่างๆ อัตโนมัติแล้ว กรุณาตรวจสอบความถูกต้องก่อนกดอนุมัติบันทึก`;
+      if (page.id === 'STEP8_REP_RCV') {
+        descEl.innerHTML =
+          `กรอกข้อมูลครบแล้ว เมื่อกด <b>[แสดงรายงาน]</b> ระบบจะตั้งชื่อไฟล์ PDF ทั้ง 2 ไฟล์เป็น:<br/>` +
+          `📄 <b>${basePdf}_ไฟล์ที่1.pdf</b><br/>` +
+          `📄 <b>${basePdf}_ไฟล์ที่2.pdf</b>`;
+      } else {
+        descEl.textContent = `ระบบกรอกข้อมูลลงช่องต่างๆ อัตโนมัติแล้ว กรุณาตรวจสอบความถูกต้องก่อนกดอนุมัติบันทึก`;
+      }
       approveBtn.style.display = 'flex';
       approveBtn.textContent = nextStepNum
         ? `✅ อนุมัติบันทึก (และเตรียมไปขั้นตอนที่ ${nextStepNum})`
-        : `✅ อนุมัติบันทึก / แสดงรายงาน`;
+        : `✅ อนุมัติแสดงรายงาน & บันทึก PDF 2 ไฟล์ (${basePdf})`;
       if (nextStepNum) {
         nextBtn.style.display = 'flex';
         nextBtn.textContent = `⏭️ ข้ามไปเปิดหน้าขั้นตอนที่ ${nextStepNum}`;
