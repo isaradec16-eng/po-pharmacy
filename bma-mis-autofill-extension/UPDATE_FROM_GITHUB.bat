@@ -7,7 +7,7 @@ echo ========================================================
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$base = 'https://raw.githubusercontent.com/isaradec16-eng/po-pharmacy/main/bma-mis-autofill-extension'; " ^
-  "$files = @('manifest.json','background.js','content.js','panel.css','remote-config.json','google-apps-script.gs','README.md'); " ^
+  "$files = @('manifest.json','background.js','content.js','panel.css','remote-config.json','google-apps-script.gs','ie-autofill.js','RUN_IE_AUTOFILL.bat','README.md'); " ^
   "foreach ($f in $files) { " ^
   "  Write-Host ('กำลังอัปเดต ' + $f + ' ...'); " ^
   "  Invoke-WebRequest -Uri ($base + '/' + $f + '?t=' + [DateTimeOffset]::Now.ToUnixTimeSeconds()) -OutFile (Join-Path $PSScriptRoot $f) -UseBasicParsing; " ^
