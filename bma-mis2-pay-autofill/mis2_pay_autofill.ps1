@@ -1278,7 +1278,7 @@ $lblSafety.Font = New-Object System.Drawing.Font("Segoe UI", 8.2, [System.Drawin
 $header.Controls.Add($lblSafety)
 
 $btnOpenWeb = New-Object System.Windows.Forms.Button
-$btnOpenWeb.Text = "🌐 เปิดเว็บ MIS2"
+$btnOpenWeb.Text = "🌐 เปิด MIS2 (IE)"
 $btnOpenWeb.Location = New-Object System.Drawing.Point(12, 60)
 $btnOpenWeb.Size = New-Object System.Drawing.Size(110, 27)
 $btnOpenWeb.BackColor = [System.Drawing.Color]::FromArgb(2, 132, 199)
@@ -1286,7 +1286,16 @@ $btnOpenWeb.ForeColor = [System.Drawing.Color]::White
 $btnOpenWeb.FlatStyle = "Flat"
 $btnOpenWeb.FlatAppearance.BorderSize = 0
 $btnOpenWeb.Add_Click({
-    Start-Process ([string]$script:Config["mis2LoginUrl"])
+    $url = [string]$script:Config["mis2LoginUrl"]
+    $iePaths = @(
+        "$env:ProgramFiles\Internet Explorer\iexplore.exe",
+        "${env:ProgramFiles(x86)}\Internet Explorer\iexplore.exe"
+    )
+    $ieExe = $iePaths | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($ieExe) {
+        try { Start-Process -FilePath $ieExe -ArgumentList $url; return } catch {}
+    }
+    Start-Process $url
 })
 $header.Controls.Add($btnOpenWeb)
 

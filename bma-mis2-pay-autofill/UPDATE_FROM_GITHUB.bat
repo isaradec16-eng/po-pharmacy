@@ -8,7 +8,7 @@ echo ========================================================
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; " ^
   "$base = 'https://raw.githubusercontent.com/isaradec16-eng/po-pharmacy/main/bma-mis2-pay-autofill'; " ^
-  "$files = @('mis2_pay_autofill.ps1','vendors-cache.json','START_MIS2_PAY_AUTOFILL.bat','README.md'); " ^
+  "$files = @('mis2_pay_autofill.ps1','vendors-cache.json','START_MIS2_PAY_AUTOFILL.bat','CREATE_DESKTOP_SHORTCUT.bat','README.md'); " ^
   "foreach ($f in $files) { " ^
   "  Write-Host ('กำลังอัปเดต ' + $f + ' ...'); " ^
   "  Invoke-WebRequest -Uri ($base + '/' + $f + '?t=' + [DateTimeOffset]::Now.ToUnixTimeSeconds()) -OutFile (Join-Path $PSScriptRoot $f) -UseBasicParsing; " ^
