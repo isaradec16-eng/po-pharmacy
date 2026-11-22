@@ -378,7 +378,7 @@ function Load-Config {
         )
         defaultDocCount     = "1"
         defaultDateMode     = "today"
-        descriptionTemplate = "ค่า{subject}"
+        descriptionTemplate = "(ค่า{subject})"
         stepDelayMs         = 220
         clearBeforePaste    = $true
         autoFillFields      = @{
@@ -1705,12 +1705,12 @@ function Apply-ItemToFields($item) {
     $amtVal = if ($item.amount) { [double]$item.amount } else { 0.0 }
     Update-TaxFieldsFromCurrent -amountVal $amtVal -companyName ([string]$item.vendorName)
 
-    # Description template (linked directly from MISS70 Column J: ชื่อโครงการ -> ค่า...)
+    # Description template (linked directly from MISS70 Column J: ชื่อโครงการ -> (ค่า...))
     $subjRaw = if ($item.missSubject) { ([string]$item.missSubject).Trim() } else { ([string]$item.subject).Trim() }
     $tpl = [string]$script:Config["descriptionTemplate"]
-    if ([string]::IsNullOrWhiteSpace($tpl)) { $tpl = "ค่า{subject}" }
-    if ($tpl -eq "ค่า{subject}" -and $subjRaw.StartsWith("ค่า")) {
-        $desc = $subjRaw
+    if ([string]::IsNullOrWhiteSpace($tpl)) { $tpl = "(ค่า{subject})" }
+    if ($tpl -eq "(ค่า{subject})" -and $subjRaw.StartsWith("ค่า")) {
+        $desc = "($subjRaw)"
     } else {
         $desc = $tpl.Replace("{subject}", $subjRaw) `
                     .Replace("{poNo}", [string]$item.poNo) `

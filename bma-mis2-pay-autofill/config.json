@@ -20,7 +20,7 @@
   ],
   "defaultDocCount": "1",
   "defaultDateMode": "today",
-  "descriptionTemplate": "ค่า{subject}",
+  "descriptionTemplate": "(ค่า{subject})",
   "stepDelayMs": 220,
   "clearBeforePaste": true,
   "autoFillFields": {
