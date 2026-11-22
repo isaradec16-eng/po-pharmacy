@@ -534,14 +534,36 @@
     return count;
   }
 
-  function runAutoFill(stepOverride) {
+  function isIePageStep7Or8() {
+    var fullUrl = window.location.href;
+    var fullText = '';
+    var docs = getTargetDocs();
+    for (var i = 0; i < docs.length; i++) {
+      try {
+        fullText += ' ' + (docs[i].body ? docs[i].body.innerText : '');
+        fullUrl += ' ' + (docs[i].location ? docs[i].location.href : '');
+      } catch (e) {}
+    }
+    return (
+      /Rep_pur_rcv\.jsp|Frm_pur_hire_rcv_committee\.jsp/i.test(fullUrl) ||
+      fullText.indexOf('รายงานรายละเอียดการตรวจรับ') !== -1 ||
+      fullText.indexOf('บันทึกข้อมูลคณะกรรมการตรวจรับ') !== -1 ||
+      fullText.indexOf('รายชื่อคณะกรรมการตรวจรับ') !== -1
+    );
+  }
+
+  function runAutoFill(stepOverride, isSilent) {
     var item = getSelectedItem();
     if (!item) {
-      alert('กรุณาเลือกรายการยาจาก Google Sheet ก่อนครับ');
+      if (!isSilent) alert('กรุณาเลือกรายการยาจาก Google Sheet ก่อนครับ');
       return;
     }
-    if (isItemAlreadyRecorded(item)) {
-      alert('มีประวัติการลงข้อมูลแล้ว\n\nรายการ [' + item.code + '] มีรหัสจัดซื้อ / ใบสั่งซื้อ / ใบตรวจรับ ครบแล้ว\nห้ามลงข้อมูลซ้ำเด็ดขาด!');
+    var rec = isItemAlreadyRecorded(item);
+    var allowStep = stepOverride === 7 || stepOverride === 8 || (!stepOverride && isIePageStep7Or8());
+    if (rec && !allowStep) {
+      if (!isSilent) {
+        alert('มีประวัติการลงข้อมูลแล้ว\n\nรายการ [' + item.code + '] มีรหัสจัดซื้อ / ใบสั่งซื้อ / ใบตรวจรับ ครบแล้ว\nห้ามลงข้อมูลซ้ำในขั้นตอนที่ 1-6 (สามารถกดปุ่ม 7.กรรมการ หรือ 8.ใบตรวจรับ ได้ตามปกติ)');
+      }
       return;
     }
     var count = 0;
@@ -554,6 +576,9 @@
       if (stepOverride === 6) count += fillStep6(item);
       if (stepOverride === 7) count += fillStep7(item);
       if (stepOverride === 8) count += fillStep8(item);
+    } else if (rec) {
+      count += fillStep7(item);
+      count += fillStep8(item);
     } else {
       count += fillStep1(item);
       count += fillStep2(item);
@@ -565,10 +590,11 @@
       count += fillStep8(item);
     }
     var st = document.getElementById('bma-ie-status');
-    if (st) {
-      st.innerHTML = count > 0
-        ? '✓ กรอกข้อมูล [' + item.code + '] สำเร็จ (' + count + ' จุด)'
-        : '⚠️ ไม่พบช่องที่ต้องกรอกในหน้านี้';
+    if (count > 0) {
+      highlightIeApprovalButtons();
+      if (st) st.innerHTML = '✓ กรอกอัตโนมัติ [' + item.code + '] แล้ว (' + count + ' จุด) • รอคุณกด [บันทึก]';
+    } else if (!isSilent && st) {
+      st.innerHTML = '⚠️ ไม่พบช่องที่ต้องกรอกในหน้านี้';
     }
   }
 
@@ -602,7 +628,11 @@
         '<option value="2">ชุดที่ 2 (วีรวิชญ์)</option>' +
       '</select>' +
     '</div>' +
-    '<button id="bma-ie-fillbtn" style="width:100%;padding:8px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-weight:bold;cursor:pointer;margin-bottom:6px;">⚡ กรอกข้อมูลหน้านี้ทันที (Auto-Fill)</button>' +
+    '<button id="bma-ie-fillbtn" style="width:100%;padding:8px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-weight:bold;cursor:pointer;margin-bottom:6px;">⚡ กรอกซ้ำอีกครั้ง (Auto-Fill)</button>' +
+    '<div style="display:flex;gap:4px;margin-bottom:6px;">' +
+      '<button id="bma-ie-step7" style="width:50%;padding:6px 4px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:5px;font-weight:bold;cursor:pointer;font-size:11px;">7. กรรมการ (ข้อ12)</button>' +
+      '<button id="bma-ie-step8" style="width:50%;padding:6px 4px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:5px;font-weight:bold;cursor:pointer;font-size:11px;">8. พิมพ์ใบตรวจรับ (ข้อ13)</button>' +
+    '</div>' +
     '<div id="bma-ie-status" style="background:#f1f5f9;padding:5px 7px;border-radius:4px;font-size:11px;font-weight:bold;">พร้อมใช้งานบน IE Mode</div>';
 
   document.body.appendChild(panel);
@@ -680,8 +710,28 @@
 
     btn.disabled = !allowMain;
     btn.style.background = !allowMain ? '#94a3b8' : '#2563eb';
-    btn.innerHTML = !allowMain ? '⛔ มีประวัติการลงข้อมูลแล้ว (ล็อกขั้น 1-6)' : '⚡ กรอกข้อมูลหน้านี้ทันที (Auto-Fill)';
+    btn.innerHTML = !allowMain ? '⛔ มีประวัติการลงข้อมูลแล้ว (ล็อกขั้น 1-6)' : '⚡ กรอกซ้ำอีกครั้ง (Auto-Fill)';
     saveState();
+
+    // กรอกอัตโนมัติทันทีที่เลือกรายการหรือโหลดหน้าเสร็จ (รอคนกดบันทึก)
+    if (allowMain) {
+      runAutoFill(undefined, true);
+    }
+  }
+
+  function highlightIeApprovalButtons() {
+    var docs = getTargetDocs();
+    for (var d = 0; d < docs.length; d++) {
+      var btns = docs[d].querySelectorAll('input[type="button"], input[type="submit"], button');
+      for (var i = 0; i < btns.length; i++) {
+        var b = btns[i];
+        var txt = String(b.value || b.innerText || '').replace(/\s+/g, '');
+        if (/^(บันทึก|ตกลง|แสดงรายงาน|รายละเอียด)$/.test(txt)) {
+          b.style.border = '2px solid #16a34a';
+          b.style.fontWeight = 'bold';
+        }
+      }
+    }
   }
 
   function loadDataViaXhr() {
@@ -697,7 +747,6 @@
             if (res && res.items) {
               state.items = res.items;
               renderIeList();
-              if (st) st.innerHTML = '✓ โหลดสำเร็จ ' + state.items.length + ' รายการ';
               return;
             }
           } catch (e) {}
@@ -714,11 +763,11 @@
   document.getElementById('bma-ie-fillbtn').onclick = function () { runAutoFill(); };
   document.getElementById('bma-ie-step7').onclick = function () { runAutoFill(7); };
   document.getElementById('bma-ie-step8').onclick = function () { runAutoFill(8); };
-  document.getElementById('bma-ie-purno').onchange = function () { state.purHireNo = this.value; saveState(); };
-  document.getElementById('bma-ie-pono').onchange = function () { state.poNo = this.value; saveState(); };
-  document.getElementById('bma-ie-rcvno').onchange = function () { state.rcvNo = this.value; saveState(); };
-  document.getElementById('bma-ie-inv').onchange = function () { state.invoiceNo = this.value; saveState(); };
-  document.getElementById('bma-ie-comm').onchange = function () { state.committeeSet = this.value; saveState(); };
+  document.getElementById('bma-ie-purno').onchange = function () { state.purHireNo = this.value; saveState(); runAutoFill(undefined, true); };
+  document.getElementById('bma-ie-pono').onchange = function () { state.poNo = this.value; saveState(); runAutoFill(undefined, true); };
+  document.getElementById('bma-ie-rcvno').onchange = function () { state.rcvNo = this.value; saveState(); runAutoFill(undefined, true); };
+  document.getElementById('bma-ie-inv').onchange = function () { state.invoiceNo = this.value; saveState(); runAutoFill(undefined, true); };
+  document.getElementById('bma-ie-comm').onchange = function () { state.committeeSet = this.value; saveState(); runAutoFill(undefined, true); };
 
   loadDataViaXhr();
 })();

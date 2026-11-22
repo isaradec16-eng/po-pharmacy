@@ -50,6 +50,7 @@
     rcvNo: '',
     filterText: '',
     minimized: false,
+    autoFillOnLoad: true,
     gasWebAppUrl: 'https://script.google.com/macros/s/AKfycbyAvDPZrKrKK0B50nU84aK9bVTyLWT47YhjW2ppGiGPSFIrI3Lryu55CBbnPFKCXKMx/exec'
   };
 
@@ -1121,6 +1122,11 @@
     syncCodesToPanel();
     renderSelectedSummary();
     updateButtonsLockState(item);
+    // กรอกอัตโนมัติทันทีที่เลือกรายการ (โดยไม่กดบันทึก รอคนอนุมัติ)
+    if (state.autoFillOnLoad !== false) {
+      lastAutoFillSig = '';
+      triggerSmartAutoFill();
+    }
   }
 
   function renderSelectedSummary() {
@@ -1287,8 +1293,13 @@
           </div>
         </div>
 
+        <label style="display:flex;align-items:center;gap:6px;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;padding:6px 9px;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;">
+          <input type="checkbox" id="bma-autofill-toggle" ${state.autoFillOnLoad !== false ? 'checked' : ''} style="accent-color:#16a34a;width:15px;height:15px;" />
+          <span>กรอกอัตโนมัติทันทีเมื่อเปิดหน้า (รอคนกดบันทึก)</span>
+        </label>
+
         <button type="button" class="bma-btn bma-btn-primary" id="bma-btn-autofill">
-          ⚡ กรอกข้อมูลหน้านี้ทันที (Auto-Fill)
+          ⚡ กรอกซ้ำอีกครั้ง (Auto-Fill)
         </button>
 
         <div class="bma-field-group">
@@ -1305,7 +1316,7 @@
           </div>
         </div>
 
-        <div id="bma-status-bar" class="bma-status-bar">พร้อมใช้งาน • เปิด Google Sheet ค้างไว้ใน Opera เพื่อซิงค์ข้อมูล</div>
+        <div id="bma-status-bar" class="bma-status-bar">พร้อมใช้งาน • กรอกอัตโนมัติและรอคนกดบันทึกทุกครั้ง</div>
       </div>
     `;
 
@@ -1337,26 +1348,55 @@
     panelEl.querySelector('#bma-pur-no').addEventListener('input', (e) => {
       state.purHireNo = e.target.value.trim();
       saveState();
+      if (state.autoFillOnLoad !== false) {
+        lastAutoFillSig = '';
+        triggerSmartAutoFill();
+      }
     });
 
     panelEl.querySelector('#bma-po-no').addEventListener('input', (e) => {
       state.poNo = e.target.value.trim();
       saveState();
+      if (state.autoFillOnLoad !== false) {
+        lastAutoFillSig = '';
+        triggerSmartAutoFill();
+      }
     });
 
     panelEl.querySelector('#bma-rcv-no').addEventListener('input', (e) => {
       state.rcvNo = e.target.value.trim();
       saveState();
+      if (state.autoFillOnLoad !== false) {
+        lastAutoFillSig = '';
+        triggerSmartAutoFill();
+      }
     });
 
     panelEl.querySelector('#bma-inv-no').addEventListener('input', (e) => {
       state.invoiceNo = e.target.value.trim();
       saveState();
+      if (state.autoFillOnLoad !== false) {
+        lastAutoFillSig = '';
+        triggerSmartAutoFill();
+      }
     });
 
     panelEl.querySelector('#bma-committee-select').addEventListener('change', (e) => {
       state.committeeSet = e.target.value;
       saveState();
+      if (state.autoFillOnLoad !== false) {
+        lastAutoFillSig = '';
+        triggerSmartAutoFill();
+      }
+    });
+
+    panelEl.querySelector('#bma-autofill-toggle').addEventListener('change', (e) => {
+      state.autoFillOnLoad = e.target.checked;
+      saveState();
+      if (state.autoFillOnLoad) {
+        lastAutoFillSig = '';
+        triggerSmartAutoFill();
+      }
     });
 
     panelEl.querySelector('#bma-btn-autofill').addEventListener('click', () => {
@@ -1396,7 +1436,8 @@
         } else if (st === '8') {
           filled += fillStep8ReportRcv(item);
         }
-        setStatus(filled > 0 ? `✓ กรอกขั้นตอนที่ ${st} สำเร็จ (${filled} จุด)` : `⚠️ ไม่พบช่องของขั้นตอนที่ ${st} ในหน้านี้`, filled > 0 ? 'ok' : 'err');
+        highlightApprovalButtons();
+        setStatus(filled > 0 ? `✓ กรอกขั้นตอนที่ ${st} สำเร็จ (${filled} จุด) • รอคุณกด [บันทึก]` : `⚠️ ไม่พบช่องของขั้นตอนที่ ${st} ในหน้านี้`, filled > 0 ? 'ok' : 'err');
       });
     });
 
@@ -1406,13 +1447,48 @@
     // ถ้ายังไม่มีข้อมูลใน Cache ให้ดึงจาก Google Sheets อัตโนมัติ
     if (!state.items || state.items.length === 0) {
       fetchSheetsData();
+    } else if (state.autoFillOnLoad !== false) {
+      setTimeout(triggerSmartAutoFill, 250);
     }
+  }
+
+  let lastAutoFillSig = '';
+
+  function computePageDomSignature() {
+    const p = detectCurrentPage();
+    let inputCount = 0;
+    let tableRows = 0;
+    getTargetDocs().forEach((d) => {
+      try {
+        inputCount += d.querySelectorAll('input, select, textarea').length;
+        tableRows += d.querySelectorAll('tr').length;
+      } catch (e) {}
+    });
+    return [
+      p.id,
+      state.selectedCode,
+      state.committeeSet,
+      state.purHireNo,
+      state.poNo,
+      state.rcvNo,
+      state.invoiceNo,
+      inputCount,
+      tableRows
+    ].join('|');
+  }
+
+  function triggerSmartAutoFill() {
+    if (state.autoFillOnLoad === false) return;
+    const sig = computePageDomSignature();
+    if (sig === lastAutoFillSig) return;
+    lastAutoFillSig = sig;
+    autoFillCurrentPage(undefined, true);
   }
 
   // โหลด State แล้วสร้างแผงควบคุม
   loadState(() => {
     buildPanel();
-    // ตรวจจับการเปลี่ยนหน้าหรือเปลี่ยน Frame ทุก 1.5 วินาที
+    // ตรวจจับการเปลี่ยนหน้า/เปิด Popup/ดึงตารางใหม่ แล้วกรอกอัตโนมัติทันทีโดยไม่ต้องกดปุ่ม (รอคนกดบันทึก)
     setInterval(() => {
       tryCaptureGeneratedCodes();
       if (panelEl) {
@@ -1423,6 +1499,7 @@
         }
         updateButtonsLockState(getSelectedItem());
       }
-    }, 1500);
+      triggerSmartAutoFill();
+    }, 1000);
   });
 })();
