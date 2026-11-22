@@ -215,6 +215,43 @@
   line-height: 1.4;
 }
 
+.bma-approval-box {
+  background: #fffbeb;
+  border: 2px solid #f59e0b;
+  border-radius: 10px;
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 4px 14px rgba(245, 158, 11, 0.18);
+}
+
+.bma-approval-title {
+  color: #b45309;
+  font-weight: 700;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.bma-approval-desc {
+  color: #78350f;
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+.bma-btn-approve {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  border-color: #15803d;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.28);
+}
+
+.bma-btn-approve:hover:not(:disabled) {
+  background: #14532d;
+}
+
 .bma-btn-primary {
   background: #2563eb;
   border-color: #2563eb;

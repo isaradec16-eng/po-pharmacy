@@ -971,7 +971,162 @@
     }
   }
 
-  // ==================== STORAGE & SYNC ====================
+  const STEP_URLS = {
+    1: 'http://bmamisapp11.bma.go.th:7778/PurHire/_agree.jsp?pur_hire_type_id=1&mode=new&isNew=1',
+    2: 'http://bmamisapp11.bma.go.th:7778/PurHire/Frm_pur_bidder.jsp',
+    3: 'http://bmamisapp11.bma.go.th:7778/PurHire/_accept.jsp?pur_hire_type_id=1&mode=search&isNew=1',
+    4: 'http://bmamisapp11.bma.go.th:7778/PurHire/_orderterm.jsp?pur_hire_type_id=1',
+    5: 'http://bmamisapp11.bma.go.th:7778/PurHire/Frm_pur_prereceiveterm.jsp',
+    6: 'http://bmamisapp11.bma.go.th:7778/PurHire/Frm_pur_receiveterm.jsp',
+    7: 'http://bmamisapp11.bma.go.th:7778/PurHire/Frm_pur_hire_rcv_committee.jsp?pur_hire_type_id=1',
+    8: 'http://bmamisapp11.bma.go.th:7778/PurHire/Rep_pur_rcv.jsp'
+  };
+
+  const PAGE_ID_TO_STEP_NUM = {
+    STEP1_AGREE: 1,
+    STEP2_BIDDER: 2,
+    STEP3_APPROVE: 3,
+    STEP4_CONTRACT: 4,
+    STEP5_DELIVERY: 5,
+    STEP6_RCV_RESULT: 6,
+    STEP7_COMMITTEE: 7,
+    STEP8_REP_RCV: 8
+  };
+
+  function navigateToMisStep(stepNum) {
+    const targetUrl = STEP_URLS[stepNum];
+    if (!targetUrl) return;
+    // หากหน้าเว็บใช้ Frame ให้เปลี่ยน URL เฉพาะ Frame เนื้อหาหลัก หรือเปลี่ยนทั้งหน้า
+    let navigated = false;
+    try {
+      const frames = document.querySelectorAll('frame, iframe');
+      frames.forEach((f) => {
+        try {
+          if (f.contentWindow && /PurHire/i.test(f.contentWindow.location.href)) {
+            f.contentWindow.location.href = targetUrl;
+            navigated = true;
+          }
+        } catch (e) {}
+      });
+    } catch (e) {}
+    if (!navigated) {
+      window.location.href = targetUrl;
+    }
+  }
+
+  function isPageShowingSavedBanner() {
+    let saved = false;
+    getTargetDocs().forEach((doc) => {
+      try {
+        const txt = doc.body ? doc.body.innerText || '' : '';
+        if (txt.includes('บันทึกเรียบร้อย')) saved = true;
+      } catch (e) {}
+    });
+    return saved;
+  }
+
+  function clickPrimarySaveButtonOnPage() {
+    let clicked = false;
+    getTargetDocs().forEach((doc) => {
+      if (clicked) return;
+      const btns = Array.from(doc.querySelectorAll('input[type="button"], input[type="submit"], button'));
+      // หาปุ่ม [บันทึก] หรือ [ตกลง] หรือ [แสดงรายงาน] หรือ [รายละเอียด]
+      const target =
+        btns.find((b) => String(b.value || b.innerText || '').trim() === 'บันทึก') ||
+        btns.find((b) => String(b.value || b.innerText || '').trim() === 'รายละเอียด') ||
+        btns.find((b) => String(b.value || b.innerText || '').trim() === 'ตกลง') ||
+        btns.find((b) => String(b.value || b.innerText || '').trim() === 'แสดงรายงาน');
+      if (target && !target.disabled) {
+        target.click();
+        clicked = true;
+      }
+    });
+    return clicked;
+  }
+
+  function approveAndSaveCurrentStep() {
+    const page = detectCurrentPage();
+    const curStepNum = PAGE_ID_TO_STEP_NUM[page.id] || 0;
+    const nextStepNum = curStepNum >= 1 && curStepNum < 8 ? curStepNum + 1 : 0;
+
+    const item = getSelectedItem();
+    if (item && isItemAlreadyRecorded(item) && !isStepAllowedWhenRecorded(page.id)) {
+      alert('มีประวัติการลงข้อมูลแล้ว\n\nห้ามบันทึกข้อมูลซ้ำในขั้นตอนที่ 1–6!');
+      return;
+    }
+
+    const ok = confirm(
+      `ยืนยันการอนุมัติบันทึกข้อมูล "${page.title}" หรือไม่?\n\n` +
+        (item ? `รายการ: [${item.code}] ${item.subject}\nยอดเงิน: ${item.amountFormatted} บาท\n\n` : '') +
+        `เมื่อคุณกด "ตกลง (OK)" ระบบจะสั่งกดปุ่ม [บันทึก]` +
+        (nextStepNum ? ` และเตรียมพาไปขั้นตอนที่ ${nextStepNum} ต่อไป` : '')
+    );
+    if (!ok) return;
+
+    if (nextStepNum) {
+      state.pendingAutoNextStep = nextStepNum;
+      saveState();
+    }
+
+    const clicked = clickPrimarySaveButtonOnPage();
+    if (clicked) {
+      setStatus(`✓ อนุมัติและสั่งกดปุ่ม [บันทึก] แล้ว... กำลังรอดึงรหัสและไปขั้นตอนถัดไป`, 'ok');
+    } else {
+      setStatus(`⚠️ ไม่พบปุ่ม [บันทึก] บนหน้าจอ กรุณากดปุ่มบันทึกบนหน้าเว็บด้วยตัวเอง`, 'err');
+    }
+  }
+
+  function updateApprovalBoxUI() {
+    if (!panelEl) return;
+    const box = panelEl.querySelector('#bma-approval-gate');
+    if (!box) return;
+    const item = getSelectedItem();
+    const page = detectCurrentPage();
+    const recorded = isItemAlreadyRecorded(item);
+    const allowPage = !recorded || isStepAllowedWhenRecorded(page.id);
+
+    if (!item || !allowPage) {
+      box.style.display = 'none';
+      return;
+    }
+
+    const curStepNum = PAGE_ID_TO_STEP_NUM[page.id] || 0;
+    const nextStepNum = curStepNum >= 1 && curStepNum < 8 ? curStepNum + 1 : 0;
+    const savedNow = isPageShowingSavedBanner();
+
+    box.style.display = 'flex';
+    const titleEl = box.querySelector('#bma-approval-title');
+    const descEl = box.querySelector('#bma-approval-desc');
+    const approveBtn = box.querySelector('#bma-btn-approve-save');
+    const nextBtn = box.querySelector('#bma-btn-goto-next');
+
+    if (savedNow && nextStepNum) {
+      titleEl.innerHTML = `✅ บันทึกขั้นตอนที่ ${curStepNum} เรียบร้อยแล้ว!`;
+      descEl.textContent = `ระบบจำรหัสที่สร้างขึ้นเรียบร้อยแล้ว กดปุ่มด้านล่างเพื่อเปิดหน้าขั้นตอนที่ ${nextStepNum} ต่อทันที (และจะกรอกอัตโนมัติพร้อมรออนุมัติก่อนบันทึก)`;
+      approveBtn.style.display = 'none';
+      nextBtn.style.display = 'flex';
+      nextBtn.textContent = `➡️ ไปขั้นตอนที่ ${nextStepNum} ต่อทันที (Auto-Fill)`;
+      nextBtn.onclick = () => {
+        state.pendingAutoNextStep = 0;
+        saveState();
+        navigateToMisStep(nextStepNum);
+      };
+    } else {
+      titleEl.innerHTML = `🔔 รออนุมัติก่อนบันทึก (${page.title})`;
+      descEl.textContent = `ระบบกรอกข้อมูลลงช่องต่างๆ อัตโนมัติแล้ว กรุณาตรวจสอบความถูกต้องก่อนกดอนุมัติบันทึก`;
+      approveBtn.style.display = 'flex';
+      approveBtn.textContent = nextStepNum
+        ? `✅ อนุมัติบันทึก (และเตรียมไปขั้นตอนที่ ${nextStepNum})`
+        : `✅ อนุมัติบันทึก / แสดงรายงาน`;
+      if (nextStepNum) {
+        nextBtn.style.display = 'flex';
+        nextBtn.textContent = `⏭️ ข้ามไปเปิดหน้าขั้นตอนที่ ${nextStepNum}`;
+        nextBtn.onclick = () => navigateToMisStep(nextStepNum);
+      } else {
+        nextBtn.style.display = 'none';
+      }
+    }
+  }
   function saveState() {
     try {
       chrome.storage.local.set({ [STATE_KEY]: state });
@@ -1488,7 +1643,8 @@
   // โหลด State แล้วสร้างแผงควบคุม
   loadState(() => {
     buildPanel();
-    // ตรวจจับการเปลี่ยนหน้า/เปิด Popup/ดึงตารางใหม่ แล้วกรอกอัตโนมัติทันทีโดยไม่ต้องกดปุ่ม (รอคนกดบันทึก)
+    updateApprovalBoxUI();
+    // ตรวจจับการเปลี่ยนหน้า/เปิด Popup/ดึงตารางใหม่ แล้วกรอกอัตโนมัติทันทีโดยไม่ต้องกดปุ่ม (รอคนอนุมัติก่อนบันทึก)
     setInterval(() => {
       tryCaptureGeneratedCodes();
       if (panelEl) {
@@ -1498,6 +1654,19 @@
           lbl.textContent = '📍 ' + p.title;
         }
         updateButtonsLockState(getSelectedItem());
+        updateApprovalBoxUI();
+      }
+      // หากผู้ใช้อนุมัติให้บันทึกแล้ว และหน้าเว็บขึ้น "บันทึกเรียบร้อย" แล้ว ให้ดูดรหัสล่าสุดแล้วเปิดหน้าขั้นตอนถัดไปอัตโนมัติ
+      if (state.pendingAutoNextStep && isPageShowingSavedBanner()) {
+        const nextSt = state.pendingAutoNextStep;
+        state.pendingAutoNextStep = 0;
+        saveState();
+        tryCaptureGeneratedCodes();
+        setStatus(`✓ บันทึกสำเร็จ! กำลังเปิดไปขั้นตอนที่ ${nextSt} อัตโนมัติ...`, 'ok');
+        setTimeout(() => {
+          navigateToMisStep(nextSt);
+        }, 800);
+        return;
       }
       triggerSmartAutoFill();
     }, 1000);
