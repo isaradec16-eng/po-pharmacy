@@ -872,13 +872,17 @@
     return p !== '' && o !== '' && r !== '';
   }
 
+  function isStepAllowedWhenRecorded(pageId) {
+    return pageId === 'STEP7_COMMITTEE' || pageId === 'STEP8_REP_RCV';
+  }
+
   function autoFillCurrentPage(subAction) {
     tryCaptureGeneratedCodes();
     const page = detectCurrentPage();
     const item = getSelectedItem();
 
-    if (item && isItemAlreadyRecorded(item)) {
-      setStatus('⛔ มีประวัติการลงข้อมูลแล้ว (ห้ามลงข้อมูลซ้ำเด็ดขาด)', 'err');
+    if (item && isItemAlreadyRecorded(item) && !isStepAllowedWhenRecorded(page.id)) {
+      setStatus('⛔ มีประวัติการลงข้อมูลแล้ว (อนุญาตเฉพาะขั้นตอนที่ 7 และ 8 เท่านั้น)', 'err');
       alert(
         'มีประวัติการลงข้อมูลแล้ว\n\nรายการ [' +
           item.code +
@@ -890,7 +894,7 @@
           item.poNo +
           '\n- เลขที่ใบตรวจรับ: ' +
           item.rcvNo +
-          '\n\nห้ามลงข้อมูลซ้ำเด็ดขาด!'
+          '\n\nห้ามลงข้อมูลซ้ำในขั้นตอนที่ 1–6 (สามารถกดกรอกขั้นตอนที่ 7 คณะกรรมการ และขั้นตอนที่ 8 พิมพ์ใบตรวจรับได้ตามปกติ)'
       );
       return;
     }
@@ -947,7 +951,7 @@
         filled = fillStep8ReportRcv(item);
         break;
       default:
-        if (item) {
+        if (item && !isItemAlreadyRecorded(item)) {
           filled += fillStep1Agree(item, subAction);
           filled += fillStep3Approve(item);
           filled += fillStep4Contract(item);
@@ -1010,21 +1014,29 @@
   function updateButtonsLockState(item) {
     if (!panelEl) return;
     const recorded = isItemAlreadyRecorded(item);
+    const page = detectCurrentPage();
+    const allowCurrentPage = !recorded || isStepAllowedWhenRecorded(page.id);
     const mainBtn = panelEl.querySelector('#bma-btn-autofill');
     const stepBtns = panelEl.querySelectorAll('.bma-step-btn');
 
     if (mainBtn) {
-      mainBtn.disabled = recorded;
-      mainBtn.textContent = recorded
-        ? '⛔ มีประวัติการลงข้อมูลแล้ว (ห้ามลงซ้ำ)'
+      mainBtn.disabled = !allowCurrentPage;
+      mainBtn.textContent = !allowCurrentPage
+        ? '⛔ มีประวัติการลงข้อมูลแล้ว (ล็อกขั้น 1-6)'
         : '⚡ กรอกข้อมูลหน้านี้ทันที (Auto-Fill)';
     }
     stepBtns.forEach((btn) => {
-      btn.disabled = recorded;
+      const st = btn.getAttribute('data-step');
+      // ขั้นตอนที่ 7 (กรรมการ) และ 8 (พิมพ์ใบตรวจรับ) กดได้เสมอแม้มีประวัติลงข้อมูลแล้ว
+      if (st === '7' || st === '8') {
+        btn.disabled = false;
+      } else {
+        btn.disabled = recorded;
+      }
     });
 
     if (recorded) {
-      setStatus('⛔ มีประวัติการลงข้อมูลแล้ว (ห้ามลงข้อมูลซ้ำเด็ดขาด)', 'err');
+      setStatus('⛔ มีประวัติการลงข้อมูลแล้ว (ล็อกขั้น 1-6 • กดขั้น 7 และ 8 ได้ตามปกติ)', 'err');
     } else if (item) {
       setStatus(`✓ รายการ [${item.code}] พร้อมสำหรับลงข้อมูล`, 'ok');
     }
@@ -1355,9 +1367,9 @@
       btn.addEventListener('click', () => {
         const st = btn.getAttribute('data-step');
         const item = getSelectedItem();
-        if (item && isItemAlreadyRecorded(item)) {
-          setStatus('⛔ มีประวัติการลงข้อมูลแล้ว (ห้ามลงข้อมูลซ้ำเด็ดขาด)', 'err');
-          alert('มีประวัติการลงข้อมูลแล้ว\n\nห้ามลงข้อมูลซ้ำเด็ดขาด!');
+        if (item && isItemAlreadyRecorded(item) && st !== '7' && st !== '8') {
+          setStatus('⛔ มีประวัติการลงข้อมูลแล้ว (อนุญาตเฉพาะขั้นตอนที่ 7 และ 8)', 'err');
+          alert('มีประวัติการลงข้อมูลแล้ว\n\nห้ามลงข้อมูลซ้ำในขั้นตอนที่ 1–6!');
           return;
         }
         let filled = 0;
@@ -1409,6 +1421,7 @@
           const p = detectCurrentPage();
           lbl.textContent = '📍 ' + p.title;
         }
+        updateButtonsLockState(getSelectedItem());
       }
     }, 1500);
   });

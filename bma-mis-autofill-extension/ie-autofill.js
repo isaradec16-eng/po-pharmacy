@@ -664,10 +664,11 @@
     document.getElementById('bma-ie-rcvno').value = state.rcvNo;
 
     var rec = isItemAlreadyRecorded(item);
+    var allowMain = !rec || isIePageStep7Or8();
     var btn = document.getElementById('bma-ie-fillbtn');
     var sum = document.getElementById('bma-ie-summary');
     var warnHtml = rec
-      ? '<div style="background:#fef2f2;border:2px solid #dc2626;color:#b91c1c;padding:5px;border-radius:4px;font-weight:bold;text-align:center;margin-bottom:5px;">⛔ มีประวัติการลงข้อมูลแล้ว<br/>(ห้ามลงข้อมูลซ้ำเด็ดขาด)</div>'
+      ? '<div style="background:#fef2f2;border:2px solid #dc2626;color:#b91c1c;padding:5px;border-radius:4px;font-weight:bold;text-align:center;margin-bottom:5px;">⛔ มีประวัติการลงข้อมูลแล้ว<br/>(ล็อกขั้น 1-6 • แก้ไขขั้น 7 และ 8 ได้)</div>'
       : '';
     sum.innerHTML =
       warnHtml +
@@ -677,9 +678,9 @@
       '<div>เห็นชอบ: ' + (item.agreeDate || '-') + ' | อนุมัติ: ' + (item.quoteDate || '-') + '</div>' +
       '<div>สั่งซื้อ: ' + (item.poSignDate || '-') + ' | ตรวจรับ: ' + (item.rcvDate || '-') + '</div>';
 
-    btn.disabled = rec;
-    btn.style.background = rec ? '#94a3b8' : '#2563eb';
-    btn.innerHTML = rec ? '⛔ มีประวัติการลงข้อมูลแล้ว (ห้ามลงซ้ำ)' : '⚡ กรอกข้อมูลหน้านี้ทันที (Auto-Fill)';
+    btn.disabled = !allowMain;
+    btn.style.background = !allowMain ? '#94a3b8' : '#2563eb';
+    btn.innerHTML = !allowMain ? '⛔ มีประวัติการลงข้อมูลแล้ว (ล็อกขั้น 1-6)' : '⚡ กรอกข้อมูลหน้านี้ทันที (Auto-Fill)';
     saveState();
   }
 
@@ -711,6 +712,8 @@
   document.getElementById('bma-ie-select').onchange = onIeItemChange;
   document.getElementById('bma-ie-sync').onclick = loadDataViaXhr;
   document.getElementById('bma-ie-fillbtn').onclick = function () { runAutoFill(); };
+  document.getElementById('bma-ie-step7').onclick = function () { runAutoFill(7); };
+  document.getElementById('bma-ie-step8').onclick = function () { runAutoFill(8); };
   document.getElementById('bma-ie-purno').onchange = function () { state.purHireNo = this.value; saveState(); };
   document.getElementById('bma-ie-pono').onchange = function () { state.poNo = this.value; saveState(); };
   document.getElementById('bma-ie-rcvno').onchange = function () { state.rcvNo = this.value; saveState(); };
