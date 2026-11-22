@@ -1,5 +1,7 @@
 # BMA MIS2 เบิกจ่ายอัตโนมัติ (`FRM_PAY_DOC : บันทึกใบขอเบิก`)
 
+**ผู้พัฒนา:** `ARISSARA.K`
+
 โปรแกรมหน้าต่างลอยบน Windows สำหรับช่วยกรอกข้อมูลลงหน้าต่าง **Oracle Forms (`ระบบการเงินจ่าย` / `FRM_PAY_DOC`)** ของระบบ MIS2 กทม. (`http://bmasso.bma.go.th/MIS2DirectLogins/index2.jsp`) โดยดึงฐานข้อมูลโดยตรงจาก **Google Sheets**
 
 > **ทำไมจึงเป็นโปรแกรม Windows (.bat/.ps1) ไม่ใช่ส่วนขยาย Opera?**

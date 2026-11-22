@@ -1235,8 +1235,8 @@ Load-Calibration
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
 $form = New-Object System.Windows.Forms.Form
-$form.Text = "BMA MIS2 เบิกจ่ายอัตโนมัติ (FRM_PAY_DOC) — หยุดก่อนบันทึกทุกครั้ง"
-$form.Size = New-Object System.Drawing.Size(475, 800)
+$form.Text = "BMA MIS2 เบิกจ่ายอัตโนมัติ (FRM_PAY_DOC) — พัฒนาโดย ARISSARA.K"
+$form.Size = New-Object System.Drawing.Size(475, 815)
 $form.MinimumSize = New-Object System.Drawing.Size(455, 680)
 $form.StartPosition = "Manual"
 $screenArea = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
@@ -1270,7 +1270,7 @@ $chkTopMost.Add_CheckedChanged({ $form.TopMost = $chkTopMost.Checked })
 $header.Controls.Add($chkTopMost)
 
 $lblSafety = New-Object System.Windows.Forms.Label
-$lblSafety.Text = "🛡️ โหมดปลอดภัย: กรอกอย่างเดียว หยุดก่อนบันทึกทุกครั้ง (คนกด Save เอง) | กด ESC หยุดทันที"
+$lblSafety.Text = "🛡️ โหมดปลอดภัย: หยุดก่อนบันทึกทุกครั้ง (คนกด Save เอง) | กด ESC หยุดทันที"
 $lblSafety.Location = New-Object System.Drawing.Point(12, 34)
 $lblSafety.Size = New-Object System.Drawing.Size(435, 20)
 $lblSafety.ForeColor = [System.Drawing.Color]::FromArgb(254, 240, 138)
@@ -1320,7 +1320,18 @@ $btnCalib.FlatStyle = "Flat"
 $btnCalib.FlatAppearance.BorderSize = 0
 $header.Controls.Add($btnCalib)
 
-# --- Status Bar ---
+# --- Bottom Status & Developer Credit Bar ---
+$lblDevCredit = New-Object System.Windows.Forms.Label
+$lblDevCredit.Dock = "Bottom"
+$lblDevCredit.Height = 20
+$lblDevCredit.BackColor = [System.Drawing.Color]::FromArgb(15, 23, 42)
+$lblDevCredit.ForeColor = [System.Drawing.Color]::FromArgb(148, 163, 184)
+$lblDevCredit.TextAlign = "MiddleRight"
+$lblDevCredit.Padding = New-Object System.Windows.Forms.Padding(8, 0, 10, 0)
+$lblDevCredit.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
+$lblDevCredit.Text = "ผู้พัฒนา: ARISSARA.K"
+$form.Controls.Add($lblDevCredit)
+
 $statusBar = New-Object System.Windows.Forms.Label
 $statusBar.Dock = "Bottom"
 $statusBar.Height = 26
