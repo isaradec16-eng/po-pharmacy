@@ -364,13 +364,6 @@ function Load-Config {
             "คณะกรรมการรับ-ส่งเงินกองการเงินโอนเข้าบัญชี รพจ."
         )
         defaultRequester    = "นางอรชุมา หุตะโกวิท"
-        requesterPresets    = @(
-            "นางอรชุมา หุตะโกวิท",
-            "นางสาวอริศรา เกตดี",
-            "นางสาวนัทธมน คำประดิษฐ์",
-            "นายคมสัน โสตางกูร",
-            "นางสาวสุพรรษา ใหม่เอี่ยม"
-        )
         defaultDateMode     = "today"
         descriptionTemplate = "(ค่า{subject})"
         stepDelayMs         = 220
@@ -1466,18 +1459,17 @@ $tab3.BackColor = [System.Drawing.Color]::White
 $tabs.TabPages.Add($tab3)
 
 $lblReq = New-Object System.Windows.Forms.Label
-$lblReq.Text = "ชื่อผู้เบิก:"
+$lblReq.Text = "ชื่อผู้เบิก (รอง ผอ.ฝ่ายการแพทย์ ปัจจุบัน — แก้ไขได้และจำค่าอัตโนมัติ):"
 $lblReq.Location = New-Object System.Drawing.Point(12, 14)
-$lblReq.Size = New-Object System.Drawing.Size(120, 20)
+$lblReq.Size = New-Object System.Drawing.Size(396, 20)
 $tab3.Controls.Add($lblReq)
 
-$cmbRequester = New-Object System.Windows.Forms.ComboBox
-$cmbRequester.Location = New-Object System.Drawing.Point(12, 35)
-$cmbRequester.Size = New-Object System.Drawing.Size(356, 24)
-foreach ($rq in $script:Config["requesterPresets"]) { $cmbRequester.Items.Add($rq) | Out-Null }
-$cmbRequester.Text = [string]$script:Config["defaultRequester"]
-$tab3.Controls.Add($cmbRequester)
-Add-QuickPasteBtn $tab3 374 35 $cmbRequester $false | Out-Null
+$txtRequester = New-Object System.Windows.Forms.TextBox
+$txtRequester.Location = New-Object System.Drawing.Point(12, 35)
+$txtRequester.Size = New-Object System.Drawing.Size(356, 24)
+$txtRequester.Text = [string]$script:Config["defaultRequester"]
+$tab3.Controls.Add($txtRequester)
+Add-QuickPasteBtn $tab3 374 35 $txtRequester $false | Out-Null
 
 $lblPayDate = New-Object System.Windows.Forms.Label
 $lblPayDate.Text = "วันที่เบิก (dd/MM/yyyy พ.ศ.):"
@@ -1851,7 +1843,7 @@ function Persist-UserPreferences {
     if (-not (Test-IsAidsBudget $script:SelectedItem)) {
         $script:Config["defaultAssignTo"] = $cmbAssign.Text.Trim()
     }
-    $script:Config["defaultRequester"] = $cmbRequester.Text.Trim()
+    $script:Config["defaultRequester"] = $txtRequester.Text.Trim()
     $script:Config["fiscalYear"]       = $txtRcvYear.Text.Trim()
     $script:Config["autoFillFields"]   = @{
         payTo      = $rPayTo.Check.Checked
@@ -2049,7 +2041,7 @@ $btnRunStep2.Add_Click({
 $btnRunStep3.Add_Click({
     Persist-UserPreferences
     $queue = @()
-    if ($cmbRequester.Text.Trim()) { $queue += @{ Key="requesterName"; Val=$cmbRequester.Text.Trim(); Multi=$false } }
+    if ($txtRequester.Text.Trim()) { $queue += @{ Key="requesterName"; Val=$txtRequester.Text.Trim(); Multi=$false } }
     if ($txtPayDate.Text.Trim())   { $queue += @{ Key="payDate";       Val=$txtPayDate.Text.Trim();   Multi=$false } }
     if ($txtDesc.Text.Trim())      { $queue += @{ Key="description";   Val=$txtDesc.Text.Trim();      Multi=$true  } }
 
