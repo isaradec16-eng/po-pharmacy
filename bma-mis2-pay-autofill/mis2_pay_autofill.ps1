@@ -347,8 +347,7 @@ $script:CalibDefinitions = @(
     @{ Key = "tabDetail";     Group = "ขั้นที่ 3 (รายละเอียดเบิก)"; Label = "หัวแท็บ 'รายละเอียดเงินเบิกจ่าย'";      Note = "แท็บที่ 4 ของฟอร์ม FRM_PAY_DOC" },
     @{ Key = "requesterName"; Group = "ขั้นที่ 3 (รายละเอียดเบิก)"; Label = "ช่อง 'ชื่อผู้เบิก'";                    Note = "กล่องใหญ่ด้านล่างจำนวนเงินที่จ่าย" },
     @{ Key = "payDate";       Group = "ขั้นที่ 3 (รายละเอียดเบิก)"; Label = "ช่อง 'วันที่เบิก'";                     Note = "รูปแบบ dd/MM/yyyy พ.ศ." },
-    @{ Key = "docCount";      Group = "ขั้นที่ 3 (รายละเอียดเบิก)"; Label = "ช่อง 'จำนวนเอกสารประกอบฎีกา'";         Note = "เช่น 1" },
-    @{ Key = "description";   Group = "ขั้นที่ 3 (รายละเอียดเบิก)"; Label = "ช่อง 'คำอธิบายรายการเบิก'";            Note = "กล่องใหญ่ด้านล่างสุด" }
+    @{ Key = "description";   Group = "ขั้นที่ 3 (รายละเอียดเบิก)"; Label = "ช่อง 'คำอธิบายรายการเบิก'";            Note = "กล่องใหญ่ด้านล่างสุด (ข้ามจำนวนเอกสาร)" }
 )
 
 function Load-Config {
@@ -372,7 +371,6 @@ function Load-Config {
             "นายคมสัน โสตางกูร",
             "นางสาวสุพรรษา ใหม่เอี่ยม"
         )
-        defaultDocCount     = "1"
         defaultDateMode     = "today"
         descriptionTemplate = "(ค่า{subject})"
         stepDelayMs         = 220
@@ -1514,23 +1512,10 @@ $btnDateRcv.Add_Click({
 })
 $tab3.Controls.Add($btnDateRcv)
 
-$lblDocCnt = New-Object System.Windows.Forms.Label
-$lblDocCnt.Text = "จำนวนเอกสาร:"
-$lblDocCnt.Location = New-Object System.Drawing.Point(312, 68)
-$lblDocCnt.Size = New-Object System.Drawing.Size(96, 20)
-$tab3.Controls.Add($lblDocCnt)
-
-$txtDocCount = New-Object System.Windows.Forms.TextBox
-$txtDocCount.Text = [string]$script:Config["defaultDocCount"]
-$txtDocCount.Location = New-Object System.Drawing.Point(312, 89)
-$txtDocCount.Size = New-Object System.Drawing.Size(56, 24)
-$tab3.Controls.Add($txtDocCount)
-Add-QuickPasteBtn $tab3 374 89 $txtDocCount $false | Out-Null
-
 $lblDesc = New-Object System.Windows.Forms.Label
-$lblDesc.Text = "คำอธิบายรายการเบิก:"
+$lblDesc.Text = "คำอธิบายรายการเบิก (ลิงก์จาก MISS70 คอลัมน์ J -> (ค่า...)):"
 $lblDesc.Location = New-Object System.Drawing.Point(12, 122)
-$lblDesc.Size = New-Object System.Drawing.Size(200, 20)
+$lblDesc.Size = New-Object System.Drawing.Size(360, 20)
 $tab3.Controls.Add($lblDesc)
 
 $txtDesc = New-Object System.Windows.Forms.TextBox
@@ -1847,7 +1832,6 @@ function Refresh-VendorCombo {
 function Persist-UserPreferences {
     $script:Config["defaultAssignTo"]  = $cmbAssign.Text.Trim()
     $script:Config["defaultRequester"] = $cmbRequester.Text.Trim()
-    $script:Config["defaultDocCount"]  = $txtDocCount.Text.Trim()
     $script:Config["fiscalYear"]       = $txtRcvYear.Text.Trim()
     $script:Config["autoFillFields"]   = @{
         payTo      = $rPayTo.Check.Checked
@@ -2041,18 +2025,17 @@ $btnRunStep2.Add_Click({
     }
 })
 
-# --- Step 3 Auto-Fill: แท็บรายละเอียดเงินเบิกจ่าย (STOPS BEFORE SAVE!) ---
+# --- Step 3 Auto-Fill: แท็บรายละเอียดเงินเบิกจ่าย (ข้ามจำนวนเอกสาร และหยุดก่อนบันทึก!) ---
 $btnRunStep3.Add_Click({
     Persist-UserPreferences
     $queue = @()
     if ($cmbRequester.Text.Trim()) { $queue += @{ Key="requesterName"; Val=$cmbRequester.Text.Trim(); Multi=$false } }
     if ($txtPayDate.Text.Trim())   { $queue += @{ Key="payDate";       Val=$txtPayDate.Text.Trim();   Multi=$false } }
-    if ($txtDocCount.Text.Trim())  { $queue += @{ Key="docCount";      Val=$txtDocCount.Text.Trim();  Multi=$false } }
     if ($txtDesc.Text.Trim())      { $queue += @{ Key="description";   Val=$txtDesc.Text.Trim();      Multi=$true  } }
 
     $calibratedQueue = @($queue | Where-Object { $script:Calibration.ContainsKey($_.Key) })
     if ($calibratedQueue.Count -eq 0) {
-        Ensure-CalibratedOrGuide @("tabDetail", "requesterName", "payDate", "docCount", "description") | Out-Null
+        Ensure-CalibratedOrGuide @("tabDetail", "requesterName", "payDate", "description") | Out-Null
         return
     }
 

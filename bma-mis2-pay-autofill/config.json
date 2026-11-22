@@ -18,7 +18,6 @@
     "นายคมสัน โสตางกูร",
     "นางสาวสุพรรษา ใหม่เอี่ยม"
   ],
-  "defaultDocCount": "1",
   "defaultDateMode": "today",
   "descriptionTemplate": "(ค่า{subject})",
   "stepDelayMs": 220,
