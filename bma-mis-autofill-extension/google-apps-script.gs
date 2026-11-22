@@ -273,6 +273,11 @@ function getCombinedMisData(vendorReg) {
     const contractEndDate = parseThaiDateToSlash(row[17]);
 
     const isGpo = /องค์การเภสัชกรรม|GPO/i.test(vendorName);
+    const isWhtExempt = /สภากาชาด|เอเบิ้ล|เอเบิล|a-ble|abel|องค์การเภสัชกรรม|gpo|ยูนีซัน|unison/i.test(vendorName + ' ' + (missInfo.vendorShort || ''));
+    const baseAmount = Math.round((amountNum / 1.07) * 100) / 100;
+    const vat7 = Math.round((amountNum - baseAmount) * 100) / 100;
+    const wht1 = isWhtExempt ? 0 : Math.round((baseAmount * 0.01) * 100) / 100;
+    const netPay = Math.round((amountNum - wht1) * 100) / 100;
     const isAidsBudget = /เอดส์|อุดหนุน/i.test(budgetType) || /(งบเอดส์|เอดส์|aids)$/i.test(code);
     const isBmaBudget = !isAidsBudget && (/งบประมาณรายจ่ายประจำปี/i.test(budgetType) || /งบ$/.test(code));
     const deliveryDays = (isGpo || isAidsBudget) ? '60' : '5';
@@ -303,6 +308,11 @@ function getCombinedMisData(vendorReg) {
       itemCount: itemCount,
       amount: amountNum,
       amountFormatted: amountFormatted,
+      baseAmount: baseAmount,
+      vat7: vat7,
+      wht1: wht1,
+      netPay: netPay,
+      isWhtExempt: isWhtExempt,
       vendorName: vendorName,
       vendorTaxId: vendorTaxId,
       vendorProfile: matchedVendor,

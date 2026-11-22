@@ -34,15 +34,16 @@
     "branchCode": false,
     "accountNo": true
   },
-  "taxExemptKeywords": [
-    "องค์การเภสัชกรรม",
-    "GPO",
+  "whtExemptKeywords": [
     "สภากาชาด",
-    "ยูนีซัน",
+    "เอเบิ้ล",
     "เอเบิล",
     "A-ble",
-    "บี.เอ็ล.ฮั้ว",
-    "โปลิฟาร์ม"
+    "Abel",
+    "องค์การเภสัชกรรม",
+    "GPO",
+    "ยูนีซัน",
+    "Unison"
   ],
   "neverAutoSave": true
 }

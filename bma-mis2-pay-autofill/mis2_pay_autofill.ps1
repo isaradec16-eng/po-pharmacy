@@ -336,6 +336,8 @@ $script:CalibDefinitions = @(
     @{ Key = "popupDetail";   Group = "ขั้นที่ 1.5 (Popup เลือกงบ)"; Label = "ปุ่ม 'รายละเอียด' แถวที่ 1 ใน Popup";  Note = "ข้ามได้ (F9) ถ้าต้องการกดเอง" },
     @{ Key = "popupBudgetChk";Group = "ขั้นที่ 1.5 (Popup เลือกงบ)"; Label = "ช่องติ๊กถูก ☑ แถวที่ 1 (งบประมาณ)";     Note = "ข้ามได้ (F9) ถ้าต้องการติ๊กเอง" },
     @{ Key = "popupOkBtn";    Group = "ขั้นที่ 1.5 (Popup เลือกงบ)"; Label = "ปุ่ม 'ตกลง' ด้านล่าง Popup";          Note = "ข้ามได้ (F9) ถ้าต้องการกดเอง" },
+    @{ Key = "vatAmount";     Group = "ขั้นที่ 1.6 (ตารางภาษี)";     Label = "ช่อง 'ภาษีมูลค่าเพิ่ม' (7%) แถวที่ 1"; Note = "ในตารางแท็บข้อมูลฎีกาเบิกเงิน" },
+    @{ Key = "whtAmount";     Group = "ขั้นที่ 1.6 (ตารางภาษี)";     Label = "ช่อง 'หักภาษีเงินได้' (1%) แถวที่ 1";  Note = "0.00 สำหรับ สภากาชาด/เอเบิ้ล/อภ./ยูนีซัน" },
     @{ Key = "tabPayee";      Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "หัวแท็บ 'ผู้รับเงิน'";                  Note = "แท็บที่ 3 ของฟอร์ม FRM_PAY_DOC" },
     @{ Key = "creditorName";  Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'ชื่อเจ้าหนี้'";                  Note = "ข้ามได้ (F9) ถ้าระบบดึงมาให้แล้ว" },
     @{ Key = "payTo";         Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'จ่ายให้'";                       Note = "ข้ามได้ (F9) ถ้าระบบดึงมาให้แล้ว" },
@@ -390,7 +392,7 @@ function Load-Config {
             branchCode   = $false
             accountNo    = $true
         }
-        taxExemptKeywords   = @("องค์การเภสัชกรรม", "GPO", "สภากาชาด", "ยูนีซัน", "เอเบิล", "A-ble", "บี.เอ็ล.ฮั้ว", "โปลิฟาร์ม")
+        whtExemptKeywords   = @("สภากาชาด", "เอเบิ้ล", "เอเบิล", "A-ble", "Abel", "องค์การเภสัชกรรม", "GPO", "ยูนีซัน", "Unison")
         neverAutoSave       = $true
     }
     if (Test-Path $script:ConfigPath) {
@@ -1287,42 +1289,85 @@ $tab1.Controls.Add($txtRcvYear)
 Add-QuickPasteBtn $tab1 252 40 $txtRcvYear $false | Out-Null
 
 $lblItemSummary = New-Object System.Windows.Forms.Label
-$lblItemSummary.Location = New-Object System.Drawing.Point(12, 78)
-$lblItemSummary.Size = New-Object System.Drawing.Size(396, 118)
+$lblItemSummary.Location = New-Object System.Drawing.Point(12, 72)
+$lblItemSummary.Size = New-Object System.Drawing.Size(396, 86)
 $lblItemSummary.BackColor = [System.Drawing.Color]::FromArgb(248, 250, 252)
 $lblItemSummary.BorderStyle = "FixedSingle"
-$lblItemSummary.Padding = New-Object System.Windows.Forms.Padding(8)
-$lblItemSummary.Text = "สรุปรายการจาก Google Sheets:`r`n- เลขที่ใบสั่งซื้อ: -`r`n- ยอดเงิน: -`r`n- บริษัท: -`r`n- เรื่อง: -"
+$lblItemSummary.Padding = New-Object System.Windows.Forms.Padding(6)
+$lblItemSummary.Text = "สรุปรายการจาก Google Sheets:`r`n- เลขที่ใบสั่งซื้อ: -  |  ยอดเงิน: -`r`n- บริษัท: -`r`n- เรื่อง: -"
 $tab1.Controls.Add($lblItemSummary)
+
+$lblVat = New-Object System.Windows.Forms.Label
+$lblVat.Text = "ภาษีมูลค่าเพิ่ม (7%):"
+$lblVat.Location = New-Object System.Drawing.Point(12, 166)
+$lblVat.Size = New-Object System.Drawing.Size(118, 20)
+$lblVat.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+$tab1.Controls.Add($lblVat)
+
+$txtVatAmount = New-Object System.Windows.Forms.TextBox
+$txtVatAmount.Location = New-Object System.Drawing.Point(132, 163)
+$txtVatAmount.Size = New-Object System.Drawing.Size(102, 23)
+$txtVatAmount.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
+$tab1.Controls.Add($txtVatAmount)
+Add-QuickPasteBtn $tab1 238 163 $txtVatAmount $false | Out-Null
+
+$lblWht = New-Object System.Windows.Forms.Label
+$lblWht.Text = "หักภาษีเงินได้ (1%):"
+$lblWht.Location = New-Object System.Drawing.Point(12, 194)
+$lblWht.Size = New-Object System.Drawing.Size(118, 20)
+$lblWht.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+$tab1.Controls.Add($lblWht)
+
+$txtWhtAmount = New-Object System.Windows.Forms.TextBox
+$txtWhtAmount.Location = New-Object System.Drawing.Point(132, 191)
+$txtWhtAmount.Size = New-Object System.Drawing.Size(102, 23)
+$txtWhtAmount.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
+$tab1.Controls.Add($txtWhtAmount)
+Add-QuickPasteBtn $tab1 238 191 $txtWhtAmount $false | Out-Null
+
+$lblWhtBadge = New-Object System.Windows.Forms.Label
+$lblWhtBadge.Location = New-Object System.Drawing.Point(278, 163)
+$lblWhtBadge.Size = New-Object System.Drawing.Size(130, 51)
+$lblWhtBadge.BackColor = [System.Drawing.Color]::FromArgb(241, 245, 249)
+$lblWhtBadge.ForeColor = [System.Drawing.Color]::FromArgb(51, 65, 85)
+$lblWhtBadge.BorderStyle = "FixedSingle"
+$lblWhtBadge.TextAlign = "MiddleCenter"
+$lblWhtBadge.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
+$lblWhtBadge.Text = "สุทธิที่จ่าย:`r`n-"
+$tab1.Controls.Add($lblWhtBadge)
 
 $btnRunStep1 = New-Object System.Windows.Forms.Button
 $btnRunStep1.Text = "⚡ ขั้นที่ 1: กรอกเลขใบตรวจรับ + กดแว่นขยาย 🔍"
-$btnRunStep1.Location = New-Object System.Drawing.Point(12, 210)
-$btnRunStep1.Size = New-Object System.Drawing.Size(396, 42)
+$btnRunStep1.Location = New-Object System.Drawing.Point(12, 224)
+$btnRunStep1.Size = New-Object System.Drawing.Size(396, 38)
 $btnRunStep1.BackColor = [System.Drawing.Color]::FromArgb(2, 132, 199)
 $btnRunStep1.ForeColor = [System.Drawing.Color]::White
-$btnRunStep1.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+$btnRunStep1.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
 $btnRunStep1.FlatStyle = "Flat"
 $btnRunStep1.FlatAppearance.BorderSize = 0
 $tab1.Controls.Add($btnRunStep1)
 
 $btnRunStep15 = New-Object System.Windows.Forms.Button
 $btnRunStep15.Text = "⚡ ขั้นที่ 1.5: กด 'รายละเอียด' → ติ๊กงบประมาณ → กด 'ตกลง'"
-$btnRunStep15.Location = New-Object System.Drawing.Point(12, 260)
-$btnRunStep15.Size = New-Object System.Drawing.Size(396, 36)
+$btnRunStep15.Location = New-Object System.Drawing.Point(12, 268)
+$btnRunStep15.Size = New-Object System.Drawing.Size(396, 35)
 $btnRunStep15.BackColor = [System.Drawing.Color]::FromArgb(14, 116, 144)
 $btnRunStep15.ForeColor = [System.Drawing.Color]::White
-$btnRunStep15.Font = New-Object System.Drawing.Font("Segoe UI", 9.2, [System.Drawing.FontStyle]::Bold)
+$btnRunStep15.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
 $btnRunStep15.FlatStyle = "Flat"
 $btnRunStep15.FlatAppearance.BorderSize = 0
 $tab1.Controls.Add($btnRunStep15)
 
-$lblStep1Tip = New-Object System.Windows.Forms.Label
-$lblStep1Tip.Location = New-Object System.Drawing.Point(12, 304)
-$lblStep1Tip.Size = New-Object System.Drawing.Size(396, 46)
-$lblStep1Tip.ForeColor = [System.Drawing.Color]::FromArgb(71, 85, 105)
-$lblStep1Tip.Text = "💡 หลังอ้างอิงใบตรวจรับสำเร็จ ตรวจสอบยอดเงินและภาษีในแท็บ 'ข้อมูลฎีกาเบิกเงิน'`r`nจากนั้นสลับมา 'ขั้น 2: ผู้รับเงิน' เพื่อกรอกข้อมูลธนาคาร/ที่อยู่"
-$tab1.Controls.Add($lblStep1Tip)
+$btnRunStep16 = New-Object System.Windows.Forms.Button
+$btnRunStep16.Text = "⚡ ขั้นที่ 1.6: กรอกภาษีมูลค่าเพิ่ม (7%) + หักภาษีเงินได้ (1%)"
+$btnRunStep16.Location = New-Object System.Drawing.Point(12, 309)
+$btnRunStep16.Size = New-Object System.Drawing.Size(396, 38)
+$btnRunStep16.BackColor = [System.Drawing.Color]::FromArgb(3, 105, 161)
+$btnRunStep16.ForeColor = [System.Drawing.Color]::White
+$btnRunStep16.Font = New-Object System.Drawing.Font("Segoe UI", 9.2, [System.Drawing.FontStyle]::Bold)
+$btnRunStep16.FlatStyle = "Flat"
+$btnRunStep16.FlatAppearance.BorderSize = 0
+$tab1.Controls.Add($btnRunStep16)
 
 # ===================== TAB 2: ขั้นที่ 2 แท็บผู้รับเงิน =====================
 $tab2 = New-Object System.Windows.Forms.TabPage
@@ -1576,6 +1621,47 @@ function Update-TargetStatusLabel {
     }
 }
 
+function Test-IsWhtExempt([string]$companyName) {
+    if ([string]::IsNullOrWhiteSpace($companyName)) { return $false }
+    $kws = $script:Config["whtExemptKeywords"]
+    if (-not $kws) {
+        $kws = @("สภากาชาด", "เอเบิ้ล", "เอเบิล", "A-ble", "Abel", "องค์การเภสัชกรรม", "GPO", "ยูนีซัน", "Unison")
+    }
+    foreach ($kw in $kws) {
+        if ($companyName -match [regex]::Escape([string]$kw)) { return $true }
+    }
+    return $false
+}
+
+function Update-TaxFieldsFromCurrent([double]$amountVal, [string]$companyName) {
+    if ($amountVal -le 0) {
+        $txtVatAmount.Text = "0.00"
+        $txtWhtAmount.Text = "0.00"
+        $lblWhtBadge.BackColor = [System.Drawing.Color]::FromArgb(241, 245, 249)
+        $lblWhtBadge.ForeColor = [System.Drawing.Color]::FromArgb(51, 65, 85)
+        $lblWhtBadge.Text = "สุทธิที่จ่าย:`r`n-"
+        return
+    }
+    $base = [Math]::Round($amountVal / 1.07, 2, [MidpointRounding]::AwayFromZero)
+    $vat7 = [Math]::Round($amountVal - $base, 2, [MidpointRounding]::AwayFromZero)
+    $exempt = Test-IsWhtExempt $companyName
+    $wht1 = if ($exempt) { 0.0 } else { [Math]::Round($base * 0.01, 2, [MidpointRounding]::AwayFromZero) }
+    $net  = [Math]::Round($amountVal - $wht1, 2, [MidpointRounding]::AwayFromZero)
+
+    $txtVatAmount.Text = $vat7.ToString("0.00", [System.Globalization.CultureInfo]::InvariantCulture)
+    $txtWhtAmount.Text = $wht1.ToString("0.00", [System.Globalization.CultureInfo]::InvariantCulture)
+
+    if ($exempt) {
+        $lblWhtBadge.BackColor = [System.Drawing.Color]::FromArgb(254, 243, 199)
+        $lblWhtBadge.ForeColor = [System.Drawing.Color]::FromArgb(146, 64, 14)
+        $lblWhtBadge.Text = "ยกเว้นหัก 1% (0.00)`r`nสุทธิ: " + $net.ToString("#,##0.00")
+    } else {
+        $lblWhtBadge.BackColor = [System.Drawing.Color]::FromArgb(220, 252, 231)
+        $lblWhtBadge.ForeColor = [System.Drawing.Color]::FromArgb(22, 101, 52)
+        $lblWhtBadge.Text = "หัก 1% ปกติ`r`nสุทธิ: " + $net.ToString("#,##0.00")
+    }
+}
+
 function Apply-VendorToFields($v) {
     if (-not $v) { return }
     $script:SelectedVendor = $v
@@ -1592,15 +1678,14 @@ function Apply-VendorToFields($v) {
     $bBranch = if ($v.branch) { $v.branch } else { "-" }
     $lblBankBranchInfo.Text = "🏦 ธนาคาร (B): $bName ($($v.bankCode))  |  สาขา (C): $bBranch"
 
-    # Check special tax warning from MISใบเบิกจ่าย notes
-    $isTaxSpecial = $false
-    foreach ($kw in $script:Config["taxExemptKeywords"]) {
-        if ($v.company -match [regex]::Escape($kw)) { $isTaxSpecial = $true; break }
-    }
-    if ($isTaxSpecial -and (-not ($script:SelectedItem -and $script:SelectedItem.payDocNo))) {
+    $amtNow = if ($script:SelectedItem -and $script:SelectedItem.amount) { [double]$script:SelectedItem.amount } else { 0.0 }
+    Update-TaxFieldsFromCurrent -amountVal $amtNow -companyName ([string]$v.company)
+
+    # Highlight WHT 1% exemption for the 4 exempt companies
+    if ((Test-IsWhtExempt ([string]$v.company)) -and (-not ($script:SelectedItem -and $script:SelectedItem.payDocNo))) {
         $lblAlert.BackColor = [System.Drawing.Color]::FromArgb(254, 243, 199)
         $lblAlert.ForeColor = [System.Drawing.Color]::FromArgb(146, 64, 14)
-        $lblAlert.Text = "⚠️ แจ้งเตือนภาษี: '$($v.company)' อยู่ในกลุ่มเงื่อนไขภาษีพิเศษ (GPO/สภากาชาด/ยูนีซัน/BL HUA/โปลิฟาร์ม) กรุณาตรวจช่องภาษีก่อนกดบันทึก!"
+        $lblAlert.Text = "✓ ยกเว้นหักภาษีเงินได้ 1%: '$($v.company)' (สภากาชาด/เอเบิ้ล/อภ./ยูนีซัน) — ระบบตั้งหัก 1% เป็น 0.00 ให้อัตโนมัติ"
     }
 }
 
@@ -1615,6 +1700,10 @@ function Apply-ItemToFields($item) {
     $rcvDisplay = if ($item.rcvNo) { "$($item.rcvNo)/$($script:Config['fiscalYear'])" } else { "(ยังไม่มีเลขใบตรวจรับใน MISS70)" }
     $amtDisplay = if ($item.amountFormatted) { "$($item.amountFormatted) บาท" } else { "-" }
     $lblItemSummary.Text = "รหัส: $($item.code)  |  ใบตรวจรับ: $rcvDisplay`r`nใบสั่งซื้อ: $poDisplay  |  ยอดเงิน: $amtDisplay`r`nบริษัท: $($item.vendorName)`r`nเรื่อง: $($item.subject)"
+
+    # Calculate VAT 7% and WHT 1% from project amount (0.00 for 4 exempt companies)
+    $amtVal = if ($item.amount) { [double]$item.amount } else { 0.0 }
+    Update-TaxFieldsFromCurrent -amountVal $amtVal -companyName ([string]$item.vendorName)
 
     # Description template (linked directly from MISS70 Column J: ชื่อโครงการ)
     $subjRaw = if ($item.missSubject) { ([string]$item.missSubject).Trim() } else { ([string]$item.subject).Trim() }
@@ -1851,7 +1940,29 @@ $btnRunStep15.Add_Click({
         Start-Sleep -Milliseconds 250
         Invoke-FillCalibratedField -key "popupOkBtn"     -text "" -clickOnly $true | Out-Null
 
-        $statusBar.Text = "✓ ขั้นที่ 1.5 เสร็จแล้ว — ตรวจแท็บข้อมูลฎีกาเบิกเงิน แล้วไปต่อขั้นที่ 2"
+        $statusBar.Text = "✓ ขั้นที่ 1.5 เสร็จแล้ว — กด 'ขั้นที่ 1.6' เพื่อกรอกภาษี 7% / หัก 1% (หรือไปขั้นที่ 2)"
+    } catch {
+        if ($_.Exception.Message -eq "EMERGENCY_STOP") {
+            $statusBar.Text = "🛑 หยุดฉุกเฉินแล้ว (กด ESC)"
+        } else {
+            $statusBar.Text = "❌ เกิดข้อผิดพลาด: $($_.Exception.Message)"
+        }
+    }
+})
+
+# --- Step 1.6 Auto-Fill: ภาษีมูลค่าเพิ่ม (7%) + หักภาษีเงินได้ (1%) ---
+$btnRunStep16.Add_Click({
+    if (-not (Ensure-CalibratedOrGuide @("vatAmount", "whtAmount"))) { return }
+    try {
+        $vatTxt = $txtVatAmount.Text.Trim()
+        $whtTxt = $txtWhtAmount.Text.Trim()
+        $statusBar.Text = "⚡ กำลังกรอกภาษีมูลค่าเพิ่ม ($vatTxt) และหักภาษีเงินได้ ($whtTxt)..."
+        [System.Windows.Forms.Application]::DoEvents()
+
+        Invoke-FillCalibratedField -key "vatAmount" -text $vatTxt -isMultiline $false | Out-Null
+        Invoke-FillCalibratedField -key "whtAmount" -text $whtTxt -isMultiline $false | Out-Null
+
+        $statusBar.Text = "✓ ขั้นที่ 1.6 เสร็จแล้ว (VAT=$vatTxt | หัก 1%=$whtTxt) — ไปต่อขั้นที่ 2"
         $tabs.SelectedIndex = 1
     } catch {
         if ($_.Exception.Message -eq "EMERGENCY_STOP") {
