@@ -21,7 +21,7 @@ const CONFIG = {
   MISS70_SHEET_ID: '1tTaFrjVCPm8IrjJAg6e0Y27jIqoedLsmJz92py1O0lU',
   MISS70_TAB_NAME: 'ชีต1',
 
-  // Spreadsheet ID ของไฟล์ EGP+MIS (แท็บ ทะเบียนบริษัท ที่เชื่อมกับ MISใบเบิกจ่าย)
+  // Spreadsheet ID ของไฟล์ EGP+MIS (ชีต ทะเบียนบริษัท: Col A บริษัท, B ธนาคาร, C สาขา, E MIs2, G ที่อยู่, H เลขผู้เสียภาษี)
   EGP_MIS_SHEET_ID: '1m0EdHfSe3M6JUBirvivwJW5GOnzKos9sUI-smRsrOvE',
   VENDORS_TAB_NAME: 'ทะเบียนบริษัท'
 };
