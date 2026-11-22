@@ -167,13 +167,31 @@ function getVendorsRegistry() {
   return { vendors: vendors, byTaxId: byTaxId, byNameKey: byNameKey };
 }
 
+function extractSpreadsheetId(idOrUrl) {
+  const s = String(idOrUrl || '').trim();
+  if (!s) return '';
+  const m = s.match(/\/d\/([a-zA-Z0-9-_]+)/);
+  return m ? m[1] : s;
+}
+
 function doGet(e) {
   try {
+    const params = (e && e.parameter) ? e.parameter : {};
+    const opts = {
+      fiscalYear: String(params.fiscalYear || '70').trim(),
+      missSheetId: extractSpreadsheetId(params.missSheetId) || CONFIG.MISS70_SHEET_ID,
+      missTabName: String(params.missTabName || CONFIG.MISS70_TAB_NAME).trim() || CONFIG.MISS70_TAB_NAME,
+      autocratSheetId: extractSpreadsheetId(params.autocratSheetId) || CONFIG.AUTOCRAT_SHEET_ID,
+      autocratTabName: String(params.autocratTabName || CONFIG.AUTOCRAT_TAB_NAME).trim() || CONFIG.AUTOCRAT_TAB_NAME
+    };
     const vendorReg = getVendorsRegistry();
-    const result = getCombinedMisData(vendorReg);
+    const result = getCombinedMisData(vendorReg, opts);
     return ContentService
       .createTextOutput(JSON.stringify({
         ok: true,
+        fiscalYear: opts.fiscalYear,
+        missSheetId: opts.missSheetId,
+        autocratSheetId: opts.autocratSheetId,
         items: result,
         vendors: vendorReg.vendors,
         updatedAt: new Date().toISOString()
@@ -211,14 +229,19 @@ function doPost(e) {
   }
 }
 
-function getCombinedMisData(vendorReg) {
+function getCombinedMisData(vendorReg, opts) {
   vendorReg = vendorReg || { vendors: [], byTaxId: {}, byNameKey: {} };
+  opts = opts || {};
+  const missSheetId = extractSpreadsheetId(opts.missSheetId) || CONFIG.MISS70_SHEET_ID;
+  const missTabName = opts.missTabName || CONFIG.MISS70_TAB_NAME;
+  const autocratSheetId = extractSpreadsheetId(opts.autocratSheetId) || CONFIG.AUTOCRAT_SHEET_ID;
+  const autocratTabName = opts.autocratTabName || CONFIG.AUTOCRAT_TAB_NAME;
 
-  // 1. อ่านรหัสจัดซื้อ / เลขใบสั่งซื้อ / เลขใบตรวจรับ / เลขที่ใบขอเบิก จากชีต MISS70
+  // 1. อ่านรหัสจัดซื้อ / เลขใบสั่งซื้อ / เลขใบตรวจรับ / เลขที่ใบขอเบิก จากชีต MISS (ตามปีงบประมาณ)
   const missMap = {};
   try {
-    const missSS = SpreadsheetApp.openById(CONFIG.MISS70_SHEET_ID);
-    const missSheet = missSS.getSheetByName(CONFIG.MISS70_TAB_NAME) || missSS.getSheets()[0];
+    const missSS = SpreadsheetApp.openById(missSheetId);
+    const missSheet = missSS.getSheetByName(missTabName) || missSS.getSheets()[0];
     const missValues = missSheet.getDataRange().getDisplayValues();
     for (let r = 3; r < missValues.length; r++) {
       const row = missValues[r];
@@ -246,9 +269,9 @@ function getCombinedMisData(vendorReg) {
     }
   } catch (e) {}
 
-  // 2. อ่านข้อมูลหลักจาก Auto Crat-EGP70 (แท็บ main)
-  const acSS = SpreadsheetApp.openById(CONFIG.AUTOCRAT_SHEET_ID);
-  const acSheet = acSS.getSheetByName(CONFIG.AUTOCRAT_TAB_NAME) || acSS.getSheets()[0];
+  // 2. อ่านข้อมูลหลักจาก Auto Crat-EGP (ตามปีงบประมาณ)
+  const acSS = SpreadsheetApp.openById(autocratSheetId);
+  const acSheet = acSS.getSheetByName(autocratTabName) || acSS.getSheets()[0];
   const acValues = acSheet.getDataRange().getDisplayValues();
 
   const items = [];
@@ -343,11 +366,13 @@ function getCombinedMisData(vendorReg) {
 }
 
 function updateMiss70Codes(payload) {
-  const missSS = SpreadsheetApp.openById(CONFIG.MISS70_SHEET_ID);
-  const missSheet = missSS.getSheetByName(CONFIG.MISS70_TAB_NAME) || missSS.getSheets()[0];
+  const targetId = extractSpreadsheetId(payload.missSheetId) || CONFIG.MISS70_SHEET_ID;
+  const targetTab = String(payload.missTabName || CONFIG.MISS70_TAB_NAME).trim() || CONFIG.MISS70_TAB_NAME;
+  const missSS = SpreadsheetApp.openById(targetId);
+  const missSheet = missSS.getSheetByName(targetTab) || missSS.getSheets()[0];
   const rowIndex = Number(payload.missRowIndex);
   if (!rowIndex || rowIndex < 4) {
-    throw new Error('ไม่พบแถวในชีต MISS70 ที่ต้องการบันทึก');
+    throw new Error('ไม่พบแถวในชีต MISS ที่ต้องการบันทึก');
   }
   if (payload.purHireNo !== undefined) {
     missSheet.getRange(rowIndex, 2).setValue(payload.purHireNo);
@@ -361,17 +386,19 @@ function updateMiss70Codes(payload) {
   if (payload.payDocNo !== undefined) {
     missSheet.getRange(rowIndex, 8).setValue(payload.payDocNo);
   }
-  return { updatedRow: rowIndex };
+  return { updatedRow: rowIndex, missSheetId: targetId };
 }
 
 function updatePayDocNo(payload) {
-  const missSS = SpreadsheetApp.openById(CONFIG.MISS70_SHEET_ID);
-  const missSheet = missSS.getSheetByName(CONFIG.MISS70_TAB_NAME) || missSS.getSheets()[0];
+  const targetId = extractSpreadsheetId(payload.missSheetId) || CONFIG.MISS70_SHEET_ID;
+  const targetTab = String(payload.missTabName || CONFIG.MISS70_TAB_NAME).trim() || CONFIG.MISS70_TAB_NAME;
+  const missSS = SpreadsheetApp.openById(targetId);
+  const missSheet = missSS.getSheetByName(targetTab) || missSS.getSheets()[0];
   const rowIndex = Number(payload.missRowIndex);
   if (!rowIndex || rowIndex < 4) {
-    throw new Error('ไม่พบแถวในชีต MISS70 ที่ต้องการบันทึกเลขที่ใบขอเบิก');
+    throw new Error('ไม่พบแถวในชีต MISS ที่ต้องการบันทึกเลขที่ใบขอเบิก');
   }
   const val = String(payload.payDocNo || '').trim();
-  missSheet.getRange(rowIndex, 8).setValue(val); // Col H: เลขที่ใบขอเบิก.../70
-  return { updatedRow: rowIndex, payDocNo: val };
+  missSheet.getRange(rowIndex, 8).setValue(val); // Col H: เลขที่ใบขอเบิก.../YY
+  return { updatedRow: rowIndex, payDocNo: val, missSheetId: targetId };
 }

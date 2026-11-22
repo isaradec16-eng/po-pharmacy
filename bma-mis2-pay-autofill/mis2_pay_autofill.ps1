@@ -351,6 +351,19 @@ $script:CalibDefinitions = @(
 )
 
 function Load-Config {
+    $defaultFyMap = [ordered]@{
+        "70" = @{
+            missSheetId     = "1tTaFrjVCPm8IrjJAg6e0Y27jIqoedLsmJz92py1O0lU"
+            missTabName     = "ชีต1"
+            autocratSheetId = "1qFqdTqcP_d_nNLAX3AL0Gq21s2zjffXW2Czo3Jv1F_Y"
+            autocratTabName = "main"
+        }
+        "71" = @{ missSheetId = ""; missTabName = "ชีต1"; autocratSheetId = ""; autocratTabName = "main" }
+        "72" = @{ missSheetId = ""; missTabName = "ชีต1"; autocratSheetId = ""; autocratTabName = "main" }
+        "73" = @{ missSheetId = ""; missTabName = "ชีต1"; autocratSheetId = ""; autocratTabName = "main" }
+        "74" = @{ missSheetId = ""; missTabName = "ชีต1"; autocratSheetId = ""; autocratTabName = "main" }
+        "75" = @{ missSheetId = ""; missTabName = "ชีต1"; autocratSheetId = ""; autocratTabName = "main" }
+    }
     $defaultCfg = [ordered]@{
         version             = "1.0.0"
         mis2LoginUrl        = "http://bmasso.bma.go.th/MIS2DirectLogins/index2.jsp"
@@ -358,6 +371,7 @@ function Load-Config {
         egpMisSheetId       = "1m0EdHfSe3M6JUBirvivwJW5GOnzKos9sUI-smRsrOvE"
         vendorsGid          = "1778203595"
         fiscalYear          = "70"
+        fiscalYears         = $defaultFyMap
         defaultAssignTo     = "สำนักงานบริหารการเงินการคลังกรุงเทพมหานคร โอนเงินเข้าบัญชี รพจ."
         assignToPresets     = @(
             "สำนักงานบริหารการเงินการคลังกรุงเทพมหานคร โอนเงินเข้าบัญชี รพจ.",
@@ -383,7 +397,21 @@ function Load-Config {
             $raw = [System.IO.File]::ReadAllText($script:ConfigPath, [System.Text.Encoding]::UTF8)
             $loaded = $raw | ConvertFrom-Json
             foreach ($prop in $loaded.PSObject.Properties) {
-                $defaultCfg[$prop.Name] = $prop.Value
+                if ($prop.Name -eq "fiscalYears" -and $prop.Value) {
+                    $fyHt = [ordered]@{}
+                    foreach ($k in $defaultFyMap.Keys) { $fyHt[$k] = $defaultFyMap[$k] }
+                    foreach ($yp in $prop.Value.PSObject.Properties) {
+                        $fyHt[[string]$yp.Name] = @{
+                            missSheetId     = [string]$yp.Value.missSheetId
+                            missTabName     = if ($yp.Value.missTabName) { [string]$yp.Value.missTabName } else { "ชีต1" }
+                            autocratSheetId = [string]$yp.Value.autocratSheetId
+                            autocratTabName = if ($yp.Value.autocratTabName) { [string]$yp.Value.autocratTabName } else { "main" }
+                        }
+                    }
+                    $defaultCfg["fiscalYears"] = $fyHt
+                } else {
+                    $defaultCfg[$prop.Name] = $prop.Value
+                }
             }
         } catch {}
     }
@@ -397,6 +425,182 @@ function Save-Config {
         $json = $script:Config | ConvertTo-Json -Depth 6
         [System.IO.File]::WriteAllText($script:ConfigPath, $json, (New-Object System.Text.UTF8Encoding($false)))
     } catch {}
+}
+
+function Extract-SpreadsheetId([string]$idOrUrl) {
+    if ([string]::IsNullOrWhiteSpace($idOrUrl)) { return "" }
+    $s = $idOrUrl.Trim()
+    $m = [regex]::Match($s, "/d/([a-zA-Z0-9-_]+)")
+    if ($m.Success) { return $m.Groups[1].Value }
+    return $s
+}
+
+function Get-FiscalYearEntry([string]$fy) {
+    if ([string]::IsNullOrWhiteSpace($fy)) { $fy = [string]$script:Config["fiscalYear"] }
+    if ([string]::IsNullOrWhiteSpace($fy)) { $fy = "70" }
+    $map = $script:Config["fiscalYears"]
+    if ($map -and $map.Contains($fy)) { return $map[$fy] }
+    return @{ missSheetId = ""; missTabName = "ชีต1"; autocratSheetId = ""; autocratTabName = "main" }
+}
+
+function Show-FiscalYearSettingsDialog([string]$initialYear) {
+    $dlg = New-Object System.Windows.Forms.Form
+    $dlg.Text = "⚙️ ตั้งค่าไฟล์ปลายทางตามปีงบประมาณ (MISS / Auto Crat)"
+    $dlg.Size = New-Object System.Drawing.Size(540, 355)
+    $dlg.StartPosition = "CenterScreen"
+    $dlg.TopMost = $true
+    $dlg.Font = New-Object System.Drawing.Font("Segoe UI", 9.5)
+    $dlg.BackColor = [System.Drawing.Color]::FromArgb(245, 248, 252)
+
+    $lblY = New-Object System.Windows.Forms.Label
+    $lblY.Text = "เลือกปีงบประมาณ:"
+    $lblY.Location = New-Object System.Drawing.Point(14, 16)
+    $lblY.Size = New-Object System.Drawing.Size(120, 22)
+    $dlg.Controls.Add($lblY)
+
+    $cmbY = New-Object System.Windows.Forms.ComboBox
+    $cmbY.Location = New-Object System.Drawing.Point(138, 13)
+    $cmbY.Size = New-Object System.Drawing.Size(110, 24)
+    $cmbY.DropDownStyle = "DropDownList"
+    foreach ($k in ($script:Config["fiscalYears"].Keys | Sort-Object { [int]$_ })) {
+        $cmbY.Items.Add($k) | Out-Null
+    }
+    $dlg.Controls.Add($cmbY)
+
+    $btnAddY = New-Object System.Windows.Forms.Button
+    $btnAddY.Text = "➕ เพิ่มปีงบถัดไป"
+    $btnAddY.Location = New-Object System.Drawing.Point(258, 12)
+    $btnAddY.Size = New-Object System.Drawing.Size(130, 27)
+    $btnAddY.BackColor = [System.Drawing.Color]::FromArgb(224, 242, 254)
+    $btnAddY.FlatStyle = "Flat"
+    $dlg.Controls.Add($btnAddY)
+
+    $lblMiss = New-Object System.Windows.Forms.Label
+    $lblMiss.Text = "ลิงก์หรือ ID ไฟล์ MISS (เช่น ลิงก์ไฟล์ MISS70 / MISS71):"
+    $lblMiss.Location = New-Object System.Drawing.Point(14, 54)
+    $lblMiss.Size = New-Object System.Drawing.Size(490, 20)
+    $lblMiss.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    $dlg.Controls.Add($lblMiss)
+
+    $txtMissUrl = New-Object System.Windows.Forms.TextBox
+    $txtMissUrl.Location = New-Object System.Drawing.Point(14, 76)
+    $txtMissUrl.Size = New-Object System.Drawing.Size(495, 24)
+    $dlg.Controls.Add($txtMissUrl)
+
+    $lblMissTab = New-Object System.Windows.Forms.Label
+    $lblMissTab.Text = "ชื่อชีตในไฟล์ MISS (ค่าเริ่มต้น: ชีต1):"
+    $lblMissTab.Location = New-Object System.Drawing.Point(14, 108)
+    $lblMissTab.Size = New-Object System.Drawing.Size(220, 20)
+    $dlg.Controls.Add($lblMissTab)
+
+    $txtMissTab = New-Object System.Windows.Forms.TextBox
+    $txtMissTab.Location = New-Object System.Drawing.Point(240, 105)
+    $txtMissTab.Size = New-Object System.Drawing.Size(120, 24)
+    $dlg.Controls.Add($txtMissTab)
+
+    $lblAc = New-Object System.Windows.Forms.Label
+    $lblAc.Text = "ลิงก์หรือ ID ไฟล์ Auto Crat-EGP (เช่น Auto Crat-EGP70 / 71):"
+    $lblAc.Location = New-Object System.Drawing.Point(14, 144)
+    $lblAc.Size = New-Object System.Drawing.Size(490, 20)
+    $lblAc.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    $dlg.Controls.Add($lblAc)
+
+    $txtAcUrl = New-Object System.Windows.Forms.TextBox
+    $txtAcUrl.Location = New-Object System.Drawing.Point(14, 166)
+    $txtAcUrl.Size = New-Object System.Drawing.Size(495, 24)
+    $dlg.Controls.Add($txtAcUrl)
+
+    $lblAcTab = New-Object System.Windows.Forms.Label
+    $lblAcTab.Text = "ชื่อชีตในไฟล์ Auto Crat (ค่าเริ่มต้น: main):"
+    $lblAcTab.Location = New-Object System.Drawing.Point(14, 198)
+    $lblAcTab.Size = New-Object System.Drawing.Size(220, 20)
+    $dlg.Controls.Add($lblAcTab)
+
+    $txtAcTab = New-Object System.Windows.Forms.TextBox
+    $txtAcTab.Location = New-Object System.Drawing.Point(240, 195)
+    $txtAcTab.Size = New-Object System.Drawing.Size(120, 24)
+    $dlg.Controls.Add($txtAcTab)
+
+    $lblHint = New-Object System.Windows.Forms.Label
+    $lblHint.Location = New-Object System.Drawing.Point(14, 228)
+    $lblHint.Size = New-Object System.Drawing.Size(495, 34)
+    $lblHint.ForeColor = [System.Drawing.Color]::FromArgb(71, 85, 105)
+    $lblHint.Font = New-Object System.Drawing.Font("Segoe UI", 8.2)
+    $lblHint.Text = "💡 วาง URL เต็มของ Google Sheets ได้เลย ระบบจะตัดรหัส Spreadsheet ID ให้อัตโนมัติ`r`n   (อย่าลืม Deploy โค้ด google-apps-script.gs ล่าสุดเพื่อให้รองรับการสลับปีงบแบบ Live)"
+    $dlg.Controls.Add($lblHint)
+
+    $btnSave = New-Object System.Windows.Forms.Button
+    $btnSave.Text = "💾 บันทึกและใช้ปีงบนี้"
+    $btnSave.Location = New-Object System.Drawing.Point(344, 270)
+    $btnSave.Size = New-Object System.Drawing.Size(165, 34)
+    $btnSave.BackColor = [System.Drawing.Color]::FromArgb(13, 148, 136)
+    $btnSave.ForeColor = [System.Drawing.Color]::White
+    $btnSave.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
+    $btnSave.FlatStyle = "Flat"
+    $dlg.Controls.Add($btnSave)
+
+    $btnCancel = New-Object System.Windows.Forms.Button
+    $btnCancel.Text = "ยกเลิก"
+    $btnCancel.Location = New-Object System.Drawing.Point(244, 270)
+    $btnCancel.Size = New-Object System.Drawing.Size(92, 34)
+    $btnCancel.FlatStyle = "Flat"
+    $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+    $dlg.Controls.Add($btnCancel)
+
+    $loadYearIntoDlg = {
+        $yKey = [string]$cmbY.SelectedItem
+        if (-not $yKey) { return }
+        $ent = Get-FiscalYearEntry $yKey
+        $lblMiss.Text   = "ลิงก์หรือ ID ไฟล์ MISS$yKey (ปลายทางคอลัมน์ D/H/J):"
+        $lblAc.Text     = "ลิงก์หรือ ID ไฟล์ Auto Crat-EGP$yKey:"
+        $txtMissUrl.Text = [string]$ent["missSheetId"]
+        $txtMissTab.Text = if ($ent["missTabName"]) { [string]$ent["missTabName"] } else { "ชีต1" }
+        $txtAcUrl.Text   = [string]$ent["autocratSheetId"]
+        $txtAcTab.Text   = if ($ent["autocratTabName"]) { [string]$ent["autocratTabName"] } else { "main" }
+    }
+
+    $cmbY.Add_SelectedIndexChanged($loadYearIntoDlg)
+    $btnAddY.Add_Click({
+        $maxY = 70
+        foreach ($k in $script:Config["fiscalYears"].Keys) {
+            $n = 0
+            if ([int]::TryParse([string]$k, [ref]$n) -and $n -gt $maxY) { $maxY = $n }
+        }
+        $nextY = [string]($maxY + 1)
+        $script:Config["fiscalYears"][$nextY] = @{
+            missSheetId     = ""
+            missTabName     = "ชีต1"
+            autocratSheetId = ""
+            autocratTabName = "main"
+        }
+        Save-Config
+        $cmbY.Items.Add($nextY) | Out-Null
+        $cmbY.SelectedItem = $nextY
+    })
+
+    $btnSave.Add_Click({
+        $yKey = [string]$cmbY.SelectedItem
+        if (-not $yKey) { return }
+        $script:Config["fiscalYears"][$yKey] = @{
+            missSheetId     = Extract-SpreadsheetId $txtMissUrl.Text
+            missTabName     = if ($txtMissTab.Text.Trim()) { $txtMissTab.Text.Trim() } else { "ชีต1" }
+            autocratSheetId = Extract-SpreadsheetId $txtAcUrl.Text
+            autocratTabName = if ($txtAcTab.Text.Trim()) { $txtAcTab.Text.Trim() } else { "main" }
+        }
+        $script:Config["fiscalYear"] = $yKey
+        Save-Config
+        $dlg.DialogResult = [System.Windows.Forms.DialogResult]::OK
+        $dlg.Close()
+    })
+
+    if ($initialYear -and $cmbY.Items.Contains($initialYear)) {
+        $cmbY.SelectedItem = $initialYear
+    } elseif ($cmbY.Items.Count -gt 0) {
+        $cmbY.SelectedIndex = 0
+    }
+    & $loadYearIntoDlg
+
+    return ($dlg.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK)
 }
 
 function Load-Calibration {
@@ -616,12 +820,23 @@ function Sync-GoogleSheetsData {
 
     if (-not [string]::IsNullOrWhiteSpace($gasUrl)) {
         try {
+            $fy = [string]$script:Config["fiscalYear"]
+            if ([string]::IsNullOrWhiteSpace($fy)) { $fy = "70" }
+            $fyEnt = Get-FiscalYearEntry $fy
+            $qParts = @(
+                "fiscalYear=" + [Uri]::EscapeDataString($fy),
+                "t=" + [DateTimeOffset]::Now.ToUnixTimeSeconds()
+            )
+            if ($fyEnt["missSheetId"])     { $qParts += "missSheetId=" + [Uri]::EscapeDataString([string]$fyEnt["missSheetId"]) }
+            if ($fyEnt["missTabName"])     { $qParts += "missTabName=" + [Uri]::EscapeDataString([string]$fyEnt["missTabName"]) }
+            if ($fyEnt["autocratSheetId"]) { $qParts += "autocratSheetId=" + [Uri]::EscapeDataString([string]$fyEnt["autocratSheetId"]) }
+            if ($fyEnt["autocratTabName"]) { $qParts += "autocratTabName=" + [Uri]::EscapeDataString([string]$fyEnt["autocratTabName"]) }
             $sep = if ($gasUrl.Contains("?")) { "&" } else { "?" }
-            $respText = Fetch-Utf8String -url ($gasUrl + $sep + "t=" + [DateTimeOffset]::Now.ToUnixTimeSeconds()) -timeoutMs 20000
+            $respText = Fetch-Utf8String -url ($gasUrl + $sep + ($qParts -join "&")) -timeoutMs 20000
             $json = $respText | ConvertFrom-Json
             if ($json.ok -and $json.items) {
                 $script:Items = @($json.items)
-                $statusParts += "รายการงบ: $($script:Items.Count)"
+                $statusParts += "ปีงบ $fy (MISS$fy): $($script:Items.Count) รายการ"
             }
             if ($json.ok -and $json.vendors -and $json.vendors.Count -gt 0) {
                 $script:Vendors = @()
@@ -1136,6 +1351,49 @@ $lblTargetStatus.Padding = New-Object System.Windows.Forms.Padding(6, 3, 6, 0)
 $lblTargetStatus.Text = "🪟 หน้าต่าง Oracle Forms: กำลังค้นหา..."
 $body.Controls.Add($lblTargetStatus)
 $y += 28
+
+# --- Fiscal Year Selector Bar (starts at 70, expandable & per-year target files) ---
+$pnlFy = New-Object System.Windows.Forms.Panel
+$pnlFy.Location = New-Object System.Drawing.Point(10, $y)
+$pnlFy.Size = New-Object System.Drawing.Size(430, 32)
+$pnlFy.BackColor = [System.Drawing.Color]::FromArgb(224, 242, 254)
+$body.Controls.Add($pnlFy)
+
+$lblFy = New-Object System.Windows.Forms.Label
+$lblFy.Text = "📅 ปีงบประมาณ:"
+$lblFy.Location = New-Object System.Drawing.Point(8, 7)
+$lblFy.Size = New-Object System.Drawing.Size(96, 20)
+$lblFy.ForeColor = [System.Drawing.Color]::FromArgb(12, 74, 110)
+$lblFy.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+$pnlFy.Controls.Add($lblFy)
+
+$cmbFiscalYear = New-Object System.Windows.Forms.ComboBox
+$cmbFiscalYear.Location = New-Object System.Drawing.Point(106, 4)
+$cmbFiscalYear.Size = New-Object System.Drawing.Size(86, 24)
+$cmbFiscalYear.DropDownStyle = "DropDownList"
+$cmbFiscalYear.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
+$pnlFy.Controls.Add($cmbFiscalYear)
+
+$lblFyFileStatus = New-Object System.Windows.Forms.Label
+$lblFyFileStatus.Location = New-Object System.Drawing.Point(198, 7)
+$lblFyFileStatus.Size = New-Object System.Drawing.Size(112, 20)
+$lblFyFileStatus.ForeColor = [System.Drawing.Color]::FromArgb(15, 118, 110)
+$lblFyFileStatus.Font = New-Object System.Drawing.Font("Segoe UI", 8.2, [System.Drawing.FontStyle]::Bold)
+$lblFyFileStatus.Text = "ไฟล์: MISS70"
+$pnlFy.Controls.Add($lblFyFileStatus)
+
+$btnFyConfig = New-Object System.Windows.Forms.Button
+$btnFyConfig.Text = "⚙️ ตั้งค่าไฟล์ปีงบ"
+$btnFyConfig.Location = New-Object System.Drawing.Point(312, 3)
+$btnFyConfig.Size = New-Object System.Drawing.Size(112, 26)
+$btnFyConfig.BackColor = [System.Drawing.Color]::FromArgb(2, 132, 199)
+$btnFyConfig.ForeColor = [System.Drawing.Color]::White
+$btnFyConfig.Font = New-Object System.Drawing.Font("Segoe UI", 8.2, [System.Drawing.FontStyle]::Bold)
+$btnFyConfig.FlatStyle = "Flat"
+$btnFyConfig.FlatAppearance.BorderSize = 0
+$pnlFy.Controls.Add($btnFyConfig)
+
+$y += 38
 
 # --- Section 1: Data Source Selection ---
 $grpSource = New-Object System.Windows.Forms.GroupBox
@@ -2078,41 +2336,127 @@ $btnRunStep3.Add_Click({
     }
 })
 
-# --- Writeback เลขที่ใบขอเบิก to MISS70 Col H ---
+# --- Fiscal Year Selector & Target File Sync ---
+$script:SuppressFyEvent = $false
+
+function Refresh-FiscalYearUi {
+    $script:SuppressFyEvent = $true
+    try {
+        $cmbFiscalYear.Items.Clear()
+        $sortedKeys = @($script:Config["fiscalYears"].Keys | Sort-Object { [int]$_ })
+        foreach ($k in $sortedKeys) {
+            $cmbFiscalYear.Items.Add([string]$k) | Out-Null
+        }
+        $curFy = [string]$script:Config["fiscalYear"]
+        if ([string]::IsNullOrWhiteSpace($curFy) -or -not $cmbFiscalYear.Items.Contains($curFy)) {
+            $curFy = if ($cmbFiscalYear.Items.Count -gt 0) { [string]$cmbFiscalYear.Items[0] } else { "70" }
+            $script:Config["fiscalYear"] = $curFy
+        }
+        $cmbFiscalYear.SelectedItem = $curFy
+        $txtRcvYear.Text = $curFy
+
+        $ent = Get-FiscalYearEntry $curFy
+        $hasFile = -not [string]::IsNullOrWhiteSpace([string]$ent["missSheetId"])
+        if ($hasFile) {
+            $lblFyFileStatus.Text = "✓ ไฟล์ MISS$curFy"
+            $lblFyFileStatus.ForeColor = [System.Drawing.Color]::FromArgb(15, 118, 110)
+        } else {
+            $lblFyFileStatus.Text = "⚠️ ยังไม่ใส่ลิงก์"
+            $lblFyFileStatus.ForeColor = [System.Drawing.Color]::FromArgb(180, 83, 9)
+        }
+        $grpSource.Text    = " 1. ค้นหารายการเบิกจ่าย (Auto Crat-EGP$curFy + MISS$curFy + ทะเบียนบริษัท) "
+        $grpWriteback.Text = " บันทึก 'เลขที่ใบขอเบิก.../$curFy' กลับลงชีต MISS$curFy (คอลัมน์ H) หลังคนกดบันทึกเอง "
+        $btnSavePayDoc.Text = "💾 บันทึกลง MISS$curFy"
+    } finally {
+        $script:SuppressFyEvent = $false
+    }
+}
+
+$cmbFiscalYear.Add_SelectedIndexChanged({
+    if ($script:SuppressFyEvent) { return }
+    $chosenFy = [string]$cmbFiscalYear.SelectedItem
+    if ([string]::IsNullOrWhiteSpace($chosenFy)) { return }
+    $script:Config["fiscalYear"] = $chosenFy
+    Save-Config
+    Refresh-FiscalYearUi
+
+    $ent = Get-FiscalYearEntry $chosenFy
+    if ([string]::IsNullOrWhiteSpace([string]$ent["missSheetId"])) {
+        $res = [System.Windows.Forms.MessageBox]::Show(
+            "ปีงบประมาณ $chosenFy ยังไม่ได้ตั้งค่าลิงก์ไฟล์ MISS$chosenFy ปลายทาง`r`nต้องการเปิดหน้าตั้งค่าเพื่อวางลิงก์ Google Sheets ตอนนี้เลยไหมครับ?",
+            "ตั้งค่าไฟล์ปีงบประมาณ $chosenFy",
+            [System.Windows.Forms.MessageBoxButtons]::YesNo,
+            [System.Windows.Forms.MessageBoxIcon]::Question
+        )
+        if ($res -eq [System.Windows.Forms.DialogResult]::Yes) {
+            if (Show-FiscalYearSettingsDialog $chosenFy) {
+                Refresh-FiscalYearUi
+            }
+        }
+    }
+
+    $statusBar.Text = "🔄 กำลังโหลดข้อมูลปีงบประมาณ $chosenFy (MISS$chosenFy)..."
+    [System.Windows.Forms.Application]::DoEvents()
+    $msg = Sync-GoogleSheetsData
+    Refresh-VendorCombo
+    Refresh-ItemCombo
+    $statusBar.Text = "✓ สลับเป็นปีงบประมาณ $chosenFy แล้ว — $msg"
+})
+
+$btnFyConfig.Add_Click({
+    $curFy = [string]$script:Config["fiscalYear"]
+    if (Show-FiscalYearSettingsDialog $curFy) {
+        Refresh-FiscalYearUi
+        $statusBar.Text = "🔄 กำลังโหลดข้อมูลปีงบประมาณ $($script:Config['fiscalYear'])..."
+        [System.Windows.Forms.Application]::DoEvents()
+        $msg = Sync-GoogleSheetsData
+        Refresh-VendorCombo
+        Refresh-ItemCombo
+        $statusBar.Text = "✓ บันทึกและโหลดข้อมูลปีงบประมาณ $($script:Config['fiscalYear']) สำเร็จ — $msg"
+    }
+})
+
+# --- Writeback เลขที่ใบขอเบิก to Active MISS{YY} Col H ---
 $btnSavePayDoc.Add_Click({
+    $fy = [string]$script:Config["fiscalYear"]
+    if ([string]::IsNullOrWhiteSpace($fy)) { $fy = "70" }
+    $fyEnt = Get-FiscalYearEntry $fy
     $payNo = $txtPayDocNo.Text.Trim()
     if ([string]::IsNullOrWhiteSpace($payNo)) {
         [System.Windows.Forms.MessageBox]::Show("กรุณาพิมพ์ 'เลขที่ใบขอเบิก' ที่ได้หลังจากกดบันทึกใน MIS2 ก่อนครับ", "แจ้งเตือน")
         return
     }
     if (-not $script:SelectedItem -or -not $script:SelectedItem.missRowIndex) {
-        [System.Windows.Forms.MessageBox]::Show("รายการนี้ยังไม่ได้เชื่อมแถวในชีต MISS70 กรุณาเลือกรายการงบจากด้านบนก่อนครับ", "แจ้งเตือน")
+        [System.Windows.Forms.MessageBox]::Show("รายการนี้ยังไม่ได้เชื่อมแถวในชีต MISS$fy กรุณาเลือกรายการงบจากด้านบนก่อนครับ", "แจ้งเตือน")
         return
     }
     try {
-        $statusBar.Text = "💾 กำลังบันทึกเลขที่ใบขอเบิก '$payNo' ลงชีต MISS70 คอลัมน์ H..."
+        $statusBar.Text = "💾 กำลังบันทึกเลขที่ใบขอเบิก '$payNo' ลงชีต MISS$fy คอลัมน์ H..."
         [System.Windows.Forms.Application]::DoEvents()
         $resp = Post-Utf8Json -url ([string]$script:Config["gasWebAppUrl"]) -payload @{
             action       = "updatePayDocNo"
             missRowIndex = [int]$script:SelectedItem.missRowIndex
             payDocNo     = $payNo
+            missSheetId  = [string]$fyEnt["missSheetId"]
+            missTabName  = [string]$fyEnt["missTabName"]
         }
         $parsed = $resp | ConvertFrom-Json
         if ($parsed.ok) {
             $script:SelectedItem | Add-Member -NotePropertyName payDocNo -NotePropertyValue $payNo -Force
-            $statusBar.Text = "✓ บันทึกเลขที่ใบขอเบิก '$payNo' ลง MISS70 แถว $($script:SelectedItem.missRowIndex) เรียบร้อยแล้ว!"
-            [System.Windows.Forms.MessageBox]::Show("บันทึกเลขที่ใบขอเบิก '$payNo' ลงชีต MISS70 คอลัมน์ H เรียบร้อยแล้วครับ", "บันทึกสำเร็จ")
+            $statusBar.Text = "✓ บันทึกเลขที่ใบขอเบิก '$payNo' ลง MISS$fy แถว $($script:SelectedItem.missRowIndex) เรียบร้อยแล้ว!"
+            [System.Windows.Forms.MessageBox]::Show("บันทึกเลขที่ใบขอเบิก '$payNo' ลงชีต MISS$fy คอลัมน์ H เรียบร้อยแล้วครับ", "บันทึกสำเร็จ")
         } else {
             throw ([string]$parsed.error)
         }
     } catch {
         [System.Windows.Forms.MessageBox]::Show("บันทึกไม่สำเร็จ: $($_.Exception.Message)`r`n`r`n(หากยังไม่เคยอัปเดตโค้ด google-apps-script.gs ล่าสุดใน Apps Script กรุณา Deploy เวอร์ชันใหม่ก่อนครับ)", "แจ้งเตือน")
-        $statusBar.Text = "❌ บันทึก MISS70 ไม่สำเร็จ"
+        $statusBar.Text = "❌ บันทึก MISS$fy ไม่สำเร็จ"
     }
 })
 
 # --- Initial Load on Form Shown ---
 $form.Add_Shown({
+    Refresh-FiscalYearUi
     $statusBar.Text = "🔄 กำลังโหลดฐานข้อมูลจาก Google Sheets..."
     [System.Windows.Forms.Application]::DoEvents()
     $msg = Sync-GoogleSheetsData
