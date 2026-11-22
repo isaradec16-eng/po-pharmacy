@@ -20,7 +20,7 @@
   ],
   "defaultDocCount": "1",
   "defaultDateMode": "today",
-  "descriptionTemplate": "ค่าจัดซื้อ{subject} ตามใบสั่งซื้อเลขที่ {poNo}/{year} ลงวันที่ {poSignDate}",
+  "descriptionTemplate": "ค่าจัดซื้อ{subject}",
   "stepDelayMs": 220,
   "clearBeforePaste": true,
   "autoFillFields": {

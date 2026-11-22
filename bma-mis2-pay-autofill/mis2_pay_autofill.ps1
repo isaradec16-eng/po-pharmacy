@@ -376,7 +376,7 @@ function Load-Config {
         )
         defaultDocCount     = "1"
         defaultDateMode     = "today"
-        descriptionTemplate = "ค่าจัดซื้อ{subject} ตามใบสั่งซื้อเลขที่ {poNo}/{year} ลงวันที่ {poSignDate}"
+        descriptionTemplate = "ค่าจัดซื้อ{subject}"
         stepDelayMs         = 220
         clearBeforePaste    = $true
         autoFillFields      = @{
@@ -1616,14 +1616,20 @@ function Apply-ItemToFields($item) {
     $amtDisplay = if ($item.amountFormatted) { "$($item.amountFormatted) บาท" } else { "-" }
     $lblItemSummary.Text = "รหัส: $($item.code)  |  ใบตรวจรับ: $rcvDisplay`r`nใบสั่งซื้อ: $poDisplay  |  ยอดเงิน: $amtDisplay`r`nบริษัท: $($item.vendorName)`r`nเรื่อง: $($item.subject)"
 
-    # Description template
+    # Description template (linked directly from MISS70 Column J: ชื่อโครงการ)
+    $subjRaw = if ($item.missSubject) { ([string]$item.missSubject).Trim() } else { ([string]$item.subject).Trim() }
     $tpl = [string]$script:Config["descriptionTemplate"]
-    $desc = $tpl.Replace("{subject}", [string]$item.subject) `
-                .Replace("{poNo}", [string]$item.poNo) `
-                .Replace("{rcvNo}", [string]$item.rcvNo) `
-                .Replace("{year}", [string]$script:Config["fiscalYear"]) `
-                .Replace("{poSignDate}", [string]$item.poSignDate) `
-                .Replace("{rcvDate}", [string]$item.rcvDate)
+    if ([string]::IsNullOrWhiteSpace($tpl)) { $tpl = "ค่าจัดซื้อ{subject}" }
+    if ($tpl -eq "ค่าจัดซื้อ{subject}" -and $subjRaw.StartsWith("ค่าจัดซื้อ")) {
+        $desc = $subjRaw
+    } else {
+        $desc = $tpl.Replace("{subject}", $subjRaw) `
+                    .Replace("{poNo}", [string]$item.poNo) `
+                    .Replace("{rcvNo}", [string]$item.rcvNo) `
+                    .Replace("{year}", [string]$script:Config["fiscalYear"]) `
+                    .Replace("{poSignDate}", [string]$item.poSignDate) `
+                    .Replace("{rcvDate}", [string]$item.rcvDate)
+    }
     $txtDesc.Text = $desc
 
     if ($script:Config["defaultDateMode"] -eq "rcvDate" -and $item.rcvDate) {

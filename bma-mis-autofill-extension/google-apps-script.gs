@@ -298,6 +298,7 @@ function getCombinedMisData(vendorReg) {
       code: code,
       projectNo: String(row[0] || '').trim(),
       subject: missInfo.subjectArabic || subjectArabic,
+      missSubject: missInfo.subjectArabic || '',
       rawSubject: rawSubject,
       itemCount: itemCount,
       amount: amountNum,
