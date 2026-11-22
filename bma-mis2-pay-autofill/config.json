@@ -24,14 +24,9 @@
   "stepDelayMs": 220,
   "clearBeforePaste": true,
   "autoFillFields": {
-    "creditorName": true,
     "payTo": true,
     "assignTo": true,
-    "taxId": true,
-    "tradeReg": true,
-    "address": true,
     "bankCode": true,
-    "branchCode": false,
     "accountNo": true
   },
   "whtExemptKeywords": [

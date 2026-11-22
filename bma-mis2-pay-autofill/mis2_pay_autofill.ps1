@@ -339,14 +339,9 @@ $script:CalibDefinitions = @(
     @{ Key = "vatAmount";     Group = "ขั้นที่ 1.6 (ตารางภาษี)";     Label = "ช่อง 'ภาษีมูลค่าเพิ่ม' (7%) แถวที่ 1"; Note = "ในตารางแท็บข้อมูลฎีกาเบิกเงิน" },
     @{ Key = "whtAmount";     Group = "ขั้นที่ 1.6 (ตารางภาษี)";     Label = "ช่อง 'หักภาษีเงินได้' (1%) แถวที่ 1";  Note = "0.00 สำหรับ สภากาชาด/เอเบิ้ล/อภ./ยูนีซัน" },
     @{ Key = "tabPayee";      Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "หัวแท็บ 'ผู้รับเงิน'";                  Note = "แท็บที่ 3 ของฟอร์ม FRM_PAY_DOC" },
-    @{ Key = "creditorName";  Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'ชื่อเจ้าหนี้'";                  Note = "ข้ามได้ (F9) ถ้าระบบดึงมาให้แล้ว" },
-    @{ Key = "payTo";         Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'จ่ายให้'";                       Note = "ข้ามได้ (F9) ถ้าระบบดึงมาให้แล้ว" },
+    @{ Key = "payTo";         Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'จ่ายให้'";                       Note = "ชื่อบริษัทจากคอลัมน์ A (ทะเบียนบริษัท)" },
     @{ Key = "assignTo";      Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'โดยมอบให้'";                     Note = "สำนักงานบริหารการเงินการคลังฯ โอนเข้าบัญชี รพจ." },
-    @{ Key = "taxId";         Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'เลขประจำตัวผู้เสียภาษี'";        Note = "ข้ามได้ (F9) ถ้าระบบดึงมาให้แล้ว" },
-    @{ Key = "tradeReg";      Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'ทะเบียนการค้า'";                 Note = "ข้ามได้ (F9) ถ้าระบบดึงมาให้แล้ว" },
-    @{ Key = "address";       Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'ที่อยู่'";                       Note = "ข้ามได้ (F9) ถ้าระบบดึงมาให้แล้ว" },
-    @{ Key = "bankCode";      Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'รหัสธนาคาร' (3 หลัก)";           Note = "เช่น 004, 006, 014, 031" },
-    @{ Key = "branchCode";    Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'รหัสสาขา'";                      Note = "ข้ามได้ (F9) ถ้าเลือกจาก LOV เอง" },
+    @{ Key = "bankCode";      Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'รหัสธนาคาร' (3 หลัก)";           Note = "เช่น 004, 006, 014, 031 (จากคอลัมน์ B)" },
     @{ Key = "accountNo";     Group = "ขั้นที่ 2 (แท็บผู้รับเงิน)"; Label = "ช่อง 'เลขที่บัญชี'";                   Note = "เลขบัญชีจากคอลัมน์ E (MIs2)" },
     @{ Key = "tabDetail";     Group = "ขั้นที่ 3 (รายละเอียดเบิก)"; Label = "หัวแท็บ 'รายละเอียดเงินเบิกจ่าย'";      Note = "แท็บที่ 4 ของฟอร์ม FRM_PAY_DOC" },
     @{ Key = "requesterName"; Group = "ขั้นที่ 3 (รายละเอียดเบิก)"; Label = "ช่อง 'ชื่อผู้เบิก'";                    Note = "กล่องใหญ่ด้านล่างจำนวนเงินที่จ่าย" },
@@ -382,15 +377,10 @@ function Load-Config {
         stepDelayMs         = 220
         clearBeforePaste    = $true
         autoFillFields      = @{
-            creditorName = $true
-            payTo        = $true
-            assignTo     = $true
-            taxId        = $true
-            tradeReg     = $true
-            address      = $true
-            bankCode     = $true
-            branchCode   = $false
-            accountNo    = $true
+            payTo     = $true
+            assignTo  = $true
+            bankCode  = $true
+            accountNo = $true
         }
         whtExemptKeywords   = @("สภากาชาด", "เอเบิ้ล", "เอเบิล", "A-ble", "Abel", "องค์การเภสัชกรรม", "GPO", "ยูนีซัน", "Unison")
         neverAutoSave       = $true
@@ -1384,7 +1374,7 @@ function Get-AfBool([string]$k, [bool]$def) {
     return $def
 }
 
-$t2y = 8
+$t2y = 12
 function Add-PayeeRow([string]$chkKey, [string]$label, [bool]$defChecked, [bool]$isMulti = $false) {
     $chk = New-Object System.Windows.Forms.CheckBox
     $chk.Text = $label
@@ -1406,12 +1396,22 @@ function Add-PayeeRow([string]$chkKey, [string]$label, [bool]$defChecked, [bool]
     $tab2.Controls.Add($tb)
     Add-QuickPasteBtn $tab2 364 ($script:t2y - 1) $tb $isMulti | Out-Null
 
-    $script:t2y += if ($isMulti) { 47 } else { 28 }
+    $script:t2y += if ($isMulti) { 47 } else { 32 }
     return @{ Check = $chk; Box = $tb }
 }
 
-$rCreditor = Add-PayeeRow "creditorName" "ชื่อเจ้าหนี้ (A)" $true $false
-$rPayTo    = Add-PayeeRow "payTo"        "จ่ายให้ (A)"     $true $false
+$lblPayeeNote = New-Object System.Windows.Forms.Label
+$lblPayeeNote.Location = New-Object System.Drawing.Point(8, $t2y)
+$lblPayeeNote.Size = New-Object System.Drawing.Size(390, 32)
+$lblPayeeNote.BackColor = [System.Drawing.Color]::FromArgb(241, 245, 249)
+$lblPayeeNote.ForeColor = [System.Drawing.Color]::FromArgb(71, 85, 105)
+$lblPayeeNote.Padding = New-Object System.Windows.Forms.Padding(6, 4, 6, 4)
+$lblPayeeNote.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+$lblPayeeNote.Text = "* ชื่อเจ้าหนี้ / เลขผู้เสียภาษี / ทะเบียนการค้า / ที่อยู่ ระบบ MIS2 ขึ้นให้อัตโนมัติอยู่แล้ว`r`n  ด้านล่างคือ 4 ช่องที่ต้องกรอกเพิ่มจาก ทะเบียนบริษัท (EGP+MIS):"
+$tab2.Controls.Add($lblPayeeNote)
+$t2y += 40
+
+$rPayTo = Add-PayeeRow "payTo" "จ่ายให้ (Col A)" $true $false
 
 # โดยมอบให้ (ComboBox with presets)
 $chkAssign = New-Object System.Windows.Forms.CheckBox
@@ -1429,36 +1429,31 @@ foreach ($p in $script:Config["assignToPresets"]) { $cmbAssign.Items.Add($p) | O
 $cmbAssign.Text = [string]$script:Config["defaultAssignTo"]
 $tab2.Controls.Add($cmbAssign)
 Add-QuickPasteBtn $tab2 364 ($t2y - 1) $cmbAssign $false | Out-Null
-$t2y += 28
+$t2y += 32
 
-$rTaxId    = Add-PayeeRow "taxId"        "เลขผู้เสียภาษี (H)" $true $false
-$rTradeReg = Add-PayeeRow "tradeReg"     "ทะเบียนการค้า (H)"  $true $false
-$rAddress  = Add-PayeeRow "address"      "ที่อยู่ (G)"        $true $true
-
-# Bank Code + Branch Info Strip
-$rBankCode = Add-PayeeRow "bankCode"     "รหัสธนาคาร (B)"     $true $false
+# Bank Code + Account No + Branch Info Strip
+$rBankCode  = Add-PayeeRow "bankCode"  "รหัสธนาคาร (Col B)" $true $false
+$rAccountNo = Add-PayeeRow "accountNo" "เลขที่บัญชี (Col E)" $true $false
 
 $lblBankBranchInfo = New-Object System.Windows.Forms.Label
-$lblBankBranchInfo.Location = New-Object System.Drawing.Point(8, ($t2y - 2))
-$lblBankBranchInfo.Size = New-Object System.Drawing.Size(390, 22)
+$lblBankBranchInfo.Location = New-Object System.Drawing.Point(8, ($t2y + 2))
+$lblBankBranchInfo.Size = New-Object System.Drawing.Size(390, 36)
 $lblBankBranchInfo.BackColor = [System.Drawing.Color]::FromArgb(254, 249, 195)
 $lblBankBranchInfo.ForeColor = [System.Drawing.Color]::FromArgb(133, 77, 14)
-$lblBankBranchInfo.Padding = New-Object System.Windows.Forms.Padding(5, 2, 5, 0)
+$lblBankBranchInfo.BorderStyle = "FixedSingle"
+$lblBankBranchInfo.Padding = New-Object System.Windows.Forms.Padding(6, 4, 6, 4)
 $lblBankBranchInfo.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
 $lblBankBranchInfo.Text = "🏦 ธนาคาร (B): -  |  สาขา (C): -"
 $tab2.Controls.Add($lblBankBranchInfo)
-$t2y += 25
-
-$rBranchCode = Add-PayeeRow "branchCode" "รหัสสาขา (เสริม)"  $false $false
-$rAccountNo  = Add-PayeeRow "accountNo"  "เลขที่บัญชี (E)"   $true  $false
+$t2y += 46
 
 $btnRunStep2 = New-Object System.Windows.Forms.Button
-$btnRunStep2.Text = "⚡ ขั้นที่ 2: กรอกแท็บ 'ผู้รับเงิน' (เฉพาะช่องที่ติ๊กถูก)"
-$btnRunStep2.Location = New-Object System.Drawing.Point(8, ($t2y + 4))
-$btnRunStep2.Size = New-Object System.Drawing.Size(390, 38)
+$btnRunStep2.Text = "⚡ ขั้นที่ 2: กรอกแท็บ 'ผู้รับเงิน' (4 ช่อง)"
+$btnRunStep2.Location = New-Object System.Drawing.Point(8, ($t2y + 6))
+$btnRunStep2.Size = New-Object System.Drawing.Size(390, 42)
 $btnRunStep2.BackColor = [System.Drawing.Color]::FromArgb(13, 148, 136)
 $btnRunStep2.ForeColor = [System.Drawing.Color]::White
-$btnRunStep2.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
+$btnRunStep2.Font = New-Object System.Drawing.Font("Segoe UI", 9.8, [System.Drawing.FontStyle]::Bold)
 $btnRunStep2.FlatStyle = "Flat"
 $btnRunStep2.FlatAppearance.BorderSize = 0
 $tab2.Controls.Add($btnRunStep2)
@@ -1665,18 +1660,12 @@ function Update-TaxFieldsFromCurrent([double]$amountVal, [string]$companyName) {
 function Apply-VendorToFields($v) {
     if (-not $v) { return }
     $script:SelectedVendor = $v
-    $rCreditor.Box.Text   = [string]$v.company
     $rPayTo.Box.Text      = [string]$v.company
-    if ($v.taxId) {
-        $rTaxId.Box.Text    = [string]$v.taxId
-        $rTradeReg.Box.Text = [string]$v.taxId
-    }
-    $rAddress.Box.Text    = [string]$v.address
     $rBankCode.Box.Text   = [string]$v.bankCode
     $rAccountNo.Box.Text  = [string]$v.accountNo
     $bName   = if ($v.bank) { $v.bank } else { "-" }
     $bBranch = if ($v.branch) { $v.branch } else { "-" }
-    $lblBankBranchInfo.Text = "🏦 ธนาคาร (B): $bName ($($v.bankCode))  |  สาขา (C): $bBranch"
+    $lblBankBranchInfo.Text = "🏦 ธนาคาร (B): $bName ($($v.bankCode))`r`n📍 สาขา (C): $bBranch"
 
     $amtNow = if ($script:SelectedItem -and $script:SelectedItem.amount) { [double]$script:SelectedItem.amount } else { 0.0 }
     Update-TaxFieldsFromCurrent -amountVal $amtNow -companyName ([string]$v.company)
@@ -1760,14 +1749,10 @@ function Apply-ItemToFields($item) {
             }
         }
     } else {
-        $rCreditor.Box.Text  = [string]$item.vendorName
         $rPayTo.Box.Text     = [string]$item.vendorName
-        $rTaxId.Box.Text     = [string]$item.vendorTaxId
-        $rTradeReg.Box.Text  = [string]$item.vendorTaxId
-        $rAddress.Box.Text   = ""
         $rBankCode.Box.Text  = ""
         $rAccountNo.Box.Text = ""
-        $lblBankBranchInfo.Text = "⚠️ ไม่พบบริษัทนี้ในแท็บ 'ทะเบียนบริษัท' — ค้นหาและเลือกจากช่องบริษัทด้านบนได้"
+        $lblBankBranchInfo.Text = "⚠️ ไม่พบบริษัทนี้ในชีต 'ทะเบียนบริษัท' — ค้นหาและเลือกจากช่องบริษัทด้านบนได้"
     }
 }
 
@@ -1828,15 +1813,10 @@ function Persist-UserPreferences {
     $script:Config["defaultDocCount"]  = $txtDocCount.Text.Trim()
     $script:Config["fiscalYear"]       = $txtRcvYear.Text.Trim()
     $script:Config["autoFillFields"]   = @{
-        creditorName = $rCreditor.Check.Checked
-        payTo        = $rPayTo.Check.Checked
-        assignTo     = $chkAssign.Checked
-        taxId        = $rTaxId.Check.Checked
-        tradeReg     = $rTradeReg.Check.Checked
-        address      = $rAddress.Check.Checked
-        bankCode     = $rBankCode.Check.Checked
-        branchCode   = $rBranchCode.Check.Checked
-        accountNo    = $rAccountNo.Check.Checked
+        payTo     = $rPayTo.Check.Checked
+        assignTo  = $chkAssign.Checked
+        bankCode  = $rBankCode.Check.Checked
+        accountNo = $rAccountNo.Check.Checked
     }
     Save-Config
 }
@@ -1973,19 +1953,14 @@ $btnRunStep16.Add_Click({
     }
 })
 
-# --- Step 2 Auto-Fill: แท็บผู้รับเงิน ---
+# --- Step 2 Auto-Fill: แท็บผู้รับเงิน (เฉพาะ 4 ช่องที่ต้องกรอกเพิ่ม) ---
 $btnRunStep2.Add_Click({
     Persist-UserPreferences
     $queue = @()
-    if ($rCreditor.Check.Checked   -and $rCreditor.Box.Text.Trim())   { $queue += @{ Key="creditorName"; Val=$rCreditor.Box.Text.Trim();   Multi=$false } }
-    if ($rPayTo.Check.Checked      -and $rPayTo.Box.Text.Trim())      { $queue += @{ Key="payTo";        Val=$rPayTo.Box.Text.Trim();      Multi=$false } }
-    if ($chkAssign.Checked         -and $cmbAssign.Text.Trim())       { $queue += @{ Key="assignTo";     Val=$cmbAssign.Text.Trim();       Multi=$false } }
-    if ($rTaxId.Check.Checked      -and $rTaxId.Box.Text.Trim())      { $queue += @{ Key="taxId";        Val=$rTaxId.Box.Text.Trim();      Multi=$false } }
-    if ($rTradeReg.Check.Checked   -and $rTradeReg.Box.Text.Trim())   { $queue += @{ Key="tradeReg";     Val=$rTradeReg.Box.Text.Trim();   Multi=$false } }
-    if ($rAddress.Check.Checked    -and $rAddress.Box.Text.Trim())    { $queue += @{ Key="address";      Val=$rAddress.Box.Text.Trim();    Multi=$true  } }
-    if ($rBankCode.Check.Checked   -and $rBankCode.Box.Text.Trim())   { $queue += @{ Key="bankCode";     Val=$rBankCode.Box.Text.Trim();   Multi=$false } }
-    if ($rBranchCode.Check.Checked -and $rBranchCode.Box.Text.Trim()) { $queue += @{ Key="branchCode";   Val=$rBranchCode.Box.Text.Trim(); Multi=$false } }
-    if ($rAccountNo.Check.Checked  -and $rAccountNo.Box.Text.Trim())  { $queue += @{ Key="accountNo";    Val=$rAccountNo.Box.Text.Trim();  Multi=$false } }
+    if ($rPayTo.Check.Checked     -and $rPayTo.Box.Text.Trim())     { $queue += @{ Key="payTo";     Val=$rPayTo.Box.Text.Trim();     Multi=$false } }
+    if ($chkAssign.Checked        -and $cmbAssign.Text.Trim())      { $queue += @{ Key="assignTo";  Val=$cmbAssign.Text.Trim();      Multi=$false } }
+    if ($rBankCode.Check.Checked  -and $rBankCode.Box.Text.Trim())  { $queue += @{ Key="bankCode";  Val=$rBankCode.Box.Text.Trim();  Multi=$false } }
+    if ($rAccountNo.Check.Checked -and $rAccountNo.Box.Text.Trim()) { $queue += @{ Key="accountNo"; Val=$rAccountNo.Box.Text.Trim(); Multi=$false } }
 
     if ($queue.Count -eq 0) {
         [System.Windows.Forms.MessageBox]::Show("ไม่มีช่องที่ติ๊กถูกและมีข้อมูลให้กรอกในแท็บผู้รับเงินครับ", "แจ้งเตือน")
