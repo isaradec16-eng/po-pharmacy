@@ -1,0 +1,48 @@
+{
+  "version": "1.0.0",
+  "mis2LoginUrl": "http://bmasso.bma.go.th/MIS2DirectLogins/index2.jsp",
+  "gasWebAppUrl": "https://script.google.com/macros/s/AKfycbyAvDPZrKrKK0B50nU84aK9bVTyLWT47YhjW2ppGiGPSFIrI3Lryu55CBbnPFKCXKMx/exec",
+  "egpMisSheetId": "1m0EdHfSe3M6JUBirvivwJW5GOnzKos9sUI-smRsrOvE",
+  "vendorsGid": "1778203595",
+  "fiscalYear": "70",
+  "defaultAssignTo": "สำนักงานบริหารการเงินการคลังกรุงเทพมหานคร โอนเงินเข้าบัญชี รพจ.",
+  "assignToPresets": [
+    "สำนักงานบริหารการเงินการคลังกรุงเทพมหานคร โอนเงินเข้าบัญชี รพจ.",
+    "คณะกรรมการรับ-ส่งเงินกองการเงินโอนเข้าบัญชี รพจ."
+  ],
+  "defaultRequester": "นางอรชุมา หุตะโกวิท",
+  "requesterPresets": [
+    "นางอรชุมา หุตะโกวิท",
+    "นางสาวอริศรา เกตดี",
+    "นางสาวนัทธมน คำประดิษฐ์",
+    "นายคมสัน โสตางกูร",
+    "นางสาวสุพรรษา ใหม่เอี่ยม"
+  ],
+  "defaultDocCount": "1",
+  "defaultDateMode": "today",
+  "descriptionTemplate": "ค่าจัดซื้อ{subject} ตามใบสั่งซื้อเลขที่ {poNo}/{year} ลงวันที่ {poSignDate}",
+  "stepDelayMs": 220,
+  "clearBeforePaste": true,
+  "autoFillFields": {
+    "creditorName": true,
+    "payTo": true,
+    "assignTo": true,
+    "taxId": true,
+    "tradeReg": true,
+    "address": true,
+    "bankCode": true,
+    "branchCode": false,
+    "accountNo": true
+  },
+  "taxExemptKeywords": [
+    "องค์การเภสัชกรรม",
+    "GPO",
+    "สภากาชาด",
+    "ยูนีซัน",
+    "เอเบิล",
+    "A-ble",
+    "บี.เอ็ล.ฮั้ว",
+    "โปลิฟาร์ม"
+  ],
+  "neverAutoSave": true
+}
