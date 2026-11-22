@@ -1499,6 +1499,7 @@
       <div class="bma-panel-header" id="bma-panel-drag">
         <div class="bma-panel-title">
           <span>💊 BMA MIS Auto-Filler</span>
+          <span style="font-size:10.5px;font-weight:600;background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:4px;">by ARISSARA.K</span>
         </div>
         <div class="bma-panel-header-btns">
           <button type="button" class="bma-icon-btn" id="bma-btn-reload" title="ดึงข้อมูลล่าสุดจาก Google Sheet">🔄 ซิงค์</button>
@@ -1577,6 +1578,9 @@
         </div>
 
         <div id="bma-status-bar" class="bma-status-bar">พร้อมใช้งาน • กรอกอัตโนมัติและรอคนกดบันทึกทุกครั้ง</div>
+        <div style="text-align:center;font-size:10.5px;color:#64748b;font-weight:700;letter-spacing:0.02em;padding-top:2px;">
+          ผู้พัฒนา: <span style="color:#1d4ed8;">ARISSARA.K</span> • กลุ่มงานเภสัชกรรม รพจ.
+        </div>
       </div>
     `;
 

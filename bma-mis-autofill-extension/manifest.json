@@ -1,8 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "BMA MIS Auto-Filler (ระบบกรอกข้อมูลจัดซื้อ/ตรวจรับ รพจ.)",
-  "version": "1.3.0",
-  "description": "ส่วนขยายบน Opera/Chrome สำหรับดึงข้อมูลจาก Google Sheets กรอกลงระบบจัดซื้อ/เช่า กทม. (MIS) อัตโนมัติครบ 8 ขั้นตอน + บันทึก PDF ใบตรวจรับอัตโนมัติ",
+  "name": "BMA MIS Auto-Filler • by ARISSARA.K",
+  "version": "1.3.1",
+  "author": "ARISSARA.K",
+  "description": "ส่วนขยายบน Opera/Chrome สำหรับดึงข้อมูลจาก Google Sheets กรอกลงระบบจัดซื้อ/เช่า กทม. (MIS) อัตโนมัติครบ 8 ขั้นตอน • พัฒนาโดย ARISSARA.K",
   "permissions": [
     "storage",
     "activeTab",

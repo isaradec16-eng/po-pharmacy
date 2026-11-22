@@ -618,7 +618,7 @@
 
   panel.innerHTML =
     '<div style="background:#1d4ed8;color:#fff;padding:7px 10px;border-radius:6px;font-weight:bold;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">' +
-      '<span>💊 BMA MIS Auto-Filler (IE Mode)</span>' +
+      '<span>💊 BMA MIS Auto-Filler <span style="font-size:10px;background:rgba(255,255,255,0.2);padding:1px 5px;border-radius:3px;">by ARISSARA.K</span></span>' +
       '<button id="bma-ie-sync" style="background:#3b82f6;color:#fff;border:none;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:11px;">🔄 ซิงค์</button>' +
     '</div>' +
     '<div style="margin-bottom:6px;">' +
@@ -643,7 +643,8 @@
       '<button id="bma-ie-step7" style="width:50%;padding:6px 4px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:5px;font-weight:bold;cursor:pointer;font-size:11px;">7. กรรมการ (ข้อ12)</button>' +
       '<button id="bma-ie-step8" style="width:50%;padding:6px 4px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:5px;font-weight:bold;cursor:pointer;font-size:11px;">8. พิมพ์ใบตรวจรับ (ข้อ13)</button>' +
     '</div>' +
-    '<div id="bma-ie-status" style="background:#f1f5f9;padding:5px 7px;border-radius:4px;font-size:11px;font-weight:bold;">พร้อมใช้งานบน IE Mode</div>';
+    '<div id="bma-ie-status" style="background:#f1f5f9;padding:5px 7px;border-radius:4px;font-size:11px;font-weight:bold;margin-bottom:4px;">พร้อมใช้งานบน IE Mode</div>' +
+    '<div style="text-align:center;font-size:10.5px;color:#64748b;font-weight:bold;">ผู้พัฒนา: <span style="color:#1d4ed8;">ARISSARA.K</span> • กลุ่มงานเภสัชกรรม รพจ.</div>';
 
   document.body.appendChild(panel);
 
