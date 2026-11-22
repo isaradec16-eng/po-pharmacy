@@ -1677,6 +1677,14 @@ function Save-BranchCodeOverride([string]$company, [string]$code) {
     } catch {}
 }
 
+function Test-IsAidsBudget($item) {
+    if (-not $item) { return $false }
+    if ($item.PSObject.Properties["isAidsBudget"] -and [bool]$item.isAidsBudget) { return $true }
+    $codeStr = [string]$item.code
+    $bType   = [string]$item.budgetType
+    return ($codeStr -match "งบเอดส์|เอดส์|aids" -or $bType -match "เอดส์|อุดหนุน")
+}
+
 function Apply-VendorToFields($v) {
     if (-not $v) { return }
     $script:SelectedVendor = $v
@@ -1684,6 +1692,11 @@ function Apply-VendorToFields($v) {
     $rBankCode.Box.Text   = [string]$v.bankCode
     $rBranchCode.Box.Text = Get-BranchCodeForVendor $v
     $rAccountNo.Box.Text  = [string]$v.accountNo
+    if (Test-IsAidsBudget $script:SelectedItem) {
+        $cmbAssign.Text = [string]$v.company
+    } else {
+        $cmbAssign.Text = [string]$script:Config["defaultAssignTo"]
+    }
     $bName   = if ($v.bank) { $v.bank } else { "-" }
     $bBranch = if ($v.branch) { $v.branch } else { "-" }
     $lblBankBranchInfo.Text = "🏦 ธนาคาร (B): $bName ($($v.bankCode))`r`n📍 สาขา (C): $bBranch"
@@ -1774,6 +1787,11 @@ function Apply-ItemToFields($item) {
         $rBankCode.Box.Text   = ""
         $rBranchCode.Box.Text = ""
         $rAccountNo.Box.Text  = ""
+        if (Test-IsAidsBudget $item) {
+            $cmbAssign.Text = [string]$item.vendorName
+        } else {
+            $cmbAssign.Text = [string]$script:Config["defaultAssignTo"]
+        }
         $lblBankBranchInfo.Text = "⚠️ ไม่พบบริษัทนี้ในชีต 'ทะเบียนบริษัท' — ค้นหาและเลือกจากช่องบริษัทด้านบนได้"
     }
 }
@@ -1830,7 +1848,9 @@ function Refresh-VendorCombo {
 }
 
 function Persist-UserPreferences {
-    $script:Config["defaultAssignTo"]  = $cmbAssign.Text.Trim()
+    if (-not (Test-IsAidsBudget $script:SelectedItem)) {
+        $script:Config["defaultAssignTo"] = $cmbAssign.Text.Trim()
+    }
     $script:Config["defaultRequester"] = $cmbRequester.Text.Trim()
     $script:Config["fiscalYear"]       = $txtRcvYear.Text.Trim()
     $script:Config["autoFillFields"]   = @{
