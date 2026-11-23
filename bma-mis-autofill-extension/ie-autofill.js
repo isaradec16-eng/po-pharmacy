@@ -818,7 +818,7 @@
       (document.body && document.body.clientHeight) || 680;
   }
 
-  var ieIsQuirks = (document.compatMode === 'BackCompat');
+  var ieIsQuirks = true; // Always use IE5-IE11 universal absolute+scroll pinning so Quirks/IE7/IE8 modes never drop panel to bottom-left
 
   var oldStyle = document.getElementById('bma-ie-style');
   if (oldStyle) oldStyle.parentNode.removeChild(oldStyle);
@@ -827,7 +827,7 @@
   styleEl.type = 'text/css';
   var cssText =
     '#bma-ie-panel, #bma-ie-panel * { box-sizing: border-box; font-family: "Leelawadee UI", "Segoe UI", Tahoma, sans-serif !important; line-height: 1.45; }' +
-    '#bma-ie-panel { position: ' + (ieIsQuirks ? 'absolute' : 'fixed') + '; top: 10px; right: 12px; left: auto; bottom: auto; width: 410px; overflow-y: auto; background: #ffffff; border: 2px solid #1d4ed8; border-radius: 10px; box-shadow: 0 10px 28px rgba(15, 23, 42, 0.25); font-size: 13.5px; color: #0f172a; z-index: 2147483647; padding: 12px; text-align: left; }' +
+    '#bma-ie-panel { position: absolute !important; top: 10px; right: 12px; left: auto; bottom: auto; width: 410px; overflow-y: auto; background: #ffffff; border: 2px solid #1d4ed8; border-radius: 10px; box-shadow: 0 10px 28px rgba(15, 23, 42, 0.25); font-size: 13.5px; color: #0f172a; z-index: 2147483647; padding: 12px; text-align: left; }' +
     '#bma-ie-panel input[type="text"], #bma-ie-panel select, #bma-ie-panel textarea { font-size: 13.5px; color: #0f172a; background: #ffffff; border: 1px solid #94a3b8; border-radius: 5px; padding: 6px 8px; width: 100%; }' +
     '#bma-ie-panel input[type="text"]:focus, #bma-ie-panel select:focus, #bma-ie-panel textarea:focus { border-color: #2563eb; outline: none; }' +
     '#bma-ie-panel button { font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer; }' +
@@ -856,8 +856,8 @@
 
   var panel = document.createElement('div');
   panel.id = 'bma-ie-panel';
-  panel.style.position = ieIsQuirks ? 'absolute' : 'fixed';
-  panel.style.top = (ieIsQuirks ? (ieGetScrollTop() + 10) : 10) + 'px';
+  panel.style.position = 'absolute';
+  panel.style.top = (ieGetScrollTop() + 10) + 'px';
   panel.style.right = '12px';
   panel.style.left = 'auto';
   panel.style.bottom = 'auto';
