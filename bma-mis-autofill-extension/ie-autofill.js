@@ -1098,7 +1098,7 @@
     '<div id="bma-ie-header" style="background:#1d4ed8;color:#ffffff;padding:8px 10px;border-radius:7px;margin-bottom:9px;cursor:move;" title="ลากแถบนี้เพื่อย้ายตำแหน่งแผงควบคุม">' +
       '<table class="bma-ie-tbl-tight"><tr>' +
         '<td style="color:#ffffff;font-size:14.5px;font-weight:700;">' +
-          'BMA MIS &amp; MIS2 <span style="font-size:11px;font-weight:600;background:#2563eb;color:#ffffff;padding:2px 6px;border-radius:4px;margin-left:4px;">ARISSARA.K</span>' +
+          'BMA MIS &amp; MIS2 <span style="font-size:11px;font-weight:600;background:#2563eb;color:#ffffff;padding:2px 6px;border-radius:4px;margin-left:4px;">ARISSARA.K v2.2</span>' +
         '</td>' +
         '<td style="width:94px;text-align:right;">' +
           '<button id="bma-ie-sync" type="button" style="background:#3b82f6;color:#ffffff;border:none;padding:4px 9px;font-size:12px;margin-right:4px;">ซิงค์</button>' +

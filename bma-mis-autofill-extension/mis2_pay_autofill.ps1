@@ -888,21 +888,22 @@ function Sync-GoogleSheetsData {
 # ==============================================================================
 function Find-OracleFormsWindow {
     $wins = [Mis2Win32]::GetVisibleWindows()
-    # Priority 1: Exact Oracle Developer Forms Runtime window (Java Applet / WebStart)
+    $selfExcl = "BMA MIS2|ตัวช่วย Oracle Forms|ตั้งพิกัด|เลือกหน้าต่าง Oracle"
+    # Priority 1: Standalone Java AWT Frame (Oracle Forms Applet / JNLP)
     foreach ($w in $wins) {
-        if ($w.Title -match "Oracle Developer Forms|FRM_PAY_DOC|บันทึกใบขอเบิก" -and $w.Title -notmatch "BMA MIS2|Internet Explorer|Edge|Opera|Chrome") {
+        if ($w.ClassName -match "SunAwtFrame|SunAwtDialog" -and $w.Title -notmatch $selfExcl) {
             return $w
         }
     }
-    # Priority 2: Java AWT Frame (Oracle Forms Applet / JNLP)
+    # Priority 2: Exact Oracle Developer Forms / FRM_PAY_DOC window (standalone OR embedded in Edge IE Mode / IE)
     foreach ($w in $wins) {
-        if ($w.ClassName -match "SunAwtFrame|SunAwtDialog" -and $w.Title -notmatch "BMA MIS2") {
+        if ($w.Title -match "Oracle Developer Forms|FRM_PAY_DOC|บันทึกใบขอเบิก|ระบบการเงินจ่าย" -and $w.Title -notmatch $selfExcl) {
             return $w
         }
     }
     # Priority 3: Window title containing Oracle / Hospital keywords (excluding browsers)
     foreach ($w in $wins) {
-        if ($w.Title -match "โรงพยาบาลเจริญกรุง|สำนักการแพทย์|Oracle" -and $w.Title -notmatch "BMA MIS2|Internet Explorer|Edge|Opera|Chrome") {
+        if ($w.Title -match "โรงพยาบาลเจริญกรุง|สำนักการแพทย์|Oracle" -and $w.Title -notmatch "$selfExcl|Internet Explorer|Edge|Opera|Chrome") {
             return $w
         }
     }

@@ -472,18 +472,22 @@ function Save-Calibration {
 # ==============================================================================
 function Find-OracleFormsWindow {
     $wins = [Mis2BridgeWin32]::GetVisibleWindows()
+    $selfExcl = "BMA MIS2|ตัวช่วย Oracle Forms|ตั้งพิกัด|เลือกหน้าต่าง Oracle"
+    # Priority 1: Standalone Java AWT Frame (Oracle Forms Applet / JNLP)
     foreach ($w in $wins) {
-        if ($w.Title -match "Oracle Developer Forms|FRM_PAY_DOC|บันทึกใบขอเบิก" -and $w.Title -notmatch "BMA MIS2|Internet Explorer|Opera|Chrome|Edge") {
+        if ($w.ClassName -match "SunAwtFrame|SunAwtDialog" -and $w.Title -notmatch $selfExcl) {
             return $w
         }
     }
+    # Priority 2: Exact Oracle Developer Forms / FRM_PAY_DOC window (standalone OR embedded in Edge IE Mode / IE)
     foreach ($w in $wins) {
-        if ($w.ClassName -match "SunAwtFrame|SunAwtDialog" -and $w.Title -notmatch "BMA MIS2") {
+        if ($w.Title -match "Oracle Developer Forms|FRM_PAY_DOC|บันทึกใบขอเบิก|ระบบการเงินจ่าย" -and $w.Title -notmatch $selfExcl) {
             return $w
         }
     }
+    # Priority 3: Other Oracle / Hospital non-browser window
     foreach ($w in $wins) {
-        if ($w.Title -match "โรงพยาบาลเจริญกรุง|สำนักการแพทย์|Oracle" -and $w.Title -notmatch "BMA MIS2|Internet Explorer|Opera|Chrome|Edge") {
+        if ($w.Title -match "โรงพยาบาลเจริญกรุง|สำนักการแพทย์|Oracle" -and $w.Title -notmatch "$selfExcl|Internet Explorer|Opera|Chrome|Edge") {
             return $w
         }
     }
@@ -815,7 +819,7 @@ function Get-StatusPayload {
     return @{
         ok              = $true
         running         = $true
-        version         = "2.0.0"
+        version         = "2.2.0"
         targetFound     = ($null -ne $info)
         targetTitle     = if ($info) { [string]$info.Title } else { "" }
         calibratedCount = $script:Calibration.Count
