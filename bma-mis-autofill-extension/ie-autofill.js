@@ -805,15 +805,29 @@
     }
   }
 
-  // ==================== BUILD IE PANEL UI (CRISP IE11 / EDGE IE MODE) ====================
+  // ==================== BUILD IE PANEL UI (CRISP IE11 / QUIRKS MODE SAFE) ====================
+  function ieGetScrollTop() {
+    return window.pageYOffset ||
+      (document.documentElement && document.documentElement.scrollTop) ||
+      (document.body && document.body.scrollTop) || 0;
+  }
+
+  function ieGetViewportHeight() {
+    return window.innerHeight ||
+      (document.documentElement && document.documentElement.clientHeight) ||
+      (document.body && document.body.clientHeight) || 680;
+  }
+
+  var ieIsQuirks = (document.compatMode === 'BackCompat');
+
   var oldStyle = document.getElementById('bma-ie-style');
   if (oldStyle) oldStyle.parentNode.removeChild(oldStyle);
   var styleEl = document.createElement('style');
   styleEl.id = 'bma-ie-style';
   styleEl.type = 'text/css';
   var cssText =
-    '#bma-ie-panel, #bma-ie-panel * { box-sizing: border-box; font-family: "Leelawadee UI", "Segoe UI", Tahoma, sans-serif !important; line-height: 1.45; -webkit-font-smoothing: antialiased; }' +
-    '#bma-ie-panel { position: fixed; top: 10px; right: 10px; width: 410px; max-height: 92vh; overflow-y: auto; background: #ffffff; border: 2px solid #1d4ed8; border-radius: 10px; box-shadow: 0 10px 28px rgba(15, 23, 42, 0.25); font-size: 13.5px; color: #0f172a; z-index: 2147483647; padding: 12px; text-align: left; }' +
+    '#bma-ie-panel, #bma-ie-panel * { box-sizing: border-box; font-family: "Leelawadee UI", "Segoe UI", Tahoma, sans-serif !important; line-height: 1.45; }' +
+    '#bma-ie-panel { position: ' + (ieIsQuirks ? 'absolute' : 'fixed') + '; top: 10px; right: 12px; left: auto; bottom: auto; width: 410px; overflow-y: auto; background: #ffffff; border: 2px solid #1d4ed8; border-radius: 10px; box-shadow: 0 10px 28px rgba(15, 23, 42, 0.25); font-size: 13.5px; color: #0f172a; z-index: 2147483647; padding: 12px; text-align: left; }' +
     '#bma-ie-panel input[type="text"], #bma-ie-panel select, #bma-ie-panel textarea { font-size: 13.5px; color: #0f172a; background: #ffffff; border: 1px solid #94a3b8; border-radius: 5px; padding: 6px 8px; width: 100%; }' +
     '#bma-ie-panel input[type="text"]:focus, #bma-ie-panel select:focus, #bma-ie-panel textarea:focus { border-color: #2563eb; outline: none; }' +
     '#bma-ie-panel button { font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer; }' +
@@ -842,6 +856,18 @@
 
   var panel = document.createElement('div');
   panel.id = 'bma-ie-panel';
+  panel.style.position = ieIsQuirks ? 'absolute' : 'fixed';
+  panel.style.top = (ieIsQuirks ? (ieGetScrollTop() + 10) : 10) + 'px';
+  panel.style.right = '12px';
+  panel.style.left = 'auto';
+  panel.style.bottom = 'auto';
+  panel.style.width = '410px';
+  panel.style.zIndex = '2147483647';
+  panel.style.background = '#ffffff';
+  panel.style.border = '2px solid #1d4ed8';
+  panel.style.padding = '12px';
+  panel.style.overflowY = 'auto';
+  panel.style.maxHeight = Math.max(360, ieGetViewportHeight() - 28) + 'px';
 
   function getCurrentIeFyEntry() {
     if (!state.fiscalYears || typeof state.fiscalYears !== 'object') {
@@ -869,7 +895,7 @@
   }
 
   panel.innerHTML =
-    '<div style="background:#1d4ed8;color:#ffffff;padding:9px 11px;border-radius:7px;margin-bottom:9px;display:table;width:100%;">' +
+    '<div id="bma-ie-header" style="background:#1d4ed8;color:#ffffff;padding:9px 11px;border-radius:7px;margin-bottom:9px;display:table;width:100%;cursor:move;" title="ลากแถบนี้เพื่อย้ายตำแหน่งแผงควบคุม">' +
       '<div style="display:table-cell;vertical-align:middle;font-size:14.5px;font-weight:700;">' +
         'BMA MIS &amp; MIS2 <span style="font-size:11px;font-weight:600;background:rgba(255,255,255,0.22);padding:2px 6px;border-radius:4px;margin-left:4px;">ARISSARA.K</span>' +
       '</div>' +
@@ -1000,7 +1026,70 @@
       '<div style="text-align:center;font-size:12px;color:#64748b;font-weight:600;">ผู้พัฒนา: <span style="color:#1d4ed8;">ARISSARA.K</span> • กลุ่มงานเภสัชกรรม รพจ.</div>' +
     '</div>';
 
-  document.body.appendChild(panel);
+  if (document.body.firstChild) {
+    document.body.insertBefore(panel, document.body.firstChild);
+  } else {
+    document.body.appendChild(panel);
+  }
+
+  var ieCustomDragged = false;
+  function ieRepositionPanel() {
+    var p = document.getElementById('bma-ie-panel');
+    if (!p) return;
+    p.style.maxHeight = Math.max(360, ieGetViewportHeight() - 28) + 'px';
+    if (ieIsQuirks && !ieCustomDragged) {
+      p.style.position = 'absolute';
+      p.style.top = (ieGetScrollTop() + 10) + 'px';
+      p.style.right = '12px';
+      p.style.left = 'auto';
+    }
+  }
+  ieRepositionPanel();
+  if (window.addEventListener) {
+    window.addEventListener('scroll', ieRepositionPanel, false);
+    window.addEventListener('resize', ieRepositionPanel, false);
+  } else if (window.attachEvent) {
+    window.attachEvent('onscroll', ieRepositionPanel);
+    window.attachEvent('onresize', ieRepositionPanel);
+  }
+  if (ieIsQuirks) {
+    setInterval(ieRepositionPanel, 450);
+  }
+
+  (function () {
+    var hdr = document.getElementById('bma-ie-header');
+    if (!hdr) return;
+    var dragging = false;
+    var startX = 0;
+    var startY = 0;
+    var origLeft = 0;
+    var origTop = 0;
+    hdr.onmousedown = function (e) {
+      e = e || window.event;
+      var tgt = e.target || e.srcElement;
+      if (tgt && tgt.tagName && tgt.tagName.toLowerCase() === 'button') return;
+      dragging = true;
+      ieCustomDragged = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      var rect = panel.getBoundingClientRect();
+      origLeft = rect.left + (ieIsQuirks ? (document.body.scrollLeft || 0) : 0);
+      origTop = rect.top + (ieIsQuirks ? ieGetScrollTop() : 0);
+      panel.style.right = 'auto';
+      panel.style.left = origLeft + 'px';
+      panel.style.top = origTop + 'px';
+      return false;
+    };
+    document.onmousemove = function (e) {
+      if (!dragging) return;
+      e = e || window.event;
+      panel.style.left = (origLeft + (e.clientX - startX)) + 'px';
+      panel.style.top = Math.max(4, origTop + (e.clientY - startY)) + 'px';
+    };
+    document.onmouseup = function () {
+      dragging = false;
+    };
+  })();
 
   function setIeStatus(msg) {
     var st = document.getElementById('bma-ie-status');

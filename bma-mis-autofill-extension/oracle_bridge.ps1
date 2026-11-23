@@ -268,6 +268,7 @@ public class Mis2BridgeJob {
     public string Path;
     public string Body;
     public string ResponseJson;
+    public string ContentType;
     public ManualResetEventSlim Done = new ManualResetEventSlim(false);
 }
 
@@ -354,7 +355,7 @@ public class Mis2BridgeHttpServer {
                 }
 
                 if (method == "OPTIONS") {
-                    WriteResponse(stream, "204 No Content", "");
+                    WriteResponse(stream, "204 No Content", "", "application/json; charset=utf-8");
                     return;
                 }
 
@@ -364,9 +365,9 @@ public class Mis2BridgeHttpServer {
 
                 int waitMs = (path == "/calibrate" || path == "/pick-window") ? 300000 : 45000;
                 if (job.Done.Wait(waitMs)) {
-                    WriteResponse(stream, "200 OK", job.ResponseJson ?? "{\"ok\":true}");
+                    WriteResponse(stream, "200 OK", job.ResponseJson ?? "{\"ok\":true}", string.IsNullOrEmpty(job.ContentType) ? "application/json; charset=utf-8" : job.ContentType);
                 } else {
-                    WriteResponse(stream, "504 Gateway Timeout", "{\"ok\":false,\"error\":\"timeout\"}");
+                    WriteResponse(stream, "504 Gateway Timeout", "{\"ok\":false,\"error\":\"timeout\"}", "application/json; charset=utf-8");
                 }
             }
         } catch {}
@@ -379,11 +380,11 @@ public class Mis2BridgeHttpServer {
         return -1;
     }
 
-    private void WriteResponse(NetworkStream stream, string status, string jsonBody) {
-        byte[] bodyBytes = Encoding.UTF8.GetBytes(jsonBody ?? "");
+    private void WriteResponse(NetworkStream stream, string status, string body, string contentType) {
+        byte[] bodyBytes = Encoding.UTF8.GetBytes(body ?? "");
         string headers =
             "HTTP/1.1 " + status + "\r\n" +
-            "Content-Type: application/json; charset=utf-8\r\n" +
+            "Content-Type: " + contentType + "\r\n" +
             "Content-Length: " + bodyBytes.Length + "\r\n" +
             "Access-Control-Allow-Origin: *\r\n" +
             "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n" +
@@ -805,6 +806,17 @@ function Process-BridgeJob($job) {
             return
         }
 
+        if ($path -eq "/ie-autofill.js") {
+            $ieFile = Join-Path $script:AppDir "ie-autofill.js"
+            $job.ContentType = "application/javascript; charset=utf-8"
+            if (Test-Path $ieFile) {
+                $job.ResponseJson = [System.IO.File]::ReadAllText($ieFile, [System.Text.Encoding]::UTF8)
+            } else {
+                $job.ResponseJson = "alert('ไม่พบไฟล์ ie-autofill.js ในเครื่อง กรุณากด UPDATE_FROM_GITHUB.bat');"
+            }
+            return
+        }
+
         if ($path -eq "/fetch-gas") {
             $targetUrl = if ($bodyObj -and $bodyObj.url) { [string]$bodyObj.url } else { "" }
             if (-not $targetUrl.StartsWith("https://script.google.com/")) {
@@ -1002,6 +1014,15 @@ $miPick.Add_Click({ Show-WindowPickerDialog | Out-Null })
 $miCalib = $trayMenu.Items.Add("🎯 ตั้งพิกัดหน้าจอ Oracle Forms (F8)...")
 $miCalib.Add_Click({ Show-CalibrationDialog })
 
+$script:AutoInjectIE = $true
+$miAutoIe = New-Object System.Windows.Forms.ToolStripMenuItem("✓ เปิดแผงอัตโนมัติใน IE ทุกหน้า (Auto-Inject)")
+$miAutoIe.Checked = $true
+$miAutoIe.Add_Click({
+    $script:AutoInjectIE = -not $script:AutoInjectIE
+    $miAutoIe.Checked = $script:AutoInjectIE
+})
+$trayMenu.Items.Add($miAutoIe) | Out-Null
+
 $trayMenu.Items.Add("-") | Out-Null
 $miExit = $trayMenu.Items.Add("❌ ปิดตัวช่วย Oracle Forms")
 $miExit.Add_Click({
@@ -1018,8 +1039,8 @@ $script:TrayIcon.Visible = $true
 $script:TrayIcon.Add_DoubleClick({ Show-CalibrationDialog })
 $script:TrayIcon.ShowBalloonTip(
     3500,
-    "BMA MIS2 Oracle Forms Bridge พร้อมทำงาน",
-    "เชื่อมต่อกับส่วนขยาย Opera / IE แล้ว (พอร์ต 47291) • คลิกขวาที่ไอคอนนี้เพื่อตั้งพิกัดหรือเปิด MIS2",
+    "BMA MIS & MIS2 Bridge พร้อมทำงาน",
+    "เชื่อมต่อกับส่วนขยาย Opera / IE แล้ว • เปิดแผงอัตโนมัติทุกหน้าใน IE และเชื่อม Oracle Forms พอร์ต 47291",
     [System.Windows.Forms.ToolTipIcon]::Info
 )
 
@@ -1038,9 +1059,42 @@ $pumpTimer.Add_Tick({
 })
 $pumpTimer.Start()
 
+# Auto-Inject IE Watcher: re-injects ie-autofill.js automatically whenever IE navigates to a new step page
+$script:IeScriptFile = Join-Path $script:AppDir "ie-autofill.js"
+$ieWatchTimer = New-Object System.Windows.Forms.Timer
+$ieWatchTimer.Interval = 1500
+$ieWatchTimer.Add_Tick({
+    if (-not $script:AutoInjectIE) { return }
+    if (-not (Test-Path $script:IeScriptFile)) { return }
+    try {
+        $shell = New-Object -ComObject Shell.Application
+        $wins = $shell.Windows()
+        $codeCache = $null
+        foreach ($w in $wins) {
+            try {
+                $u = [string]$w.LocationURL
+                if ($u -match "bmamisapp11\.bma\.go\.th|misweb\.bma\.go\.th|bmasso\.bma\.go\.th") {
+                    if ($w.ReadyState -eq 4 -and $w.Document -and $w.Document.body) {
+                        $existing = $w.Document.getElementById("bma-ie-panel")
+                        if ($null -eq $existing) {
+                            if ($null -eq $codeCache) {
+                                $codeCache = [System.IO.File]::ReadAllText($script:IeScriptFile, [System.Text.Encoding]::UTF8)
+                            }
+                            $w.Document.parentWindow.execScript($codeCache, "javascript")
+                        }
+                    }
+                }
+            } catch {}
+        }
+    } catch {}
+})
+$ieWatchTimer.Start()
+
 try {
     [System.Windows.Forms.Application]::Run()
 } finally {
+    $ieWatchTimer.Stop()
+    $ieWatchTimer.Dispose()
     $pumpTimer.Stop()
     $pumpTimer.Dispose()
     $script:TrayIcon.Visible = $false
