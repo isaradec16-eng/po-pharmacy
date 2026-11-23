@@ -805,6 +805,26 @@ function Process-BridgeJob($job) {
             return
         }
 
+        if ($path -eq "/fetch-gas") {
+            $targetUrl = if ($bodyObj -and $bodyObj.url) { [string]$bodyObj.url } else { "" }
+            if (-not $targetUrl.StartsWith("https://script.google.com/")) {
+                $job.ResponseJson = (@{ ok = $false; error = "Invalid GAS URL" } | ConvertTo-Json -Compress)
+                return
+            }
+            $wc = New-Object System.Net.WebClient
+            $wc.Encoding = [System.Text.Encoding]::UTF8
+            $m = if ($bodyObj -and $bodyObj.method) { ([string]$bodyObj.method).ToUpperInvariant() } else { "GET" }
+            if ($m -eq "POST") {
+                $wc.Headers.Add("Content-Type", "application/json; charset=utf-8")
+                $postBody = if ($bodyObj.payload) { ($bodyObj.payload | ConvertTo-Json -Depth 6 -Compress) } else { "{}" }
+                $rawResp = $wc.UploadString($targetUrl, "POST", $postBody)
+            } else {
+                $rawResp = $wc.DownloadString($targetUrl)
+            }
+            $job.ResponseJson = $rawResp
+            return
+        }
+
         if ($path -eq "/open-mis2-ie") {
             $url = if ($bodyObj -and $bodyObj.url) { [string]$bodyObj.url } else { "http://bmasso.bma.go.th/MIS2DirectLogins/index2.jsp" }
             $opened = Open-Mis2InIE $url

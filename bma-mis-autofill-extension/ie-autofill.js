@@ -805,13 +805,43 @@
     }
   }
 
-  // ==================== BUILD IE PANEL UI ====================
+  // ==================== BUILD IE PANEL UI (CRISP IE11 / EDGE IE MODE) ====================
+  var oldStyle = document.getElementById('bma-ie-style');
+  if (oldStyle) oldStyle.parentNode.removeChild(oldStyle);
+  var styleEl = document.createElement('style');
+  styleEl.id = 'bma-ie-style';
+  styleEl.type = 'text/css';
+  var cssText =
+    '#bma-ie-panel, #bma-ie-panel * { box-sizing: border-box; font-family: "Leelawadee UI", "Segoe UI", Tahoma, sans-serif !important; line-height: 1.45; -webkit-font-smoothing: antialiased; }' +
+    '#bma-ie-panel { position: fixed; top: 10px; right: 10px; width: 410px; max-height: 92vh; overflow-y: auto; background: #ffffff; border: 2px solid #1d4ed8; border-radius: 10px; box-shadow: 0 10px 28px rgba(15, 23, 42, 0.25); font-size: 13.5px; color: #0f172a; z-index: 2147483647; padding: 12px; text-align: left; }' +
+    '#bma-ie-panel input[type="text"], #bma-ie-panel select, #bma-ie-panel textarea { font-size: 13.5px; color: #0f172a; background: #ffffff; border: 1px solid #94a3b8; border-radius: 5px; padding: 6px 8px; width: 100%; }' +
+    '#bma-ie-panel input[type="text"]:focus, #bma-ie-panel select:focus, #bma-ie-panel textarea:focus { border-color: #2563eb; outline: none; }' +
+    '#bma-ie-panel button { font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer; }' +
+    '.bma-ie-lbl { font-size: 12.5px; font-weight: 600; color: #334155; margin-bottom: 3px; }' +
+    '.bma-ie-row { display: table; width: 100%; table-layout: fixed; margin-bottom: 7px; }' +
+    '.bma-ie-cell { display: table-cell; vertical-align: middle; }' +
+    '.bma-ie-pr6 { padding-right: 6px; }' +
+    '.bma-ie-inrow { display: table; width: 100%; }' +
+    '.bma-ie-inrow-field { display: table-cell; width: 100%; vertical-align: middle; }' +
+    '.bma-ie-inrow-btn { display: table-cell; width: 58px; padding-left: 5px; vertical-align: middle; }' +
+    '.bma-ie-copy { width: 54px; height: 32px; background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; font-size: 12px !important; font-weight: 600; padding: 0; }' +
+    '.bma-ie-copy:hover { background: #bae6fd; }' +
+    '.bma-ie-actbtn { width: 100%; padding: 8px 10px; border: none; color: #ffffff; font-size: 13px !important; font-weight: 600; margin-bottom: 6px; text-align: center; }' +
+    '.bma-ie-chkrow { display: table; width: 100%; margin-bottom: 6px; }' +
+    '.bma-ie-chklbl { display: table-cell; width: 92px; vertical-align: middle; font-size: 12.5px; font-weight: 600; color: #1e293b; }' +
+    '.bma-ie-chkin { display: table-cell; vertical-align: middle; }';
+  if (styleEl.styleSheet) {
+    styleEl.styleSheet.cssText = cssText;
+  } else {
+    styleEl.appendChild(document.createTextNode(cssText));
+  }
+  (document.head || document.getElementsByTagName('head')[0] || document.documentElement).appendChild(styleEl);
+
   var oldPanel = document.getElementById('bma-ie-panel');
   if (oldPanel) oldPanel.parentNode.removeChild(oldPanel);
 
   var panel = document.createElement('div');
   panel.id = 'bma-ie-panel';
-  panel.style.cssText = 'position:fixed;top:10px;right:10px;width:350px;max-height:92vh;overflow-y:auto;background:#ffffff;border:2px solid #2563eb;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,0.25);font-family:Tahoma,sans-serif;font-size:12px;color:#1e293b;z-index:2147483647;padding:10px;box-sizing:border-box;';
 
   function getCurrentIeFyEntry() {
     if (!state.fiscalYears || typeof state.fiscalYears !== 'object') {
@@ -835,144 +865,139 @@
   var ieChecks = state.payChecks || { payTo: true, assignTo: true, bankCode: true, branchCode: true, accountNo: true };
 
   function ieCopyBtnHtml(id, isMulti) {
-    return '<button type="button" class="bma-ie-copy" data-src="' + id + '" data-multi="' + (isMulti ? '1' : '0') + '" style="width:28px;height:25px;background:#e0f2fe;color:#0369a1;border:1px solid #7dd3fc;border-radius:4px;cursor:pointer;font-size:11px;padding:0;flex-shrink:0;" title="คัดลอก/วาง">📋</button>';
+    return '<span class="bma-ie-inrow-btn"><button type="button" class="bma-ie-copy" data-src="' + id + '" data-multi="' + (isMulti ? '1' : '0') + '" title="คัดลอกหรือวางลงช่องที่เลือก">คัดลอก</button></span>';
   }
 
   panel.innerHTML =
-    '<div style="background:#1d4ed8;color:#fff;padding:7px 9px;border-radius:6px;font-weight:bold;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;">' +
-      '<span>💊 BMA MIS &amp; MIS2 <span style="font-size:9.5px;background:rgba(255,255,255,0.2);padding:1px 5px;border-radius:3px;">ARISSARA.K</span></span>' +
-      '<span>' +
-        '<button id="bma-ie-sync" type="button" style="background:#3b82f6;color:#fff;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10.5px;margin-right:3px;">🔄 ซิงค์</button>' +
-        '<button id="bma-ie-min" type="button" style="background:rgba(255,255,255,0.2);color:#fff;border:none;border-radius:4px;padding:2px 6px;cursor:pointer;font-size:10.5px;">➖</button>' +
-      '</span>' +
+    '<div style="background:#1d4ed8;color:#ffffff;padding:9px 11px;border-radius:7px;margin-bottom:9px;display:table;width:100%;">' +
+      '<div style="display:table-cell;vertical-align:middle;font-size:14.5px;font-weight:700;">' +
+        'BMA MIS &amp; MIS2 <span style="font-size:11px;font-weight:600;background:rgba(255,255,255,0.22);padding:2px 6px;border-radius:4px;margin-left:4px;">ARISSARA.K</span>' +
+      '</div>' +
+      '<div style="display:table-cell;vertical-align:middle;text-align:right;width:96px;">' +
+        '<button id="bma-ie-sync" type="button" style="background:#3b82f6;color:#fff;border:none;padding:4px 9px;font-size:12px;margin-right:4px;">ซิงค์</button>' +
+        '<button id="bma-ie-min" type="button" style="background:rgba(255,255,255,0.22);color:#fff;border:none;padding:4px 8px;font-size:12px;">-</button>' +
+      '</div>' +
     '</div>' +
 
     '<div id="bma-ie-body">' +
-      '<div style="display:flex;gap:4px;background:#e2e8f0;padding:3px;border-radius:7px;margin-bottom:7px;">' +
-        '<button id="bma-ie-tab-pur" type="button" style="flex:1;padding:6px 4px;border:none;border-radius:5px;font-weight:bold;font-size:11.5px;cursor:pointer;">📦 จัดซื้อ/ตรวจรับ (8 ขั้น)</button>' +
-        '<button id="bma-ie-tab-pay" type="button" style="flex:1;padding:6px 4px;border:none;border-radius:5px;font-weight:bold;font-size:11.5px;cursor:pointer;">💰 เบิกจ่าย MIS2 (ฎีกา)</button>' +
+      '<div class="bma-ie-row" style="background:#e2e8f0;padding:4px;border-radius:8px;margin-bottom:9px;">' +
+        '<div class="bma-ie-cell bma-ie-pr6"><button id="bma-ie-tab-pur" type="button" style="width:100%;padding:8px 6px;border:none;font-size:13px;">จัดซื้อ/ตรวจรับ (8 ขั้น)</button></div>' +
+        '<div class="bma-ie-cell"><button id="bma-ie-tab-pay" type="button" style="width:100%;padding:8px 6px;border:none;font-size:13px;">เบิกจ่าย MIS2 (ฎีกา)</button></div>' +
       '</div>' +
 
-      '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:6px;margin-bottom:6px;">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
-          '<span style="color:#1e40af;font-weight:bold;font-size:11px;">📅 ปีงบประมาณ &amp; ไฟล์ปลายทาง</span>' +
-          '<button id="bma-ie-fy-toggle" type="button" style="background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:bold;cursor:pointer;">➕ เพิ่มปีงบ / ตั้งค่าไฟล์</button>' +
+      '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px;padding:8px 9px;margin-bottom:8px;">' +
+        '<div style="display:table;width:100%;margin-bottom:5px;">' +
+          '<div style="display:table-cell;vertical-align:middle;color:#1e3a8a;font-weight:700;font-size:12.5px;">ปีงบประมาณ &amp; ไฟล์ปลายทาง</div>' +
+          '<div style="display:table-cell;vertical-align:middle;text-align:right;">' +
+            '<button id="bma-ie-fy-toggle" type="button" style="background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;padding:3px 8px;font-size:11.5px;">+ เพิ่มปีงบ / ตั้งค่า</button>' +
+          '</div>' +
         '</div>' +
-        '<select id="bma-ie-fy-select" style="width:100%;padding:4px;border:1px solid #93c5fd;border-radius:4px;font-weight:bold;color:#1e3a8a;box-sizing:border-box;"></select>' +
-        '<div id="bma-ie-fy-box" style="display:none;margin-top:6px;padding-top:6px;border-top:1px dashed #93c5fd;font-size:11px;">' +
-          '<div style="margin-bottom:4px;">' +
-            '<div style="font-weight:bold;color:#1e3a8a;">ปีงบประมาณ (เช่น 70, 71, 72):</div>' +
-            '<div style="display:flex;gap:4px;">' +
-              '<input id="bma-ie-cfg-fy" type="text" value="' + state.fiscalYear + '" style="width:65px;padding:3px;border:1px solid #cbd5e1;border-radius:4px;font-weight:bold;" />' +
-              '<button id="bma-ie-add-next-fy" type="button" style="flex:1;background:#fff;color:#1d4ed8;border:1px solid #93c5fd;border-radius:4px;font-size:10px;font-weight:bold;cursor:pointer;">➕ สร้างปีถัดไป</button>' +
-            '</div>' +
+        '<select id="bma-ie-fy-select" style="border-color:#93c5fd;font-weight:600;color:#1e3a8a;"></select>' +
+        '<div id="bma-ie-fy-box" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #93c5fd;">' +
+          '<div class="bma-ie-lbl">ปีงบประมาณ (เช่น 70, 71, 72):</div>' +
+          '<div class="bma-ie-row">' +
+            '<div class="bma-ie-cell bma-ie-pr6" style="width:90px;"><input id="bma-ie-cfg-fy" type="text" value="' + state.fiscalYear + '" /></div>' +
+            '<div class="bma-ie-cell"><button id="bma-ie-add-next-fy" type="button" style="width:100%;padding:6px;background:#fff;color:#1d4ed8;border:1px solid #93c5fd;font-size:12px;">+ สร้างปีถัดไป</button></div>' +
           '</div>' +
-          '<div style="margin-bottom:4px;">' +
-            '<div style="font-weight:bold;color:#1e3a8a;">ลิงก์/ID ไฟล์ Auto Crat-EGP:</div>' +
-            '<input id="bma-ie-cfg-ac" type="text" value="' + (curIeEntry.autocratSheetId || '') + '" placeholder="วางลิงก์หรือ ID Google Sheet..." style="width:100%;padding:3px;border:1px solid #cbd5e1;border-radius:4px;font-size:10.5px;box-sizing:border-box;" />' +
-          '</div>' +
-          '<div style="margin-bottom:5px;">' +
-            '<div style="font-weight:bold;color:#1e3a8a;">ลิงก์/ID ไฟล์ MISS:</div>' +
-            '<input id="bma-ie-cfg-miss" type="text" value="' + (curIeEntry.missSheetId || '') + '" placeholder="วางลิงก์หรือ ID Google Sheet..." style="width:100%;padding:3px;border:1px solid #cbd5e1;border-radius:4px;font-size:10.5px;box-sizing:border-box;" />' +
-          '</div>' +
-          '<button id="bma-ie-save-fy" type="button" style="width:100%;background:#1d4ed8;color:#fff;border:none;border-radius:4px;padding:5px;font-size:11px;font-weight:bold;cursor:pointer;">💾 บันทึกปีงบ &amp; โหลดไฟล์ใหม่</button>' +
+          '<div class="bma-ie-lbl">ลิงก์/ID ไฟล์ Auto Crat-EGP:</div>' +
+          '<input id="bma-ie-cfg-ac" type="text" value="' + (curIeEntry.autocratSheetId || '') + '" placeholder="วางลิงก์หรือ ID Google Sheet..." style="margin-bottom:6px;font-size:12px;" />' +
+          '<div class="bma-ie-lbl">ลิงก์/ID ไฟล์ MISS:</div>' +
+          '<input id="bma-ie-cfg-miss" type="text" value="' + (curIeEntry.missSheetId || '') + '" placeholder="วางลิงก์หรือ ID Google Sheet..." style="margin-bottom:7px;font-size:12px;" />' +
+          '<button id="bma-ie-save-fy" type="button" class="bma-ie-actbtn" style="background:#1d4ed8;margin-bottom:0;">บันทึกปีงบ &amp; โหลดไฟล์ใหม่</button>' +
         '</div>' +
       '</div>' +
 
-      '<div style="margin-bottom:6px;">' +
-        '<input id="bma-ie-search" type="text" placeholder="ค้นหารหัส เช่น 1งบ, 7งบ, 30งบ..." style="width:100%;padding:5px;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:4px;box-sizing:border-box;" />' +
-        '<select id="bma-ie-select" style="width:100%;padding:5px;border:1px solid #cbd5e1;border-radius:4px;box-sizing:border-box;font-weight:bold;"></select>' +
+      '<div style="margin-bottom:8px;">' +
+        '<input id="bma-ie-search" type="text" placeholder="พิมพ์ค้นหารหัส เช่น 1งบ, 7งบ, 30งบ..." style="margin-bottom:6px;" />' +
+        '<select id="bma-ie-select" style="font-weight:600;"></select>' +
       '</div>' +
 
       /* ===== MODE 1: จัดซื้อ/ตรวจรับ (8 ขั้นตอน) ===== */
       '<div id="bma-ie-mode-pur">' +
-        '<div id="bma-ie-summary" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:7px;margin-bottom:6px;font-size:11.5px;line-height:1.45;">กำลังโหลดข้อมูลจาก Google Sheet...</div>' +
-        '<div style="display:flex;gap:4px;margin-bottom:6px;">' +
-          '<input id="bma-ie-purno" type="text" placeholder="รหัสจัดซื้อ" title="รหัสจัดซื้อ" style="width:33%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;box-sizing:border-box;" />' +
-          '<input id="bma-ie-pono" type="text" placeholder="เลขใบสั่งซื้อ" title="เลขที่ใบสั่งซื้อ" style="width:33%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;box-sizing:border-box;" />' +
-          '<input id="bma-ie-rcvno" type="text" placeholder="เลขใบตรวจรับ" title="เลขที่ใบตรวจรับ" style="width:34%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;box-sizing:border-box;" />' +
+        '<div id="bma-ie-summary" style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:7px;padding:8px 10px;margin-bottom:8px;font-size:13px;">กำลังโหลดข้อมูลจาก Google Sheet...</div>' +
+        '<div class="bma-ie-row">' +
+          '<div class="bma-ie-cell bma-ie-pr6"><div class="bma-ie-lbl">รหัสจัดซื้อ</div><input id="bma-ie-purno" type="text" placeholder="เช่น 8" /></div>' +
+          '<div class="bma-ie-cell bma-ie-pr6"><div class="bma-ie-lbl">ใบสั่งซื้อ</div><input id="bma-ie-pono" type="text" placeholder="เช่น 8" /></div>' +
+          '<div class="bma-ie-cell"><div class="bma-ie-lbl">ใบตรวจรับ</div><input id="bma-ie-rcvno" type="text" placeholder="เช่น 8" /></div>' +
         '</div>' +
-        '<div style="display:flex;gap:4px;margin-bottom:8px;">' +
-          '<input id="bma-ie-inv" type="text" placeholder="เลขที่บิล (หน้าส่งมอบ)..." style="width:55%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;box-sizing:border-box;" />' +
-          '<select id="bma-ie-comm" style="width:45%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;box-sizing:border-box;">' +
-            '<option value="1">ชุดที่ 1 (เบญญาภา)</option>' +
-            '<option value="2">ชุดที่ 2 (วีรวิชญ์)</option>' +
-          '</select>' +
+        '<div class="bma-ie-row">' +
+          '<div class="bma-ie-cell bma-ie-pr6" style="width:54%;"><div class="bma-ie-lbl">เลขที่บิล (หน้าส่งมอบ)</div><input id="bma-ie-inv" type="text" placeholder="เลขที่บิล..." /></div>' +
+          '<div class="bma-ie-cell"><div class="bma-ie-lbl">ชุดกรรมการ</div><select id="bma-ie-comm"><option value="1">ชุดที่ 1 (เบญญาภา)</option><option value="2">ชุดที่ 2 (วีรวิชญ์)</option></select></div>' +
         '</div>' +
-        '<button id="bma-ie-fillbtn" type="button" style="width:100%;padding:8px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-weight:bold;cursor:pointer;margin-bottom:6px;">⚡ กรอกซ้ำอีกครั้ง (Auto-Fill)</button>' +
-        '<div style="display:flex;gap:4px;margin-bottom:6px;">' +
-          '<button id="bma-ie-step7" type="button" style="width:50%;padding:6px 4px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:5px;font-weight:bold;cursor:pointer;font-size:11px;">7. กรรมการ (ข้อ12)</button>' +
-          '<button id="bma-ie-step8" type="button" style="width:50%;padding:6px 4px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:5px;font-weight:bold;cursor:pointer;font-size:11px;">8. พิมพ์ใบตรวจรับ (ข้อ13)</button>' +
+        '<button id="bma-ie-fillbtn" type="button" class="bma-ie-actbtn" style="background:#2563eb;">กรอกข้อมูลหน้านี้ (Auto-Fill)</button>' +
+        '<div class="bma-ie-row">' +
+          '<div class="bma-ie-cell bma-ie-pr6"><button id="bma-ie-step7" type="button" style="width:100%;padding:7px 6px;background:#eff6ff;color:#1e40af;border:1px solid #93c5fd;font-size:12.5px;">7. กรรมการ (ข้อ 12)</button></div>' +
+          '<div class="bma-ie-cell"><button id="bma-ie-step8" type="button" style="width:100%;padding:7px 6px;background:#eff6ff;color:#1e40af;border:1px solid #93c5fd;font-size:12.5px;">8. ใบตรวจรับ (ข้อ 13)</button></div>' +
         '</div>' +
       '</div>' +
 
       /* ===== MODE 2: เบิกจ่าย MIS2 (FRM_PAY_DOC) ===== */
       '<div id="bma-ie-mode-pay" style="display:none;">' +
-        '<div id="bma-ie-bridge-bar" style="background:#fffbeb;border:1px solid #fcd34d;color:#92400e;border-radius:6px;padding:6px;font-size:10.5px;margin-bottom:6px;">' +
+        '<div id="bma-ie-bridge-bar" style="background:#fffbeb;border:1px solid #f59e0b;color:#92400e;border-radius:7px;padding:8px 9px;font-size:12.5px;margin-bottom:8px;">' +
           '<div id="bma-ie-bridge-txt">กำลังตรวจสอบตัวช่วย Oracle Forms...</div>' +
-          '<div style="display:flex;gap:3px;margin-top:4px;">' +
-            '<button id="bma-ie-br-pick" type="button" style="flex:1;padding:3px;font-size:10px;font-weight:bold;background:#fff;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;">🪟 เลือกหน้าต่าง</button>' +
-            '<button id="bma-ie-br-cal" type="button" style="flex:1;padding:3px;font-size:10px;font-weight:bold;background:#fff;border:1px solid #cbd5e1;border-radius:4px;cursor:pointer;">🎯 ตั้งพิกัด (F8)</button>' +
+          '<div class="bma-ie-row" style="margin-top:6px;margin-bottom:0;">' +
+            '<div class="bma-ie-cell bma-ie-pr6"><button id="bma-ie-br-pick" type="button" style="width:100%;padding:5px;font-size:12px;background:#fff;color:#1e293b;border:1px solid #94a3b8;">เลือกหน้าต่าง Oracle</button></div>' +
+            '<div class="bma-ie-cell"><button id="bma-ie-br-cal" type="button" style="width:100%;padding:5px;font-size:12px;background:#fff;color:#1e293b;border:1px solid #94a3b8;">ตั้งพิกัด (F8)</button></div>' +
           '</div>' +
         '</div>' +
-        '<div id="bma-ie-pay-dup" style="display:none;background:#fef2f2;border:2px solid #dc2626;color:#b91c1c;padding:5px;border-radius:5px;font-weight:bold;font-size:11px;text-align:center;margin-bottom:5px;"></div>' +
-        '<div id="bma-ie-pay-brief" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:5px;padding:5px 7px;font-size:11px;margin-bottom:6px;"></div>' +
+        '<div id="bma-ie-pay-dup" style="display:none;background:#fef2f2;border:2px solid #dc2626;color:#b91c1c;padding:7px;border-radius:6px;font-weight:700;font-size:12.5px;text-align:center;margin-bottom:7px;"></div>' +
+        '<div id="bma-ie-pay-brief" style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:7px 9px;font-size:13px;margin-bottom:8px;"></div>' +
 
-        '<div style="display:flex;gap:3px;margin-bottom:6px;">' +
-          '<button id="bma-ie-psub-1" type="button" style="flex:1;padding:5px 3px;font-size:10.5px;font-weight:bold;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;">1. ใบตรวจรับ</button>' +
-          '<button id="bma-ie-psub-2" type="button" style="flex:1;padding:5px 3px;font-size:10.5px;font-weight:bold;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;">2. ผู้รับเงิน</button>' +
-          '<button id="bma-ie-psub-3" type="button" style="flex:1;padding:5px 3px;font-size:10.5px;font-weight:bold;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;">3. รายละเอียด</button>' +
+        '<div class="bma-ie-row" style="margin-bottom:8px;">' +
+          '<div class="bma-ie-cell bma-ie-pr6"><button id="bma-ie-psub-1" type="button" style="width:100%;padding:7px 4px;font-size:12.5px;border:1px solid #94a3b8;">1. ใบตรวจรับ</button></div>' +
+          '<div class="bma-ie-cell bma-ie-pr6"><button id="bma-ie-psub-2" type="button" style="width:100%;padding:7px 4px;font-size:12.5px;border:1px solid #94a3b8;">2. ผู้รับเงิน</button></div>' +
+          '<div class="bma-ie-cell"><button id="bma-ie-psub-3" type="button" style="width:100%;padding:7px 4px;font-size:12.5px;border:1px solid #94a3b8;">3. รายละเอียด</button></div>' +
         '</div>' +
 
         /* Pay Sub 1 */
         '<div id="bma-ie-ppane-1">' +
-          '<div style="display:flex;gap:4px;margin-bottom:5px;">' +
-            '<div style="flex:1;"><div style="font-size:10.5px;font-weight:bold;">เลขใบตรวจรับ</div><div style="display:flex;gap:2px;"><input id="bma-ie-pay-rcvno" type="text" style="width:100%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;box-sizing:border-box;" />' + ieCopyBtnHtml('bma-ie-pay-rcvno', false) + '</div></div>' +
-            '<div style="width:95px;"><div style="font-size:10.5px;font-weight:bold;">ปีงบ</div><div style="display:flex;gap:2px;"><input id="bma-ie-pay-rcvyr" type="text" value="' + state.fiscalYear + '" style="width:100%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;box-sizing:border-box;" />' + ieCopyBtnHtml('bma-ie-pay-rcvyr', false) + '</div></div>' +
+          '<div class="bma-ie-row">' +
+            '<div class="bma-ie-cell bma-ie-pr6"><div class="bma-ie-lbl">เลขที่ใบตรวจรับ</div><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-rcvno" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-rcvno', false) + '</div></div>' +
+            '<div class="bma-ie-cell" style="width:140px;"><div class="bma-ie-lbl">ปีงบ</div><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-rcvyr" type="text" value="' + state.fiscalYear + '" /></span>' + ieCopyBtnHtml('bma-ie-pay-rcvyr', false) + '</div></div>' +
           '</div>' +
-          '<div style="display:flex;gap:4px;margin-bottom:5px;">' +
-            '<div style="flex:1;"><div style="font-size:10.5px;font-weight:bold;">VAT (7%)</div><div style="display:flex;gap:2px;"><input id="bma-ie-pay-vat" type="text" style="width:100%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;box-sizing:border-box;" />' + ieCopyBtnHtml('bma-ie-pay-vat', false) + '</div></div>' +
-            '<div style="flex:1;"><div style="font-size:10.5px;font-weight:bold;">หักภาษี (1%)</div><div style="display:flex;gap:2px;"><input id="bma-ie-pay-wht" type="text" style="width:100%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;box-sizing:border-box;" />' + ieCopyBtnHtml('bma-ie-pay-wht', false) + '</div></div>' +
+          '<div class="bma-ie-row">' +
+            '<div class="bma-ie-cell bma-ie-pr6"><div class="bma-ie-lbl">ภาษีมูลค่าเพิ่ม (7%)</div><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-vat" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-vat', false) + '</div></div>' +
+            '<div class="bma-ie-cell"><div class="bma-ie-lbl">หักภาษีเงินได้ (1%)</div><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-wht" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-wht', false) + '</div></div>' +
           '</div>' +
-          '<div id="bma-ie-pay-taxbadge" style="background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;padding:5px;border-radius:5px;font-weight:bold;font-size:11px;text-align:center;margin-bottom:6px;">สุทธิที่จ่าย: -</div>' +
-          '<button id="bma-ie-prun-1" type="button" style="width:100%;padding:6px;background:#0284c7;color:#fff;border:none;border-radius:5px;font-weight:bold;cursor:pointer;margin-bottom:4px;font-size:11.5px;">⚡ ขั้น 1: กรอกใบตรวจรับ + กดแว่นขยาย 🔍</button>' +
-          '<button id="bma-ie-prun-15" type="button" style="width:100%;padding:6px;background:#0e7490;color:#fff;border:none;border-radius:5px;font-weight:bold;cursor:pointer;margin-bottom:4px;font-size:11.5px;">⚡ ขั้น 1.5: รายละเอียด ➔ ติ๊กงบ ➔ ตกลง</button>' +
-          '<button id="bma-ie-prun-16" type="button" style="width:100%;padding:6px;background:#0369a1;color:#fff;border:none;border-radius:5px;font-weight:bold;cursor:pointer;margin-bottom:6px;font-size:11.5px;">⚡ ขั้น 1.6: กรอก VAT 7% + หักภาษี 1%</button>' +
+          '<div id="bma-ie-pay-taxbadge" style="background:#f0fdf4;border:1px solid #86efac;color:#166534;padding:7px 9px;border-radius:6px;font-weight:700;font-size:13px;text-align:center;margin-bottom:8px;">ยอดสุทธิที่จ่าย: -</div>' +
+          '<button id="bma-ie-prun-1" type="button" class="bma-ie-actbtn" style="background:#0284c7;">ขั้น 1: กรอกใบตรวจรับ + กดแว่นขยาย</button>' +
+          '<button id="bma-ie-prun-15" type="button" class="bma-ie-actbtn" style="background:#0e7490;">ขั้น 1.5: รายละเอียด &raquo; ติ๊กงบ &raquo; ตกลง</button>' +
+          '<button id="bma-ie-prun-16" type="button" class="bma-ie-actbtn" style="background:#0369a1;">ขั้น 1.6: กรอก VAT 7% + หักภาษี 1%</button>' +
         '</div>' +
 
         /* Pay Sub 2 */
         '<div id="bma-ie-ppane-2" style="display:none;">' +
-          '<input id="bma-ie-vsearch" type="text" placeholder="ค้นหาบริษัทในทะเบียนบริษัท..." style="width:100%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:3px;box-sizing:border-box;" />' +
-          '<select id="bma-ie-vselect" style="width:100%;padding:4px;border:1px solid #cbd5e1;border-radius:4px;margin-bottom:4px;box-sizing:border-box;"></select>' +
-          '<div id="bma-ie-bankinfo" style="background:#f0f9ff;border:1px solid #bae6fd;color:#0c4a6e;padding:4px 6px;border-radius:5px;font-size:10.5px;margin-bottom:5px;">🏦 ธนาคาร: - | 📍 สาขา: -</div>' +
-          '<div style="display:flex;align-items:center;gap:3px;margin-bottom:4px;"><label style="width:74px;font-size:10.5px;font-weight:bold;"><input id="bma-ie-ck-payTo" type="checkbox" ' + (ieChecks.payTo !== false ? 'checked' : '') + ' />จ่ายให้</label><input id="bma-ie-pay-to" type="text" style="flex:1;padding:3px;border:1px solid #cbd5e1;border-radius:4px;" />' + ieCopyBtnHtml('bma-ie-pay-to', false) + '</div>' +
-          '<div style="display:flex;align-items:center;gap:3px;margin-bottom:4px;"><label style="width:74px;font-size:10.5px;font-weight:bold;"><input id="bma-ie-ck-assignTo" type="checkbox" ' + (ieChecks.assignTo !== false ? 'checked' : '') + ' />มอบให้</label><input id="bma-ie-pay-assign" type="text" style="flex:1;padding:3px;border:1px solid #cbd5e1;border-radius:4px;" />' + ieCopyBtnHtml('bma-ie-pay-assign', false) + '</div>' +
-          '<div style="display:flex;align-items:center;gap:3px;margin-bottom:4px;"><label style="width:74px;font-size:10.5px;font-weight:bold;"><input id="bma-ie-ck-bankCode" type="checkbox" ' + (ieChecks.bankCode !== false ? 'checked' : '') + ' />ธนาคาร</label><input id="bma-ie-pay-bank" type="text" style="flex:1;padding:3px;border:1px solid #cbd5e1;border-radius:4px;" />' + ieCopyBtnHtml('bma-ie-pay-bank', false) + '</div>' +
-          '<div style="display:flex;align-items:center;gap:3px;margin-bottom:4px;"><label style="width:74px;font-size:10.5px;font-weight:bold;"><input id="bma-ie-ck-branchCode" type="checkbox" ' + (ieChecks.branchCode !== false ? 'checked' : '') + ' />สาขา 4 หลัก</label><input id="bma-ie-pay-branch" type="text" style="flex:1;padding:3px;border:1px solid #cbd5e1;border-radius:4px;" />' + ieCopyBtnHtml('bma-ie-pay-branch', false) + '</div>' +
-          '<div style="display:flex;align-items:center;gap:3px;margin-bottom:6px;"><label style="width:74px;font-size:10.5px;font-weight:bold;"><input id="bma-ie-ck-accountNo" type="checkbox" ' + (ieChecks.accountNo !== false ? 'checked' : '') + ' />เลขบัญชี</label><input id="bma-ie-pay-acct" type="text" style="flex:1;padding:3px;border:1px solid #cbd5e1;border-radius:4px;" />' + ieCopyBtnHtml('bma-ie-pay-acct', false) + '</div>' +
-          '<button id="bma-ie-prun-2" type="button" style="width:100%;padding:7px;background:#0284c7;color:#fff;border:none;border-radius:5px;font-weight:bold;cursor:pointer;margin-bottom:6px;">⚡ ขั้น 2: กรอกแท็บ \'ผู้รับเงิน\'</button>' +
+          '<input id="bma-ie-vsearch" type="text" placeholder="ค้นหาบริษัทในทะเบียนบริษัท..." style="margin-bottom:5px;" />' +
+          '<select id="bma-ie-vselect" style="margin-bottom:6px;"></select>' +
+          '<div id="bma-ie-bankinfo" style="background:#f0f9ff;border:1px solid #7dd3fc;color:#0c4a6e;padding:6px 8px;border-radius:6px;font-size:12.5px;margin-bottom:7px;">ธนาคาร: - | สาขา: -</div>' +
+          '<div class="bma-ie-chkrow"><label class="bma-ie-chklbl"><input id="bma-ie-ck-payTo" type="checkbox" ' + (ieChecks.payTo !== false ? 'checked' : '') + ' /> จ่ายให้</label><div class="bma-ie-chkin"><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-to" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-to', false) + '</div></div></div>' +
+          '<div class="bma-ie-chkrow"><label class="bma-ie-chklbl"><input id="bma-ie-ck-assignTo" type="checkbox" ' + (ieChecks.assignTo !== false ? 'checked' : '') + ' /> โดยมอบให้</label><div class="bma-ie-chkin"><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-assign" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-assign', false) + '</div></div></div>' +
+          '<div class="bma-ie-chkrow"><label class="bma-ie-chklbl"><input id="bma-ie-ck-bankCode" type="checkbox" ' + (ieChecks.bankCode !== false ? 'checked' : '') + ' /> ธนาคาร</label><div class="bma-ie-chkin"><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-bank" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-bank', false) + '</div></div></div>' +
+          '<div class="bma-ie-chkrow"><label class="bma-ie-chklbl"><input id="bma-ie-ck-branchCode" type="checkbox" ' + (ieChecks.branchCode !== false ? 'checked' : '') + ' /> สาขา 4 หลัก</label><div class="bma-ie-chkin"><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-branch" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-branch', false) + '</div></div></div>' +
+          '<div class="bma-ie-chkrow"><label class="bma-ie-chklbl"><input id="bma-ie-ck-accountNo" type="checkbox" ' + (ieChecks.accountNo !== false ? 'checked' : '') + ' /> เลขบัญชี</label><div class="bma-ie-chkin"><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-acct" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-acct', false) + '</div></div></div>' +
+          '<button id="bma-ie-prun-2" type="button" class="bma-ie-actbtn" style="background:#0284c7;">ขั้น 2: กรอกแท็บ \'ผู้รับเงิน\'</button>' +
         '</div>' +
 
         /* Pay Sub 3 */
         '<div id="bma-ie-ppane-3" style="display:none;">' +
-          '<div style="margin-bottom:4px;"><div style="font-size:10.5px;font-weight:bold;">ชื่อผู้ขอเบิก</div><div style="display:flex;gap:2px;"><input id="bma-ie-pay-req" type="text" value="' + (state.defaultRequester || 'นางอรชุมา หุตะโกวิท') + '" style="flex:1;padding:4px;border:1px solid #cbd5e1;border-radius:4px;" />' + ieCopyBtnHtml('bma-ie-pay-req', false) + '</div></div>' +
-          '<div style="margin-bottom:4px;"><div style="display:flex;justify-content:space-between;font-size:10.5px;font-weight:bold;"><span>วันที่เบิก (พ.ศ.)</span><span><button id="bma-ie-dt-today" type="button" style="font-size:10px;padding:1px 4px;cursor:pointer;">วันนี้</button> <button id="bma-ie-dt-rcv" type="button" style="font-size:10px;padding:1px 4px;cursor:pointer;">วันตรวจรับ</button></span></div><div style="display:flex;gap:2px;"><input id="bma-ie-pay-date" type="text" value="' + ieTodayThaiSlash() + '" style="flex:1;padding:4px;border:1px solid #cbd5e1;border-radius:4px;" />' + ieCopyBtnHtml('bma-ie-pay-date', false) + '</div></div>' +
-          '<div style="margin-bottom:5px;"><div style="font-size:10.5px;font-weight:bold;">คำอธิบายรายการเบิก</div><div style="display:flex;gap:2px;"><textarea id="bma-ie-pay-desc" style="flex:1;height:48px;padding:4px;border:1px solid #cbd5e1;border-radius:4px;font-family:Tahoma,sans-serif;font-size:11px;"></textarea>' + ieCopyBtnHtml('bma-ie-pay-desc', true) + '</div></div>' +
-          '<button id="bma-ie-prun-3" type="button" style="width:100%;padding:7px;background:#0284c7;color:#fff;border:none;border-radius:5px;font-weight:bold;cursor:pointer;margin-bottom:5px;">⚡ ขั้น 3: กรอกแท็บ \'รายละเอียดเบิก\'</button>' +
-          '<div style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:4px 6px;border-radius:5px;font-size:10.5px;font-weight:bold;text-align:center;margin-bottom:6px;">🛑 หยุดก่อนบันทึกทุกครั้ง (คนกด 💾 เอง) | กด ESC หยุดทันที</div>' +
+          '<div style="margin-bottom:6px;"><div class="bma-ie-lbl">ชื่อผู้ขอเบิก</div><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-req" type="text" value="' + (state.defaultRequester || 'นางอรชุมา หุตะโกวิท') + '" /></span>' + ieCopyBtnHtml('bma-ie-pay-req', false) + '</div></div>' +
+          '<div style="margin-bottom:6px;"><div style="display:table;width:100%;margin-bottom:3px;"><span style="display:table-cell;font-size:12.5px;font-weight:600;color:#334155;">วันที่เบิก (พ.ศ.)</span><span style="display:table-cell;text-align:right;"><button id="bma-ie-dt-today" type="button" style="font-size:11.5px;padding:2px 7px;background:#f1f5f9;border:1px solid #cbd5e1;margin-right:4px;">วันนี้</button><button id="bma-ie-dt-rcv" type="button" style="font-size:11.5px;padding:2px 7px;background:#f1f5f9;border:1px solid #cbd5e1;">วันตรวจรับ</button></span></div><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-date" type="text" value="' + ieTodayThaiSlash() + '" /></span>' + ieCopyBtnHtml('bma-ie-pay-date', false) + '</div></div>' +
+          '<div style="margin-bottom:7px;"><div class="bma-ie-lbl">คำอธิบายรายการเบิก</div><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><textarea id="bma-ie-pay-desc" style="height:62px;"></textarea></span>' + ieCopyBtnHtml('bma-ie-pay-desc', true) + '</div></div>' +
+          '<button id="bma-ie-prun-3" type="button" class="bma-ie-actbtn" style="background:#0284c7;">ขั้น 3: กรอกแท็บ \'รายละเอียดเบิก\'</button>' +
+          '<div style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:6px 8px;border-radius:6px;font-size:12px;font-weight:600;text-align:center;margin-bottom:8px;">หยุดก่อนบันทึกทุกครั้ง (คนตรวจและกดบันทึกเอง) | กด ESC หยุดทันที</div>' +
         '</div>' +
 
-        '<div style="border-top:1px solid #e2e8f0;padding-top:5px;margin-bottom:6px;">' +
-          '<div style="font-size:10.5px;font-weight:bold;margin-bottom:3px;">บันทึกเลขที่ใบขอเบิกลง MISS (คอลัมน์ H)</div>' +
-          '<div style="display:flex;gap:4px;">' +
-            '<input id="bma-ie-pay-docno" type="text" placeholder="เช่น 123/' + state.fiscalYear + '" style="flex:1;padding:4px;border:1px solid #cbd5e1;border-radius:4px;" />' +
-            '<button id="bma-ie-pay-savedoc" type="button" style="background:#16a34a;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-weight:bold;font-size:11px;cursor:pointer;">💾 บันทึก</button>' +
+        '<div style="border-top:1px solid #cbd5e1;padding-top:8px;margin-bottom:8px;">' +
+          '<div class="bma-ie-lbl">บันทึกเลขที่ใบขอเบิกลง MISS (คอลัมน์ H)</div>' +
+          '<div class="bma-ie-inrow">' +
+            '<span class="bma-ie-inrow-field"><input id="bma-ie-pay-docno" type="text" placeholder="เช่น 123/' + state.fiscalYear + '" /></span>' +
+            '<span style="display:table-cell;width:105px;padding-left:6px;vertical-align:middle;"><button id="bma-ie-pay-savedoc" type="button" style="width:100%;height:33px;background:#16a34a;color:#fff;border:none;font-size:12.5px;">ลง MISS' + state.fiscalYear + '</button></span>' +
           '</div>' +
         '</div>' +
       '</div>' +
 
-      '<div id="bma-ie-status" style="background:#f1f5f9;padding:5px 7px;border-radius:4px;font-size:11px;font-weight:bold;margin-bottom:4px;">พร้อมใช้งานบน IE Mode</div>' +
-      '<div style="text-align:center;font-size:10.5px;color:#64748b;font-weight:bold;">ผู้พัฒนา: <span style="color:#1d4ed8;">ARISSARA.K</span> • กลุ่มงานเภสัชกรรม รพจ.</div>' +
+      '<div id="bma-ie-status" style="background:#f1f5f9;border:1px solid #e2e8f0;padding:7px 9px;border-radius:6px;font-size:12.5px;font-weight:600;color:#1e293b;margin-bottom:6px;">พร้อมใช้งานบน IE Mode</div>' +
+      '<div style="text-align:center;font-size:12px;color:#64748b;font-weight:600;">ผู้พัฒนา: <span style="color:#1d4ed8;">ARISSARA.K</span> • กลุ่มงานเภสัชกรรม รพจ.</div>' +
     '</div>';
 
   document.body.appendChild(panel);
@@ -988,17 +1013,17 @@
     if (!bar || !txt) return;
     if (ieBridgeStatus.connected) {
       bar.style.background = '#ecfdf5';
-      bar.style.borderColor = '#86efac';
+      bar.style.borderColor = '#4ade80';
       bar.style.color = '#166534';
       var wStr = ieBridgeStatus.targetFound
-        ? '🪟 ล็อก: ' + String(ieBridgeStatus.targetTitle || 'Oracle Forms').slice(0, 26)
-        : '⚠️ ยังไม่พบหน้าต่าง Oracle Forms';
-      txt.innerHTML = '<b>🟢 เชื่อมตัวช่วย Oracle Forms แล้ว</b> (พิกัด ' + ieBridgeStatus.calibratedCount + '/' + ieBridgeStatus.totalCalibCount + ')<br/>' + wStr;
+        ? 'หน้าต่างเป้าหมาย: ' + String(ieBridgeStatus.targetTitle || 'Oracle Forms').slice(0, 32)
+        : 'ยังไม่พบหน้าต่าง Oracle Forms (เปิด FRM_PAY_DOC แล้วกดเลือกหน้าต่าง)';
+      txt.innerHTML = '<b>[เชื่อมต่อแล้ว] ตัวช่วย Oracle Forms</b> (พิกัด ' + ieBridgeStatus.calibratedCount + '/' + ieBridgeStatus.totalCalibCount + ')<br/>' + wStr;
     } else {
       bar.style.background = '#fffbeb';
-      bar.style.borderColor = '#fcd34d';
+      bar.style.borderColor = '#f59e0b';
       bar.style.color = '#92400e';
-      txt.innerHTML = '<b>🟡 โหมดคัดลอกวาง</b> (เปิด <b>START_ORACLE_BRIDGE.bat</b> เพื่อกรอกอัตโนมัติ)';
+      txt.innerHTML = '<b>[โหมดคัดลอกวาง]</b> ยังไม่เปิดตัวช่วย (เปิด <b>START_ORACLE_BRIDGE.bat</b> เพื่อกรอกอัตโนมัติ)';
     }
   }
 
@@ -1212,7 +1237,32 @@
     var payNo = String(document.getElementById('bma-ie-pay-docno').value || '').replace(/^\s+|\s+$/g, '');
     if (!payNo) { alert('กรุณาพิมพ์เลขที่ใบขอเบิกก่อนครับ'); return; }
     if (!item || !item.missRowIndex) { alert('รายการนี้ยังไม่ได้เชื่อมแถวในชีต MISS' + fy); return; }
-    setIeStatus('💾 กำลังบันทึกเลขใบขอเบิก ' + payNo + ' ลง MISS' + fy + '...');
+    setIeStatus('กำลังบันทึกเลขใบขอเบิก ' + payNo + ' ลง MISS' + fy + '...');
+    var postPayload = {
+      action: 'updatePayDocNo',
+      missRowIndex: item.missRowIndex,
+      payDocNo: payNo,
+      missSheetId: extractSheetId(entry.missSheetId),
+      missTabName: 'ชีต1'
+    };
+
+    function onSaved() {
+      item.payDocNo = payNo;
+      saveState();
+      applyItemToIePay(item);
+      setIeStatus('บันทึกเลขใบขอเบิก ' + payNo + ' ลง MISS' + fy + ' เรียบร้อย!');
+    }
+
+    function trySaveViaBridge() {
+      ieBridgeReq('/fetch-gas', 'POST', { url: GAS_URL, method: 'POST', payload: postPayload }, function (ok, res) {
+        if (ok && res && res.ok) {
+          onSaved();
+        } else {
+          setIeStatus('บันทึก MISS' + fy + ' ไม่สำเร็จ (เปิด START_ORACLE_BRIDGE.bat แล้วลองใหม่)');
+        }
+      });
+    }
+
     try {
       var xhr = new XMLHttpRequest();
       xhr.open('POST', GAS_URL, true);
@@ -1222,25 +1272,17 @@
           try {
             var res = JSON.parse(xhr.responseText);
             if (res && res.ok) {
-              item.payDocNo = payNo;
-              saveState();
-              applyItemToIePay(item);
-              setIeStatus('✓ บันทึกเลขใบขอเบิก ' + payNo + ' ลง MISS' + fy + ' เรียบร้อย!');
+              onSaved();
               return;
             }
           } catch (e) {}
-          setIeStatus('❌ บันทึก MISS' + fy + ' ไม่สำเร็จ');
+          trySaveViaBridge();
         }
       };
-      xhr.send(JSON.stringify({
-        action: 'updatePayDocNo',
-        missRowIndex: item.missRowIndex,
-        payDocNo: payNo,
-        missSheetId: extractSheetId(entry.missSheetId),
-        missTabName: 'ชีต1'
-      }));
+      xhr.onerror = trySaveViaBridge;
+      xhr.send(JSON.stringify(postPayload));
     } catch (e2) {
-      setIeStatus('❌ บันทึกไม่สำเร็จ');
+      trySaveViaBridge();
     }
   }
 
@@ -1396,48 +1438,74 @@
     }
   }
 
+  function applyLoadedSheetsResponse(res, fy, viaTag) {
+    if (res && res.items) {
+      state.items = res.items;
+      if (res.vendors && res.vendors.length > 0) {
+        state.vendors = res.vendors;
+      } else {
+        loadFallbackVendorsCache();
+      }
+      renderIeVendors();
+      renderIeList();
+      setIeStatus('ปีงบ ' + fy + ': โหลดสำเร็จ (' + state.items.length + ' รายการ' + (viaTag || '') + ')');
+      return true;
+    }
+    return false;
+  }
+
   function loadDataViaXhr() {
     var fy = String(state.fiscalYear || '70').replace(/^\s+|\s+$/g, '');
     var entry = getCurrentIeFyEntry();
-    setIeStatus('⏳ กำลังดึงข้อมูลปีงบ ' + fy + ' (MISS' + fy + ' / Auto Crat-EGP' + fy + ')...');
+    setIeStatus('กำลังดึงข้อมูลปีงบ ' + fy + ' (MISS' + fy + ' / Auto Crat-EGP' + fy + ')...');
     var url =
       GAS_URL +
       '?fiscalYear=' + encodeURIComponent(fy) +
       '&autocratSheetId=' + encodeURIComponent(extractSheetId(entry.autocratSheetId)) +
       '&missSheetId=' + encodeURIComponent(extractSheetId(entry.missSheetId)) +
       '&t=' + new Date().getTime();
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', url, true);
-    xhr.onreadystatechange = function () {
-      if (xhr.readyState === 4) {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            var res = JSON.parse(xhr.responseText);
-            if (res && res.items) {
-              state.items = res.items;
-              if (res.vendors && res.vendors.length > 0) {
-                state.vendors = res.vendors;
-              } else {
-                loadFallbackVendorsCache();
-              }
-              renderIeVendors();
-              renderIeList();
-              setIeStatus('✓ ปีงบ ' + fy + ': โหลดสำเร็จ (' + state.items.length + ' รายการ)');
-              return;
-            }
-          } catch (e) {}
+
+    function tryViaBridge() {
+      ieBridgeReq('/fetch-gas', 'POST', { url: url, method: 'GET' }, function (ok, res) {
+        if (ok && applyLoadedSheetsResponse(res, fy, ' ผ่านตัวช่วย')) {
+          return;
         }
-        setIeStatus('⚠️ โหลดข้อมูลไม่สำเร็จ');
-      }
-    };
-    xhr.send();
+        if (state.items && state.items.length > 0) {
+          renderIeVendors();
+          renderIeList();
+          setIeStatus('ใช้ข้อมูลในแคช (' + state.items.length + ' รายการ) — เปิด START_ORACLE_BRIDGE.bat เพื่อซิงค์สดบน IE');
+        } else {
+          setIeStatus('โหลดข้อมูลไม่สำเร็จ — เปิด START_ORACLE_BRIDGE.bat แล้วกด ซิงค์ อีกครั้ง');
+        }
+      });
+    }
+
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4) {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              var res = JSON.parse(xhr.responseText);
+              if (applyLoadedSheetsResponse(res, fy, '')) return;
+            } catch (e) {}
+          }
+          tryViaBridge();
+        }
+      };
+      xhr.onerror = tryViaBridge;
+      xhr.send();
+    } catch (e2) {
+      tryViaBridge();
+    }
   }
 
   document.getElementById('bma-ie-min').onclick = function () {
     var body = document.getElementById('bma-ie-body');
     var hidden = body.style.display === 'none';
     body.style.display = hidden ? 'block' : 'none';
-    this.innerHTML = hidden ? '➖' : '➕';
+    this.innerHTML = hidden ? '-' : '+';
   };
 
   document.getElementById('bma-ie-tab-pur').onclick = function () { switchIeMode('purhire'); };
