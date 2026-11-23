@@ -961,10 +961,11 @@
       '<div id="bma-ie-mode-pay" style="display:none;">' +
         '<div id="bma-ie-bridge-bar" style="background:#fffbeb;border:1px solid #f59e0b;color:#92400e;border-radius:7px;padding:8px 9px;font-size:12.5px;margin-bottom:8px;">' +
           '<div id="bma-ie-bridge-txt">กำลังตรวจสอบตัวช่วย Oracle Forms...</div>' +
-          '<div class="bma-ie-row" style="margin-top:6px;margin-bottom:0;">' +
+          '<div class="bma-ie-row" style="margin-top:6px;margin-bottom:5px;">' +
             '<div class="bma-ie-cell bma-ie-pr6"><button id="bma-ie-br-pick" type="button" style="width:100%;padding:5px;font-size:12px;background:#fff;color:#1e293b;border:1px solid #94a3b8;">เลือกหน้าต่าง Oracle</button></div>' +
             '<div class="bma-ie-cell"><button id="bma-ie-br-cal" type="button" style="width:100%;padding:5px;font-size:12px;background:#fff;color:#1e293b;border:1px solid #94a3b8;">ตั้งพิกัด (F8)</button></div>' +
           '</div>' +
+          '<button id="bma-ie-br-float" type="button" style="width:100%;padding:6px;font-size:12.5px;background:#0f766e;color:#ffffff;border:none;">เปิดแผงลอยเบิกจ่าย (ลอยทับ Oracle Forms)</button>' +
         '</div>' +
         '<div id="bma-ie-pay-dup" style="display:none;background:#fef2f2;border:2px solid #dc2626;color:#b91c1c;padding:7px;border-radius:6px;font-weight:700;font-size:12.5px;text-align:center;margin-bottom:7px;"></div>' +
         '<div id="bma-ie-pay-brief" style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:7px 9px;font-size:13px;margin-bottom:8px;"></div>' +
@@ -1610,6 +1611,12 @@
   document.getElementById('bma-ie-br-cal').onclick = function () {
     if (!ieBridgeStatus.connected) { alert('กรุณาเปิด START_ORACLE_BRIDGE.bat ก่อนกดตั้งพิกัดครับ'); pollIeBridge(); return; }
     ieBridgeReq('/calibrate', 'POST', {}, function () { pollIeBridge(); });
+  };
+  document.getElementById('bma-ie-br-float').onclick = function () {
+    if (!ieBridgeStatus.connected) { alert('กรุณาดับเบิลคลิกเปิด START_ORACLE_BRIDGE.bat ก่อนครับ'); pollIeBridge(); return; }
+    ieBridgeReq('/open-floating-pay', 'POST', {}, function (ok, d) {
+      setIeStatus(ok && d && d.ok ? 'เปิดแผงลอยเบิกจ่ายทับหน้าต่าง Oracle Forms แล้ว' : 'ไม่พบไฟล์ mis2_pay_autofill.ps1 (กด UPDATE_FROM_GITHUB.bat)');
+    });
   };
 
   document.getElementById('bma-ie-prun-1').onclick = function () { runIeBridgeStep('1'); };

@@ -2249,6 +2249,7 @@
               <button type="button" class="bma-mini-btn" id="bma-bridge-pick" title="เลือกหน้าต่าง Oracle Forms">🪟 เลือกหน้าต่าง</button>
               <button type="button" class="bma-mini-btn" id="bma-bridge-calib" title="ตั้งพิกัดหน้าจอ Oracle Forms (F8)">🎯 ตั้งพิกัด</button>
             </div>
+            <button type="button" class="bma-mini-btn" id="bma-bridge-open-float" style="width:100%;background:#0f766e;color:#ffffff;border-color:#0f766e;padding:5px;">📌 เปิดแผงลอยเบิกจ่าย (ลอยทับหน้าต่าง Oracle Forms)</button>
           </div>
 
           <div id="bma-pay-dup-alert" class="bma-dup-alert" style="display:none;font-size:11.5px;padding:6px 8px;"></div>
@@ -2440,6 +2441,21 @@
       } else {
         window.open('http://bmasso.bma.go.th/MIS2DirectLogins/index2.jsp', '_blank');
       }
+    });
+
+    panelEl.querySelector('#bma-bridge-open-float').addEventListener('click', () => {
+      if (!bridgeStatus.connected) {
+        alert('กรุณาดับเบิลคลิกเปิด START_ORACLE_BRIDGE.bat ก่อนครับ (เมื่อเปิดแล้ว แผงลอยจะเด้งทับหน้าต่าง Oracle Forms อัตโนมัติ)');
+        pollBridgeStatus(false);
+        return;
+      }
+      sendBridgeRequest('/open-floating-pay', 'POST', {}, 10000, (res) => {
+        if (res && res.ok && res.data && res.data.ok) {
+          setStatus('📌 เปิดแผงลอยเบิกจ่ายทับหน้าต่าง Oracle Forms แล้ว', 'ok');
+        } else {
+          setStatus('⚠️ ไม่พบไฟล์ mis2_pay_autofill.ps1 (กด UPDATE_FROM_GITHUB.bat)', 'err');
+        }
+      });
     });
 
     panelEl.querySelector('#bma-bridge-pick').addEventListener('click', () => {

@@ -1,0 +1,75 @@
+{
+  "version": "1.0.0",
+  "mis2LoginUrl": "http://bmasso.bma.go.th/MIS2DirectLogins/index2.jsp",
+  "gasWebAppUrl": "https://script.google.com/macros/s/AKfycbyAvDPZrKrKK0B50nU84aK9bVTyLWT47YhjW2ppGiGPSFIrI3Lryu55CBbnPFKCXKMx/exec",
+  "egpMisSheetId": "1m0EdHfSe3M6JUBirvivwJW5GOnzKos9sUI-smRsrOvE",
+  "vendorsGid": "1778203595",
+  "fiscalYear": "70",
+  "fiscalYears": {
+    "70": {
+      "missSheetId": "1tTaFrjVCPm8IrjJAg6e0Y27jIqoedLsmJz92py1O0lU",
+      "missTabName": "ชีต1",
+      "autocratSheetId": "1qFqdTqcP_d_nNLAX3AL0Gq21s2zjffXW2Czo3Jv1F_Y",
+      "autocratTabName": "main"
+    },
+    "71": {
+      "missSheetId": "",
+      "missTabName": "ชีต1",
+      "autocratSheetId": "",
+      "autocratTabName": "main"
+    },
+    "72": {
+      "missSheetId": "",
+      "missTabName": "ชีต1",
+      "autocratSheetId": "",
+      "autocratTabName": "main"
+    },
+    "73": {
+      "missSheetId": "",
+      "missTabName": "ชีต1",
+      "autocratSheetId": "",
+      "autocratTabName": "main"
+    },
+    "74": {
+      "missSheetId": "",
+      "missTabName": "ชีต1",
+      "autocratSheetId": "",
+      "autocratTabName": "main"
+    },
+    "75": {
+      "missSheetId": "",
+      "missTabName": "ชีต1",
+      "autocratSheetId": "",
+      "autocratTabName": "main"
+    }
+  },
+  "defaultAssignTo": "สำนักงานบริหารการเงินการคลังกรุงเทพมหานคร โอนเงินเข้าบัญชี รพจ.",
+  "assignToPresets": [
+    "สำนักงานบริหารการเงินการคลังกรุงเทพมหานคร โอนเงินเข้าบัญชี รพจ.",
+    "คณะกรรมการรับ-ส่งเงินกองการเงินโอนเข้าบัญชี รพจ."
+  ],
+  "defaultRequester": "นางอรชุมา หุตะโกวิท",
+  "defaultDateMode": "today",
+  "descriptionTemplate": "(ค่า{subject})",
+  "stepDelayMs": 220,
+  "clearBeforePaste": true,
+  "autoFillFields": {
+    "payTo": true,
+    "assignTo": true,
+    "bankCode": true,
+    "branchCode": true,
+    "accountNo": true
+  },
+  "whtExemptKeywords": [
+    "สภากาชาด",
+    "เอเบิ้ล",
+    "เอเบิล",
+    "A-ble",
+    "Abel",
+    "องค์การเภสัชกรรม",
+    "GPO",
+    "ยูนีซัน",
+    "Unison"
+  ],
+  "neverAutoSave": true
+}

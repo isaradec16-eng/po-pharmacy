@@ -471,16 +471,36 @@ function Save-Calibration {
 function Find-OracleFormsWindow {
     $wins = [Mis2BridgeWin32]::GetVisibleWindows()
     foreach ($w in $wins) {
+        if ($w.Title -match "Oracle Developer Forms|FRM_PAY_DOC|บันทึกใบขอเบิก" -and $w.Title -notmatch "BMA MIS2|Internet Explorer|Opera|Chrome|Edge") {
+            return $w
+        }
+    }
+    foreach ($w in $wins) {
         if ($w.ClassName -match "SunAwtFrame|SunAwtDialog" -and $w.Title -notmatch "BMA MIS2") {
             return $w
         }
     }
     foreach ($w in $wins) {
-        if ($w.Title -match "FRM_PAY_DOC|บันทึกใบขอเบิก|โรงพยาบาลเจริญกรุง|สำนักการแพทย์|Oracle|MIS2" -and $w.Title -notmatch "BMA MIS2|Internet Explorer|Opera|Chrome|Edge") {
+        if ($w.Title -match "โรงพยาบาลเจริญกรุง|สำนักการแพทย์|Oracle" -and $w.Title -notmatch "BMA MIS2|Internet Explorer|Opera|Chrome|Edge") {
             return $w
         }
     }
     return $null
+}
+
+function Open-FloatingPayPanel {
+    $candidates = @(
+        (Join-Path $script:AppDir "mis2_pay_autofill.ps1"),
+        (Join-Path (Split-Path -Parent $script:AppDir) "bma-mis2-pay-autofill\mis2_pay_autofill.ps1")
+    )
+    $panelScript = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+    if ($panelScript) {
+        try {
+            Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile","-ExecutionPolicy","Bypass","-STA","-File",$panelScript
+            return $true
+        } catch {}
+    }
+    return $false
 }
 
 function Get-ActiveTargetInfo {
@@ -844,6 +864,12 @@ function Process-BridgeJob($job) {
             return
         }
 
+        if ($path -eq "/open-floating-pay") {
+            $opened = Open-FloatingPayPanel
+            $job.ResponseJson = (@{ ok = $opened } | ConvertTo-Json -Compress)
+            return
+        }
+
         if ($path -eq "/pick-window") {
             $picked = Show-WindowPickerDialog
             $st = Get-StatusPayload
@@ -1011,6 +1037,9 @@ $miOpenIE.Add_Click({ Open-Mis2InIE | Out-Null })
 $miPick = $trayMenu.Items.Add("🪟 เลือกหน้าต่าง Oracle Forms...")
 $miPick.Add_Click({ Show-WindowPickerDialog | Out-Null })
 
+$miOpenPayPanel = $trayMenu.Items.Add("📌 เปิดแผงลอยเบิกจ่าย (ทับ Oracle Forms)")
+$miOpenPayPanel.Add_Click({ Open-FloatingPayPanel | Out-Null })
+
 $miCalib = $trayMenu.Items.Add("🎯 ตั้งพิกัดหน้าจอ Oracle Forms (F8)...")
 $miCalib.Add_Click({ Show-CalibrationDialog })
 
@@ -1023,6 +1052,15 @@ $miAutoIe.Add_Click({
 })
 $trayMenu.Items.Add($miAutoIe) | Out-Null
 
+$script:AutoPopOraclePay = $true
+$miAutoPop = New-Object System.Windows.Forms.ToolStripMenuItem("✓ เปิดแผงเบิกจ่ายลอยทับ Oracle Forms อัตโนมัติ")
+$miAutoPop.Checked = $true
+$miAutoPop.Add_Click({
+    $script:AutoPopOraclePay = -not $script:AutoPopOraclePay
+    $miAutoPop.Checked = $script:AutoPopOraclePay
+})
+$trayMenu.Items.Add($miAutoPop) | Out-Null
+
 $trayMenu.Items.Add("-") | Out-Null
 $miExit = $trayMenu.Items.Add("❌ ปิดตัวช่วย Oracle Forms")
 $miExit.Add_Click({
@@ -1033,14 +1071,14 @@ $miExit.Add_Click({
 
 $script:TrayIcon = New-Object System.Windows.Forms.NotifyIcon
 $script:TrayIcon.Icon = [System.Drawing.SystemIcons]::Application
-$script:TrayIcon.Text = "BMA MIS2 Oracle Forms Bridge (127.0.0.1:47291) — ARISSARA.K"
+$script:TrayIcon.Text = "BMA MIS & MIS2 Bridge (127.0.0.1:47291) — ARISSARA.K"
 $script:TrayIcon.ContextMenuStrip = $trayMenu
 $script:TrayIcon.Visible = $true
-$script:TrayIcon.Add_DoubleClick({ Show-CalibrationDialog })
+$script:TrayIcon.Add_DoubleClick({ Open-FloatingPayPanel | Out-Null })
 $script:TrayIcon.ShowBalloonTip(
     3500,
     "BMA MIS & MIS2 Bridge พร้อมทำงาน",
-    "เชื่อมต่อกับส่วนขยาย Opera / IE แล้ว • เปิดแผงอัตโนมัติทุกหน้าใน IE และเชื่อม Oracle Forms พอร์ต 47291",
+    "เปิดแผงอัตโนมัติใน IE ทุกหน้า และเปิดแผงลอยทับ Oracle Forms (ระบบการเงินจ่าย) ให้อัตโนมัติ",
     [System.Windows.Forms.ToolTipIcon]::Info
 )
 
@@ -1059,11 +1097,32 @@ $pumpTimer.Add_Tick({
 })
 $pumpTimer.Start()
 
-# Auto-Inject IE Watcher: re-injects ie-autofill.js automatically whenever IE navigates to a new step page
+# Unified Watcher:
+# 1) Auto-injects ie-autofill.js into IE pages on bma.go.th across step navigations
+# 2) Auto-launches Always-on-Top MIS2 Pay panel whenever Oracle Developer Forms Runtime opens
 $script:IeScriptFile = Join-Path $script:AppDir "ie-autofill.js"
+$script:LastOracleHwnd = [IntPtr]::Zero
 $ieWatchTimer = New-Object System.Windows.Forms.Timer
 $ieWatchTimer.Interval = 1500
 $ieWatchTimer.Add_Tick({
+    # 1. Detect Oracle Developer Forms Runtime (Java Applet window) -> auto-float MIS2 Pay panel on top!
+    if ($script:AutoPopOraclePay) {
+        try {
+            $oraWin = Find-OracleFormsWindow
+            if ($null -ne $oraWin) {
+                if ($oraWin.Hwnd -ne $script:LastOracleHwnd) {
+                    $script:LastOracleHwnd = $oraWin.Hwnd
+                    $script:TargetHwnd = $oraWin.Hwnd
+                    $script:TargetWinTitle = $oraWin.Title
+                    Open-FloatingPayPanel | Out-Null
+                }
+            } else {
+                $script:LastOracleHwnd = [IntPtr]::Zero
+            }
+        } catch {}
+    }
+
+    # 2. Auto-inject ie-autofill.js into open IE windows on bma.go.th
     if (-not $script:AutoInjectIE) { return }
     if (-not (Test-Path $script:IeScriptFile)) { return }
     try {

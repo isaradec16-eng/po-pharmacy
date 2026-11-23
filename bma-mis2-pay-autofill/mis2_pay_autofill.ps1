@@ -16,6 +16,11 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
+$script:PanelMutex = New-Object System.Threading.Mutex($false, "Local\BmaMis2PayPanel_ARISSARA")
+if (-not $script:PanelMutex.WaitOne(0, $false)) {
+    exit 0
+}
+
 # ==============================================================================
 # 1. Win32 Native Helper (DPI-Aware, Window Finder, Hardware Ctrl+V, Hotkeys)
 # ==============================================================================
@@ -883,15 +888,21 @@ function Sync-GoogleSheetsData {
 # ==============================================================================
 function Find-OracleFormsWindow {
     $wins = [Mis2Win32]::GetVisibleWindows()
-    # Priority 1: Java AWT Frame (Oracle Forms Applet / JNLP)
+    # Priority 1: Exact Oracle Developer Forms Runtime window (Java Applet / WebStart)
+    foreach ($w in $wins) {
+        if ($w.Title -match "Oracle Developer Forms|FRM_PAY_DOC|บันทึกใบขอเบิก" -and $w.Title -notmatch "BMA MIS2|Internet Explorer|Edge|Opera|Chrome") {
+            return $w
+        }
+    }
+    # Priority 2: Java AWT Frame (Oracle Forms Applet / JNLP)
     foreach ($w in $wins) {
         if ($w.ClassName -match "SunAwtFrame|SunAwtDialog" -and $w.Title -notmatch "BMA MIS2") {
             return $w
         }
     }
-    # Priority 2: Window title containing Oracle Forms / Hospital / MIS keywords
+    # Priority 3: Window title containing Oracle / Hospital keywords (excluding browsers)
     foreach ($w in $wins) {
-        if ($w.Title -match "FRM_PAY_DOC|บันทึกใบขอเบิก|โรงพยาบาลเจริญกรุง|สำนักการแพทย์|Oracle|MIS2" -and $w.Title -notmatch "BMA MIS2") {
+        if ($w.Title -match "โรงพยาบาลเจริญกรุง|สำนักการแพทย์|Oracle" -and $w.Title -notmatch "BMA MIS2|Internet Explorer|Edge|Opera|Chrome") {
             return $w
         }
     }
