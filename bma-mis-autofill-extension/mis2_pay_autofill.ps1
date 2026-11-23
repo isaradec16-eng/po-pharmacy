@@ -16,9 +16,16 @@
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-$script:PanelMutex = New-Object System.Threading.Mutex($false, "Local\BmaMis2PayPanel_ARISSARA")
-if (-not $script:PanelMutex.WaitOne(0, $false)) {
-    exit 0
+trap {
+    try {
+        [System.Windows.Forms.MessageBox]::Show(
+            "เกิดข้อผิดพลาดในแผงลอยเบิกจ่าย MIS2:`r`n$($_.Exception.Message)",
+            "BMA MIS2 เบิกจ่ายอัตโนมัติ (Error)",
+            [System.Windows.Forms.MessageBoxButtons]::OK,
+            [System.Windows.Forms.MessageBoxIcon]::Error
+        ) | Out-Null
+    } catch {}
+    break
 }
 
 # ==============================================================================
@@ -296,6 +303,16 @@ public class Mis2Win32 {
         KeyCombo(VK_CONTROL, VK_V);
     }
 
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    public static void ForceTopMost(IntPtr hWnd) {
+        if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
+        if (IsIconic(hWnd)) ShowWindow(hWnd, SW_RESTORE);
+        SetWindowPos(hWnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0040);
+        FocusWindow(hWnd);
+    }
+
     public static bool IsKeyDown(int vk) {
         return (GetAsyncKeyState(vk) & 0x8000) != 0;
     }
@@ -313,6 +330,17 @@ public class Mis2Win32 {
 
 Add-Type -TypeDefinition $win32Code -Language CSharp
 [Mis2Win32]::SetProcessDPIAware() | Out-Null
+
+$script:PanelMutex = New-Object System.Threading.Mutex($false, "Local\BmaMis2PayPanel_ARISSARA")
+if (-not $script:PanelMutex.WaitOne(0, $false)) {
+    try {
+        $existing = [Mis2Win32]::GetVisibleWindows() | Where-Object { $_.Title -match "BMA MIS2 เบิกจ่ายอัตโนมัติ" } | Select-Object -First 1
+        if ($existing) {
+            [Mis2Win32]::ForceTopMost($existing.Hwnd)
+        }
+    } catch {}
+    exit 0
+}
 
 # ==============================================================================
 # 2. Paths, State & Configuration Management
@@ -830,7 +858,7 @@ function Sync-GoogleSheetsData {
             $fyEnt = Get-FiscalYearEntry $fy
             $qParts = @(
                 "fiscalYear=" + [Uri]::EscapeDataString($fy),
-                "t=" + [DateTimeOffset]::Now.ToUnixTimeSeconds()
+                "t=" + [DateTime]::Now.Ticks
             )
             if ($fyEnt["missSheetId"])     { $qParts += "missSheetId=" + [Uri]::EscapeDataString([string]$fyEnt["missSheetId"]) }
             if ($fyEnt["missTabName"])     { $qParts += "missTabName=" + [Uri]::EscapeDataString([string]$fyEnt["missTabName"]) }
@@ -1248,11 +1276,13 @@ Load-Calibration
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "BMA MIS2 เบิกจ่ายอัตโนมัติ (FRM_PAY_DOC) — พัฒนาโดย ARISSARA.K"
-$form.Size = New-Object System.Drawing.Size(475, 815)
-$form.MinimumSize = New-Object System.Drawing.Size(455, 680)
-$form.StartPosition = "Manual"
 $screenArea = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-$form.Location = New-Object System.Drawing.Point(([Math]::Max(10, $screenArea.Right - 485)), 15)
+$initH = [Math]::Min(815, [Math]::Max(520, $screenArea.Height - 24))
+$form.Size = New-Object System.Drawing.Size(475, $initH)
+$form.MinimumSize = New-Object System.Drawing.Size(435, [Math]::Min(520, $initH))
+$form.AutoScroll = $true
+$form.StartPosition = "Manual"
+$form.Location = New-Object System.Drawing.Point(([Math]::Max(10, $screenArea.Right - 485)), 12)
 $form.TopMost = $true
 $form.BackColor = [System.Drawing.Color]::FromArgb(244, 247, 251)
 $form.Font = New-Object System.Drawing.Font("Segoe UI", 9)
@@ -2489,6 +2519,7 @@ $btnSavePayDoc.Add_Click({
 # --- Initial Load on Form Shown ---
 $form.Add_Shown({
     $form.TopMost = $true
+    [Mis2Win32]::ForceTopMost($form.Handle)
     $form.BringToFront()
     $form.Activate()
     Refresh-FiscalYearUi

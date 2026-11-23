@@ -31,7 +31,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -STA -Command ^
   "try { " ^
   "  $localJs = Join-Path $dir 'ie-autofill.js'; " ^
   "  if (Test-Path $localJs) { $code = [System.IO.File]::ReadAllText($localJs, [System.Text.Encoding]::UTF8) } " ^
-  "  else { $code = (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/isaradec16-eng/po-pharmacy/main/bma-mis-autofill-extension/ie-autofill.js?t=' + [DateTimeOffset]::Now.ToUnixTimeSeconds()) }; " ^
+  "  else { $code = (New-Object System.Net.WebClient).DownloadString('https://raw.githubusercontent.com/isaradec16-eng/po-pharmacy/main/bma-mis-autofill-extension/ie-autofill.js?t=' + [DateTime]::Now.Ticks) }; " ^
   "  $shell = New-Object -ComObject Shell.Application; " ^
   "  $injected = 0; " ^
   "  foreach ($win in $shell.Windows()) { " ^

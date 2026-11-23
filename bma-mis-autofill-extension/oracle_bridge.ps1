@@ -249,6 +249,16 @@ public class Mis2BridgeWin32 {
         KeyCombo(VK_CONTROL, VK_V);
     }
 
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    public static void ForceTopMost(IntPtr hWnd) {
+        if (hWnd == IntPtr.Zero || !IsWindow(hWnd)) return;
+        if (IsIconic(hWnd)) ShowWindow(hWnd, SW_RESTORE);
+        SetWindowPos(hWnd, new IntPtr(-1), 0, 0, 0, 0, 0x0001 | 0x0002 | 0x0040);
+        FocusWindow(hWnd);
+    }
+
     public static bool IsKeyDown(int vk) {
         return (GetAsyncKeyState(vk) & 0x8000) != 0;
     }
@@ -495,11 +505,11 @@ function Find-OracleFormsWindow {
 }
 
 function Open-FloatingPayPanel {
-    # If already open, restore and bring to front immediately
+    # If already open, restore and force on top of maximized Oracle Forms immediately
     try {
         $existing = [Mis2BridgeWin32]::GetVisibleWindows() | Where-Object { $_.Title -match "BMA MIS2 เบิกจ่ายอัตโนมัติ" } | Select-Object -First 1
         if ($existing) {
-            [Mis2BridgeWin32]::FocusWindow($existing.Hwnd) | Out-Null
+            [Mis2BridgeWin32]::ForceTopMost($existing.Hwnd)
             return $true
         }
     } catch {}
@@ -1159,7 +1169,8 @@ $script:TrayIcon.ShowBalloonTip(
     [System.Windows.Forms.ToolTipIcon]::Info
 )
 
-# Hidden ApplicationContext + STA Queue Pump Timer
+# Hidden ApplicationContext + STA Queue Pump Timer + Global Hotkey (Ctrl+Shift+M -> Open Floating Pay Panel)
+$script:LastHotkeyPop = $false
 $pumpTimer = New-Object System.Windows.Forms.Timer
 $pumpTimer.Interval = 40
 $pumpTimer.Add_Tick({
@@ -1171,6 +1182,11 @@ $pumpTimer.Add_Tick({
             $job.Done.Set()
         }
     }
+    $hkNow = ([Mis2BridgeWin32]::IsKeyDown(0x11) -and [Mis2BridgeWin32]::IsKeyDown(0x10) -and [Mis2BridgeWin32]::IsKeyDown(0x4D))
+    if ($hkNow -and -not $script:LastHotkeyPop) {
+        Open-FloatingPayPanel | Out-Null
+    }
+    $script:LastHotkeyPop = $hkNow
 })
 $pumpTimer.Start()
 

@@ -15,7 +15,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$wc = New-Object System.Net.WebClient; $ok = 0; $fail = 0; " ^
   "foreach ($f in $files) { " ^
   "  try { " ^
-  "    $url = $base + '/' + $f + '?t=' + [DateTimeOffset]::Now.ToUnixTimeSeconds(); " ^
+  "    $url = $base + '/' + $f + '?t=' + [DateTime]::Now.Ticks; " ^
   "    $dest = Join-Path $dir $f; " ^
   "    $wc.DownloadFile($url, $dest); " ^
   "    Write-Host ('  [OK] ' + $f) -ForegroundColor Green; $ok++; " ^
