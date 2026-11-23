@@ -797,7 +797,10 @@ const DEFAULT_CONFIG = {
   autocratGid: "0",
   miss70SheetId: "1tTaFrjVCPm8IrjJAg6e0Y27jIqoedLsmJz92py1O0lU",
   miss70Gid: "0",
-  gasWebAppUrl: "https://script.google.com/macros/s/AKfycbyAvDPZrKrKK0B50nU84aK9bVTyLWT47YhjW2ppGiGPSFIrI3Lryu55CBbnPFKCXKMx/exec"
+  egpMisSheetId: "1m0EdHfSe3M6JUBirvivwJW5GOnzKos9sUI-smRsrOvE",
+  vendorsGid: "1778203595",
+  gasWebAppUrl: "https://script.google.com/macros/s/AKfycbyAvDPZrKrKK0B50nU84aK9bVTyLWT47YhjW2ppGiGPSFIrI3Lryu55CBbnPFKCXKMx/exec",
+  bridgeUrl: "http://127.0.0.1:47291"
 };
 
 function thaiToArabic(str) {
@@ -923,17 +926,97 @@ function extractSheetId(idOrUrl) {
   return m ? m[1] : s;
 }
 
+function bankNameToCode(bankName) {
+  const b = String(bankName || "").trim().toLowerCase();
+  const rules = [
+    ["กรุงเทพ", "002"],
+    ["กสิกร", "004"],
+    ["กรุงไทย", "006"],
+    ["ทหารไทย", "011"],
+    ["ทีเอ็มบี", "011"],
+    ["ธนชาต", "011"],
+    ["ไทยพาณิช", "014"],
+    ["ไทยพานิช", "014"],
+    ["ซิตี้", "017"],
+    ["สแตนดาร์ด", "020"],
+    ["ซีไอเอ็มบี", "022"],
+    ["ยูโอบี", "024"],
+    ["uob", "024"],
+    ["กรุงศรี", "025"],
+    ["ออมสิน", "030"],
+    ["ฮ่องกง", "031"],
+    ["hsbc", "031"],
+    ["ดอยซ์", "032"],
+    ["ธ.ก.ส", "034"],
+    ["บีเอ็นพี", "045"],
+    ["bnp", "045"],
+    ["ทิสโก้", "067"],
+    ["เกียรตินาคิน", "069"],
+    ["แลนด์", "073"]
+  ];
+  for (let i = 0; i < rules.length; i++) {
+    if (b.indexOf(rules[i][0]) !== -1) return rules[i][1];
+  }
+  return "";
+}
+
+async function loadBundledVendorsCache() {
+  try {
+    const url = chrome.runtime.getURL("vendors-cache.json");
+    const resp = await fetch(url);
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.vendors)) return data.vendors;
+  } catch (e) {}
+  return [];
+}
+
+function parseVendorsFromCsv(rows) {
+  const vendors = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    const company = String(row[0] || "").replace(/\s+/g, " ").trim();
+    if (!company) continue;
+    const bank = String(row[1] || "").replace(/\s+/g, " ").trim();
+    const branch = String(row[2] || "").replace(/\s+/g, " ").trim();
+    const acctThai = String(row[3] || "").trim();
+    const acctMis2 = thaiToArabic(String(row[4] || "").trim() || acctThai).trim();
+    const address = String(row[6] || "").replace(/\s+/g, " ").trim();
+    let taxId = thaiToArabic(String(row[7] || "")).replace(/\D/g, "");
+    if (taxId === "000000") taxId = "";
+    const digitsOnly = acctMis2.replace(/\D/g, "");
+    const branchCode = digitsOnly.length >= 3 ? ("0" + digitsOnly.substring(0, 3)) : "";
+    vendors.push({
+      company,
+      bank,
+      bankCode: bankNameToCode(bank),
+      branch,
+      branchCode,
+      accountNo: acctMis2,
+      address,
+      taxId
+    });
+  }
+  return vendors;
+}
+
 async function fetchAllFromGoogleSheets(cfg) {
   const settings = Object.assign({}, DEFAULT_CONFIG, cfg || {});
   const fy = String(settings.fiscalYear || "70").trim();
   const acSheetId = extractSheetId(settings.autocratSheetId) || DEFAULT_CONFIG.autocratSheetId;
   const missSheetId = extractSheetId(settings.missSheetId || settings.miss70SheetId) || DEFAULT_CONFIG.miss70SheetId;
+  const egpMisSheetId = extractSheetId(settings.egpMisSheetId) || DEFAULT_CONFIG.egpMisSheetId;
+  const vendorsGid = String(settings.vendorsGid || DEFAULT_CONFIG.vendorsGid);
   const isCustomYearOrSheet =
     fy !== "70" ||
     acSheetId !== DEFAULT_CONFIG.autocratSheetId ||
     missSheetId !== DEFAULT_CONFIG.miss70SheetId;
 
-  // 1. ถ้าระบุไฟล์ของปีงบประมาณใหม่ไว้ หรือเป็นปีอื่นที่ไม่ใช่ 70 ให้ลองดึงสดจาก Google Sheets ของปีนั้นโดยตรงก่อน (และส่งพารามิเตอร์ไปที่ Apps Script ด้วย)
+  let cachedVendors = await loadBundledVendorsCache();
+
+  // 1. ดึงจาก Google Apps Script Web App (ได้ทั้ง items + vendors ทะเบียนบริษัท)
   if (settings.gasWebAppUrl && settings.gasWebAppUrl.startsWith("https://script.google.com/")) {
     try {
       const qs = new URLSearchParams({
@@ -945,20 +1028,24 @@ async function fetchAllFromGoogleSheets(cfg) {
       const sep = settings.gasWebAppUrl.includes("?") ? "&" : "?";
       const r = await fetch(settings.gasWebAppUrl + sep + qs.toString(), { cache: "no-store" });
       const data = await r.json();
-      // ถ้า Apps Script ตอบกลับมาตรงกับ Sheet ID ที่ขอ (หรือเป็นปี 70) ให้ใช้ข้อมูลนั้นได้ทันที
       const gasMatchedSheet = !data.autocratSheetId || data.autocratSheetId === acSheetId;
       if (data && data.ok && Array.isArray(data.items) && data.items.length > 0 && (!isCustomYearOrSheet || gasMatchedSheet)) {
-        return { items: data.items, source: `Apps Script (ปีงบ ${fy})` };
+        const vendors = (Array.isArray(data.vendors) && data.vendors.length > 0) ? data.vendors : cachedVendors;
+        return { items: data.items, vendors, source: `Apps Script (ปีงบ ${fy})` };
       }
     } catch (e) {}
   }
 
-  // 2. ดึงสดโดยตรงจาก Google Sheets ตามไฟล์ปลายทางของปีงบประมาณที่เลือก (Auto Crat-EGPxx และ MISSxx)
+  // 2. ดึงสดโดยตรงจาก Google Sheets (Auto Crat-EGPxx, MISSxx, และ EGP+MIS ทะเบียนบริษัท)
   try {
-    const [acRows, missRows] = await Promise.all([
+    const [acRows, missRows, vendorRows] = await Promise.all([
       fetchSheetCsv(acSheetId, settings.autocratGid),
-      fetchSheetCsv(missSheetId, settings.miss70Gid).catch(() => [])
+      fetchSheetCsv(missSheetId, settings.miss70Gid).catch(() => []),
+      fetchSheetCsv(egpMisSheetId, vendorsGid).catch(() => [])
     ]);
+
+    const liveVendors = parseVendorsFromCsv(vendorRows);
+    const vendors = liveVendors.length > 0 ? liveVendors : cachedVendors;
 
     const missMap = {};
     for (let r = 3; r < missRows.length; r++) {
@@ -969,6 +1056,7 @@ async function fetchAllFromGoogleSheets(cfg) {
       const rcvNo = String(row[3] || "").trim();
       const amount = parseAmount(row[4]);
       const vendorShort = String(row[6] || "").trim();
+      const payDocNo = String(row[7] || "").trim();
       const orderSeq = String(row[8] || "").trim();
       const subject = thaiToArabic(String(row[9] || "").trim());
       if (orderSeq && (subject || purHireNo || amount > 0)) {
@@ -977,6 +1065,7 @@ async function fetchAllFromGoogleSheets(cfg) {
           purHireNo,
           poNo,
           rcvNo,
+          payDocNo,
           orderSeq,
           subjectArabic: subject,
           vendorShort,
@@ -1000,7 +1089,7 @@ async function fetchAllFromGoogleSheets(cfg) {
       const amountNum = (missInfo.amount !== undefined && missInfo.amount > 0) ? missInfo.amount : acAmountNum;
       const amountFormatted = amountNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const vendorName = String(row[9] || "").trim();
-      const vendorTaxId = String(row[10] || "").trim();
+      const vendorTaxId = thaiToArabic(String(row[10] || "")).replace(/\D/g, "");
       const budgetType = String(row[11] || "").trim();
 
       const agreeDate = parseThaiDateToSlash(row[12]);
@@ -1020,6 +1109,7 @@ async function fetchAllFromGoogleSheets(cfg) {
         code,
         projectNo: String(row[0] || "").trim(),
         subject: thaiToArabic(missInfo.subjectArabic || subjectArabic),
+        missSubject: missInfo.subjectArabic || "",
         rawSubject,
         itemCount,
         amount: amountNum,
@@ -1040,18 +1130,19 @@ async function fetchAllFromGoogleSheets(cfg) {
         purHireNo: missInfo.purHireNo || "",
         poNo: missInfo.poNo || "",
         rcvNo: missInfo.rcvNo || "",
+        payDocNo: missInfo.payDocNo || "",
         missRowIndex: missInfo.missRowIndex || null
       });
     }
 
     if (items.length > 0) {
-      return { items, source: "ซิงค์สดจาก Google Sheets" };
+      return { items, vendors, source: "ซิงค์สดจาก Google Sheets" };
     }
   } catch (e) {
-    // หากดึงสดไม่ได้ (เช่น ไม่ได้ล็อกอิน Google ใน Opera) ให้ใช้ข้อมูล SEED_ITEMS ที่ฝังไว้ทันที
+    // หากดึงสดไม่ได้ (เช่น ไม่ได้ล็อกอิน Google ใน Opera) ให้ใช้ข้อมูล SEED_ITEMS + vendors-cache.json
   }
 
-  return { items: SEED_ITEMS, source: "ฐานข้อมูลในตัว (1งบ-29งบ)" };
+  return { items: SEED_ITEMS, vendors: cachedVendors, source: "ฐานข้อมูลในตัว (1งบ-29งบ)" };
 }
 
 const GITHUB_REMOTE_CONFIG_URL =
@@ -1140,6 +1231,71 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     return true;
   }
 
+  if (msg && msg.type === "SAVE_PAY_DOC_NO") {
+    (async () => {
+      try {
+        const gasUrl = msg.gasWebAppUrl || DEFAULT_CONFIG.gasWebAppUrl;
+        const resp = await fetch(gasUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({
+            action: "updatePayDocNo",
+            missRowIndex: Number(msg.missRowIndex),
+            payDocNo: String(msg.payDocNo || "").trim(),
+            missSheetId: extractSheetId(msg.missSheetId) || DEFAULT_CONFIG.miss70SheetId,
+            missTabName: String(msg.missTabName || "ชีต1").trim()
+          })
+        });
+        const text = await resp.text();
+        let parsed = null;
+        try { parsed = JSON.parse(text); } catch (e) {}
+        if (parsed && parsed.ok) {
+          sendResponse({ ok: true, result: parsed.result });
+        } else {
+          sendResponse({ ok: false, error: (parsed && parsed.error) || "บันทึกไม่สำเร็จ (ตรวจสอบ Apps Script Deploy)" });
+        }
+      } catch (err) {
+        sendResponse({ ok: false, error: err.message || String(err) });
+      }
+    })();
+    return true;
+  }
+
+  if (msg && msg.type === "BRIDGE_REQUEST") {
+    (async () => {
+      const endpoint = String(msg.endpoint || "/status");
+      const method = String(msg.method || "GET").toUpperCase();
+      const timeoutMs = Number(msg.timeoutMs) || (endpoint === "/status" ? 2500 : 120000);
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+      try {
+        const opts = {
+          method,
+          cache: "no-store",
+          signal: ctrl.signal
+        };
+        if (method === "POST") {
+          opts.headers = { "Content-Type": "text/plain;charset=utf-8" };
+          opts.body = JSON.stringify(msg.payload || {});
+        }
+        const resp = await fetch(DEFAULT_CONFIG.bridgeUrl + endpoint, opts);
+        const text = await resp.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch (e) { data = { ok: false, error: text }; }
+        sendResponse({ ok: true, bridgeConnected: true, data });
+      } catch (err) {
+        sendResponse({
+          ok: false,
+          bridgeConnected: false,
+          error: err.name === "AbortError" ? "หมดเวลารอตัวช่วย Oracle Forms" : "ยังไม่ได้เปิดตัวช่วย Oracle Forms (START_ORACLE_BRIDGE.bat)"
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+    })();
+    return true;
+  }
+
   if (msg && msg.type === "FETCH_SHEETS_DATA") {
     (async () => {
       try {
@@ -1165,18 +1321,27 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
             (fy === "70" && remoteConfig && remoteConfig.miss70SheetId) ||
             DEFAULT_CONFIG.miss70SheetId;
         }
+        if (remoteConfig && remoteConfig.egpMisSheetId) {
+          mergedCfg.egpMisSheetId = remoteConfig.egpMisSheetId;
+        }
+        if (remoteConfig && remoteConfig.vendorsGid) {
+          mergedCfg.vendorsGid = remoteConfig.vendorsGid;
+        }
 
         const res = await fetchAllFromGoogleSheets(mergedCfg);
         sendResponse({
           ok: true,
           items: res.items,
+          vendors: res.vendors || [],
           source: res.source,
           remoteConfig: remoteConfig
         });
       } catch (err) {
+        const fallbackVendors = await loadBundledVendorsCache();
         sendResponse({
           ok: true,
           items: SEED_ITEMS,
+          vendors: fallbackVendors,
           source: "ฐานข้อมูลในตัว (1งบ-29งบ)",
           remoteConfig: null
         });

@@ -1,9 +1,11 @@
 {
-  "version": "1.3.0",
-  "updatedAt": "2026-11-22T20:00:00+07:00",
+  "version": "2.0.0",
+  "updatedAt": "2026-11-23T06:55:00+07:00",
   "gasWebAppUrl": "https://script.google.com/macros/s/AKfycbyAvDPZrKrKK0B50nU84aK9bVTyLWT47YhjW2ppGiGPSFIrI3Lryu55CBbnPFKCXKMx/exec",
   "autocratSheetId": "1qFqdTqcP_d_nNLAX3AL0Gq21s2zjffXW2Czo3Jv1F_Y",
   "miss70SheetId": "1tTaFrjVCPm8IrjJAg6e0Y27jIqoedLsmJz92py1O0lU",
+  "egpMisSheetId": "1m0EdHfSe3M6JUBirvivwJW5GOnzKos9sUI-smRsrOvE",
+  "vendorsGid": "1778203595",
   "defaultFiscalYear": "70",
   "fiscalYears": {
     "70": {

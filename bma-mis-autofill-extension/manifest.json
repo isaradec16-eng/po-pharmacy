@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
-  "name": "BMA MIS Auto-Filler • by ARISSARA.K",
-  "version": "1.3.1",
+  "name": "BMA MIS & MIS2 Auto-Filler (จัดซื้อ/ตรวจรับ + เบิกจ่าย) • by ARISSARA.K",
+  "version": "2.0.0",
   "author": "ARISSARA.K",
-  "description": "ส่วนขยายบน Opera/Chrome สำหรับดึงข้อมูลจาก Google Sheets กรอกลงระบบจัดซื้อ/เช่า กทม. (MIS) อัตโนมัติครบ 8 ขั้นตอน • พัฒนาโดย ARISSARA.K",
+  "description": "ส่วนขยายรวม 2 ระบบ (Opera/Chrome/IE) สำหรับระบบจัดซื้อ/ตรวจรับ MIS (8 ขั้นตอน) และระบบเบิกจ่าย/ฎีกา MIS2 (FRM_PAY_DOC + Oracle Forms Bridge) • พัฒนาโดย ARISSARA.K",
   "permissions": [
     "storage",
     "activeTab",
@@ -14,6 +14,9 @@
     "http://bmamisapp11.bma.go.th/*",
     "http://bmamisapp11.bma.go.th:7778/*",
     "http://misweb.bma.go.th/*",
+    "http://bmasso.bma.go.th/*",
+    "http://127.0.0.1:47291/*",
+    "http://localhost:47291/*",
     "https://*.google.com/*",
     "https://*.googleusercontent.com/*",
     "https://raw.githubusercontent.com/*",
@@ -27,7 +30,8 @@
       "matches": [
         "http://bmamisapp11.bma.go.th/*",
         "http://bmamisapp11.bma.go.th:7778/*",
-        "http://misweb.bma.go.th/*"
+        "http://misweb.bma.go.th/*",
+        "http://bmasso.bma.go.th/*"
       ],
       "js": [
         "content.js"

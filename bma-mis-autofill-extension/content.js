@@ -54,9 +54,41 @@
     return m ? m[1] : s;
   }
 
+  const WHT_EXEMPT_KEYWORDS = [
+    'สภากาชาด',
+    'เอเบิ้ล',
+    'เอเบิล',
+    'a-ble',
+    'abel',
+    'องค์การเภสัชกรรม',
+    'gpo',
+    'ยูนีซัน',
+    'unison'
+  ];
+
+  const ASSIGN_TO_PRESETS = [
+    'สำนักงานบริหารการเงินการคลังกรุงเทพมหานคร โอนเงินเข้าบัญชี รพจ.',
+    'คณะกรรมการรับ-ส่งเงินกองการเงินโอนเข้าบัญชี รพจ.'
+  ];
+
+  function isMis2PortalHost() {
+    return /bmasso\.bma\.go\.th/i.test(window.location.href || '');
+  }
+
+  let bridgeStatus = {
+    connected: false,
+    targetFound: false,
+    targetTitle: '',
+    calibratedCount: 0,
+    totalCalibCount: 18
+  };
+
   let state = {
     items: [],
+    vendors: [],
     selectedCode: '',
+    activeMode: isMis2PortalHost() ? 'pay' : 'purhire',
+    paySubTab: '1',
     committeeSet: '1',
     fiscalYear: '70',
     fiscalYears: JSON.parse(JSON.stringify(DEFAULT_FISCAL_YEARS)),
@@ -68,6 +100,10 @@
     filterText: '',
     minimized: false,
     autoFillOnLoad: true,
+    defaultAssignTo: ASSIGN_TO_PRESETS[0],
+    defaultRequester: 'นางอรชุมา หุตะโกวิท',
+    payChecks: { payTo: true, assignTo: true, bankCode: true, branchCode: true, accountNo: true },
+    branchOverrides: {},
     gasWebAppUrl: 'https://script.google.com/macros/s/AKfycbyAvDPZrKrKK0B50nU84aK9bVTyLWT47YhjW2ppGiGPSFIrI3Lryu55CBbnPFKCXKMx/exec'
   };
 
@@ -86,6 +122,9 @@
 
   function detectCurrentPage() {
     const url = window.location.href;
+    if (/bmasso\.bma\.go\.th/i.test(url)) {
+      return { id: 'MIS2_PORTAL', title: 'MIS2 ระบบการเงินจ่าย (FRM_PAY_DOC)' };
+    }
     const docs = getTargetDocs();
     let fullText = '';
     let fullUrl = url;
@@ -1197,7 +1236,7 @@
     const recorded = isItemAlreadyRecorded(item);
     const allowPage = !recorded || isStepAllowedWhenRecorded(page.id);
 
-    if (!item || !allowPage) {
+    if (!item || !allowPage || page.id === 'MIS2_PORTAL' || page.id === 'UNKNOWN') {
       box.style.display = 'none';
       return;
     }
@@ -1387,6 +1426,7 @@
       sel.value = state.selectedCode;
       renderSelectedSummary();
       updateButtonsLockState(getSelectedItem());
+      applyItemToPayFields(getSelectedItem());
     }
   }
 
@@ -1399,8 +1439,9 @@
     syncCodesToPanel();
     renderSelectedSummary();
     updateButtonsLockState(item);
+    applyItemToPayFields(item);
     // กรอกอัตโนมัติทันทีที่เลือกรายการ (โดยไม่กดบันทึก รอคนอนุมัติ)
-    if (state.autoFillOnLoad !== false) {
+    if (state.autoFillOnLoad !== false && !isMis2PortalHost() && state.activeMode !== 'pay') {
       lastAutoFillSig = '';
       triggerSmartAutoFill();
     }
@@ -1554,16 +1595,498 @@
           state.remoteVersion = res.remoteConfig.version || '1.3.0';
         }
         state.items = res.items || [];
+        if (Array.isArray(res.vendors) && res.vendors.length > 0) {
+          state.vendors = res.vendors;
+        }
         saveState();
         renderFiscalYearDropdown();
+        renderPayVendorOptions();
         const cntLbl = panelEl ? panelEl.querySelector('#bma-sheet-count-lbl') : null;
         if (cntLbl) cntLbl.textContent = `ค้นหาและเลือกรายการ ปีงบ ${fy} (${state.items.length} รายการ)`;
         renderItemOptions();
         const curItem = getSelectedItem();
+        applyItemToPayFields(curItem);
         if (!isItemAlreadyRecorded(curItem)) {
           const verTag = state.remoteVersion ? ` • GitHub v${state.remoteVersion}` : '';
           const srcText = res.source ? ` [${res.source}${verTag}]` : '';
           setStatus(`✓ ปีงบ ${fy}: พร้อมใช้งาน ${state.items.length} รายการ${srcText}`, 'ok');
+        }
+      }
+    );
+  }
+
+  // ==================== MIS2 DISBURSEMENT (FRM_PAY_DOC) MODULE ====================
+  function normalizeCompanyKey(name) {
+    return thaiToArabic(String(name || ''))
+      .replace(/บริษัท|ห้างหุ้นส่วนจำกัด|หจก\.?|จำกัด|\(มหาชน\)|\(ประเทศไทย\)|\.|,|-|\s+/gi, '')
+      .toLowerCase();
+  }
+
+  function isWhtExemptCompany(companyName) {
+    const s = String(companyName || '').toLowerCase();
+    if (!s) return false;
+    return WHT_EXEMPT_KEYWORDS.some((kw) => s.includes(String(kw).toLowerCase()));
+  }
+
+  function calcTaxBreakdown(amountVal, companyName) {
+    const amt = Number(amountVal) || 0;
+    if (amt <= 0) {
+      return { base: 0, vat7: 0, wht1: 0, net: 0, exempt: false };
+    }
+    const base = Math.round((amt / 1.07) * 100) / 100;
+    const vat7 = Math.round((amt - base) * 100) / 100;
+    const exempt = isWhtExemptCompany(companyName);
+    const wht1 = exempt ? 0 : Math.round(base * 0.01 * 100) / 100;
+    const net = Math.round((amt - wht1) * 100) / 100;
+    return { base, vat7, wht1, net, exempt };
+  }
+
+  function getTodayThaiSlash() {
+    const now = new Date();
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear() + 543;
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
+  function isItemAidsBudget(item) {
+    if (!item) return false;
+    if (item.isAidsBudget) return true;
+    return /งบเอดส์|เอดส์|aids/i.test(String(item.code || '')) || /เอดส์|อุดหนุน/i.test(String(item.budgetType || ''));
+  }
+
+  function formatPayDescription(item) {
+    if (!item) return '';
+    const subjRaw = String(item.missSubject || item.subject || '').trim();
+    if (!subjRaw) return '';
+    if (subjRaw.startsWith('ค่า')) return `(${subjRaw})`;
+    return `(ค่า${subjRaw})`;
+  }
+
+  function getBranchCodeForVendor(v) {
+    if (!v) return '';
+    const cKey = String(v.company || '').trim();
+    if (cKey && state.branchOverrides && state.branchOverrides[cKey]) {
+      return state.branchOverrides[cKey];
+    }
+    if (v.branchCode && String(v.branchCode).trim()) {
+      return String(v.branchCode).trim();
+    }
+    const digits = thaiToArabic(String(v.accountNo || '')).replace(/\D/g, '');
+    return digits.length >= 3 ? '0' + digits.slice(0, 3) : '';
+  }
+
+  function findMatchingVendor(vendorName, taxId) {
+    const list = Array.isArray(state.vendors) ? state.vendors : [];
+    const cleanTax = thaiToArabic(String(taxId || '')).replace(/\D/g, '');
+    if (cleanTax) {
+      const byTax = list.find((v) => String(v.taxId || '').replace(/\D/g, '') === cleanTax);
+      if (byTax) return byTax;
+    }
+    const nKey = normalizeCompanyKey(vendorName);
+    if (!nKey) return null;
+    let exact = list.find((v) => normalizeCompanyKey(v.company) === nKey);
+    if (exact) return exact;
+    if (nKey.length >= 4) {
+      exact = list.find((v) => {
+        const vk = normalizeCompanyKey(v.company);
+        return vk && (vk.includes(nKey) || nKey.includes(vk));
+      });
+    }
+    return exact || null;
+  }
+
+  function copyTextToBrowserClipboard(text) {
+    const val = String(text || '');
+    if (!val) return Promise.resolve(false);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(val).then(
+        () => true,
+        () => fallbackCopyText(val)
+      );
+    }
+    return Promise.resolve(fallbackCopyText(val));
+  }
+
+  function fallbackCopyText(val) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = val;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function sendBridgeRequest(endpoint, method, payload, timeoutMs, cb) {
+    try {
+      chrome.runtime.sendMessage(
+        { type: 'BRIDGE_REQUEST', endpoint, method: method || 'GET', payload: payload || {}, timeoutMs },
+        (res) => {
+          if (chrome.runtime.lastError) {
+            if (cb) cb({ ok: false, bridgeConnected: false, error: chrome.runtime.lastError.message });
+            return;
+          }
+          if (cb) cb(res || { ok: false, bridgeConnected: false });
+        }
+      );
+    } catch (e) {
+      if (cb) cb({ ok: false, bridgeConnected: false, error: e.message });
+    }
+  }
+
+  function updateBridgeStatusUI() {
+    if (!panelEl) return;
+    const bar = panelEl.querySelector('#bma-bridge-bar');
+    const txt = panelEl.querySelector('#bma-bridge-status-text');
+    if (!bar || !txt) return;
+    if (bridgeStatus.connected) {
+      bar.className = 'bma-bridge-bar connected';
+      const winText = bridgeStatus.targetFound
+        ? `🪟 ล็อกหน้าต่าง: ${String(bridgeStatus.targetTitle || 'Oracle Forms').slice(0, 26)}`
+        : '⚠️ ยังไม่พบหน้าต่าง Oracle Forms (เปิด FRM_PAY_DOC แล้วกดเลือกหน้าต่าง)';
+      txt.innerHTML =
+        `<b>🟢 เชื่อมตัวช่วย Oracle Forms แล้ว</b> (พิกัด ${bridgeStatus.calibratedCount}/${bridgeStatus.totalCalibCount})<br/>${winText}`;
+    } else {
+      bar.className = 'bma-bridge-bar offline';
+      txt.innerHTML =
+        `<b>🟡 โหมดคัดลอกวาง (ยังไม่เปิดตัวช่วย Oracle Forms)</b><br/>` +
+        `กดปุ่ม 📋 คัดลอกไปวางได้เลย หรือดับเบิลคลิก <b>START_ORACLE_BRIDGE.bat</b> เพื่อกรอกอัตโนมัติ`;
+    }
+  }
+
+  function pollBridgeStatus(silent) {
+    sendBridgeRequest('/status', 'GET', null, 2000, (res) => {
+      if (res && res.bridgeConnected && res.data && res.data.ok) {
+        bridgeStatus = {
+          connected: true,
+          targetFound: Boolean(res.data.targetFound),
+          targetTitle: String(res.data.targetTitle || ''),
+          calibratedCount: Number(res.data.calibratedCount || 0),
+          totalCalibCount: Number(res.data.totalCalibCount || 18)
+        };
+      } else {
+        bridgeStatus = {
+          connected: false,
+          targetFound: false,
+          targetTitle: '',
+          calibratedCount: 0,
+          totalCalibCount: 18
+        };
+      }
+      updateBridgeStatusUI();
+      if (!silent) {
+        setStatus(
+          bridgeStatus.connected
+            ? `✓ เชื่อมตัวช่วย Oracle Forms แล้ว (พิกัด ${bridgeStatus.calibratedCount}/${bridgeStatus.totalCalibCount})`
+            : '🟡 ยังไม่เปิดตัวช่วย Oracle Forms • ใช้ปุ่ม 📋 คัดลอกวางได้ทันที',
+          bridgeStatus.connected ? 'ok' : ''
+        );
+      }
+    });
+  }
+
+  function handleQuickCopyOrPaste(val, isMultiline, btnEl) {
+    const clean = String(val || '').trim();
+    if (!clean) {
+      setStatus('⚠️ ไม่มีข้อมูลในช่องนี้ให้คัดลอก/วาง', 'err');
+      return;
+    }
+    copyTextToBrowserClipboard(clean);
+    if (btnEl) {
+      const orig = btnEl.textContent;
+      btnEl.textContent = '✓';
+      setTimeout(() => { btnEl.textContent = orig; }, 900);
+    }
+    if (bridgeStatus.connected && bridgeStatus.targetFound) {
+      sendBridgeRequest('/paste', 'POST', { text: clean, isMultiline: Boolean(isMultiline) }, 10000, (res) => {
+        if (res && res.ok && res.data && res.data.pasted) {
+          setStatus('✓ วางข้อมูลลงช่องที่เลือกใน Oracle Forms แล้ว', 'ok');
+        } else {
+          setStatus('📋 คัดลอกลงคลิปบอร์ดแล้ว (กด Ctrl+V ใน Oracle Forms)', 'ok');
+        }
+      });
+    } else {
+      setStatus('📋 คัดลอกลงคลิปบอร์ดแล้ว (กด Ctrl+V ใน Oracle Forms)', 'ok');
+    }
+  }
+
+  function updatePayTaxDisplay(amountVal, companyName) {
+    if (!panelEl) return;
+    const tax = calcTaxBreakdown(amountVal, companyName);
+    const vatIn = panelEl.querySelector('#bma-pay-vat');
+    const whtIn = panelEl.querySelector('#bma-pay-wht');
+    const badge = panelEl.querySelector('#bma-pay-tax-badge');
+    if (vatIn) vatIn.value = tax.vat7.toFixed(2);
+    if (whtIn) whtIn.value = tax.wht1.toFixed(2);
+    if (badge) {
+      const netStr = tax.net.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (tax.exempt) {
+        badge.className = 'bma-tax-box exempt';
+        badge.textContent = `✓ ยกเว้นหัก 1% (0.00) • ยอดสุทธิจ่าย: ${netStr} บาท`;
+      } else {
+        badge.className = 'bma-tax-box';
+        badge.textContent = `หัก 1% ปกติ • ยอดสุทธิจ่าย: ${netStr} บาท`;
+      }
+    }
+  }
+
+  function renderPayVendorOptions() {
+    if (!panelEl) return;
+    const sel = panelEl.querySelector('#bma-pay-vendor-select');
+    const qIn = panelEl.querySelector('#bma-pay-vendor-search');
+    if (!sel) return;
+    const q = String((qIn && qIn.value) || '').toLowerCase().trim();
+    const list = (state.vendors || []).filter((v) => {
+      if (!q) return true;
+      return (
+        String(v.company || '').toLowerCase().includes(q) ||
+        String(v.bank || '').toLowerCase().includes(q) ||
+        String(v.accountNo || '').includes(q) ||
+        String(v.taxId || '').includes(q)
+      );
+    });
+    if (list.length === 0) {
+      sel.innerHTML = '<option value="">-- ไม่พบข้อมูลในทะเบียนบริษัท --</option>';
+      return;
+    }
+    sel.innerHTML =
+      '<option value="">-- เลือกบริษัทจากทะเบียนบริษัท (' + list.length + ') --</option>' +
+      list
+        .map((v, idx) => {
+          const bTag = v.bank ? ` [${v.bankCode || ''} ${v.bank}]` : '';
+          return `<option value="${v.company.replace(/"/g, '&quot;')}">${v.company}${bTag}</option>`;
+        })
+        .join('');
+  }
+
+  function applyVendorToPayFields(v) {
+    if (!panelEl || !v) return;
+    const item = getSelectedItem();
+    const payToIn = panelEl.querySelector('#bma-pay-to');
+    const assignIn = panelEl.querySelector('#bma-pay-assign');
+    const bankIn = panelEl.querySelector('#bma-pay-bank');
+    const branchIn = panelEl.querySelector('#bma-pay-branch');
+    const acctIn = panelEl.querySelector('#bma-pay-acct');
+    const infoBox = panelEl.querySelector('#bma-pay-bank-info');
+
+    if (payToIn) payToIn.value = v.company || '';
+    if (bankIn) bankIn.value = v.bankCode || '';
+    if (branchIn) branchIn.value = getBranchCodeForVendor(v);
+    if (acctIn) acctIn.value = v.accountNo || '';
+    if (assignIn) {
+      assignIn.value = isItemAidsBudget(item) ? (v.company || '') : (state.defaultAssignTo || ASSIGN_TO_PRESETS[0]);
+    }
+    if (infoBox) {
+      infoBox.innerHTML = `🏦 ธนาคาร (B): <b>${v.bank || '-'} (${v.bankCode || '-'})</b><br/>📍 สาขา (C): <b>${v.branch || '-'}</b>`;
+    }
+    updatePayTaxDisplay(item ? item.amount : 0, v.company || '');
+  }
+
+  function applyItemToPayFields(item) {
+    if (!panelEl || !item) return;
+    const fy = String(state.fiscalYear || '70');
+    const rcvNoIn = panelEl.querySelector('#bma-pay-rcvno');
+    const rcvYrIn = panelEl.querySelector('#bma-pay-rcvyr');
+    const reqIn = panelEl.querySelector('#bma-pay-requester');
+    const dtIn = panelEl.querySelector('#bma-pay-date');
+    const descIn = panelEl.querySelector('#bma-pay-desc');
+    const docIn = panelEl.querySelector('#bma-pay-docno');
+    const saveDocBtn = panelEl.querySelector('#bma-pay-save-doc');
+    const alertBox = panelEl.querySelector('#bma-pay-dup-alert');
+    const sumBox = panelEl.querySelector('#bma-pay-item-brief');
+
+    if (rcvNoIn) rcvNoIn.value = state.rcvNo || item.rcvNo || '';
+    if (rcvYrIn) rcvYrIn.value = fy;
+    if (reqIn && !reqIn.value) reqIn.value = state.defaultRequester || 'นางอรชุมา หุตะโกวิท';
+    if (dtIn && !dtIn.value) dtIn.value = getTodayThaiSlash();
+    if (descIn) descIn.value = formatPayDescription(item);
+    if (docIn) docIn.value = item.payDocNo || '';
+    if (saveDocBtn) saveDocBtn.textContent = `💾 บันทึกลง MISS${fy}`;
+
+    if (sumBox) {
+      const rcvDisp = item.rcvNo ? `${item.rcvNo}/${fy}` : '(ยังไม่มีเลขใบตรวจรับ)';
+      sumBox.innerHTML =
+        `<b>[${item.code}]</b> ใบตรวจรับ: <b>${rcvDisp}</b> | ยอด: <b style="color:#16a34a;">${item.amountFormatted} ฿</b><br/>` +
+        `<span style="color:#475569;">${item.vendorName || '-'}</span>`;
+    }
+
+    if (alertBox) {
+      if (item.payDocNo) {
+        alertBox.style.display = 'block';
+        alertBox.innerHTML = `⛔ มีประวัติการขอเบิกแล้วใน MISS${fy} (เลขที่ใบขอเบิก: <b>${item.payDocNo}</b>) — ระวังเบิกซ้ำ!`;
+      } else {
+        alertBox.style.display = 'none';
+      }
+    }
+
+    updatePayTaxDisplay(item.amount, item.vendorName);
+
+    const matched = (item.vendorProfile && item.vendorProfile.company)
+      ? item.vendorProfile
+      : findMatchingVendor(item.vendorName, item.vendorTaxId);
+
+    if (matched) {
+      applyVendorToPayFields(matched);
+      const vSel = panelEl.querySelector('#bma-pay-vendor-select');
+      if (vSel) vSel.value = matched.company || '';
+    } else {
+      const payToIn = panelEl.querySelector('#bma-pay-to');
+      const assignIn = panelEl.querySelector('#bma-pay-assign');
+      const bankIn = panelEl.querySelector('#bma-pay-bank');
+      const branchIn = panelEl.querySelector('#bma-pay-branch');
+      const acctIn = panelEl.querySelector('#bma-pay-acct');
+      const infoBox = panelEl.querySelector('#bma-pay-bank-info');
+      if (payToIn) payToIn.value = item.vendorName || '';
+      if (assignIn) assignIn.value = isItemAidsBudget(item) ? (item.vendorName || '') : (state.defaultAssignTo || ASSIGN_TO_PRESETS[0]);
+      if (bankIn) bankIn.value = '';
+      if (branchIn) branchIn.value = '';
+      if (acctIn) acctIn.value = '';
+      if (infoBox) infoBox.textContent = '⚠️ ไม่พบบริษัทนี้ในทะเบียนบริษัท — เลือกจากรายการบริษัทด้านบนได้';
+    }
+  }
+
+  function switchUnifiedMode(mode) {
+    state.activeMode = mode === 'pay' ? 'pay' : 'purhire';
+    saveState();
+    if (!panelEl) return;
+    const purDiv = panelEl.querySelector('#bma-mode-purhire');
+    const payDiv = panelEl.querySelector('#bma-mode-pay');
+    const tabPur = panelEl.querySelector('#bma-tab-btn-purhire');
+    const tabPay = panelEl.querySelector('#bma-tab-btn-pay');
+    if (purDiv) purDiv.style.display = state.activeMode === 'purhire' ? 'flex' : 'none';
+    if (payDiv) payDiv.style.display = state.activeMode === 'pay' ? 'flex' : 'none';
+    if (tabPur) tabPur.className = 'bma-mode-tab' + (state.activeMode === 'purhire' ? ' active' : '');
+    if (tabPay) tabPay.className = 'bma-mode-tab' + (state.activeMode === 'pay' ? ' active pay-active' : '');
+    if (state.activeMode === 'pay') {
+      applyItemToPayFields(getSelectedItem());
+      pollBridgeStatus(true);
+    }
+  }
+
+  function switchPaySubTab(sub) {
+    state.paySubTab = String(sub || '1');
+    saveState();
+    if (!panelEl) return;
+    ['1', '2', '3'].forEach((k) => {
+      const pane = panelEl.querySelector('#bma-pay-pane-' + k);
+      const btn = panelEl.querySelector('#bma-pay-subbtn-' + k);
+      if (pane) pane.style.display = k === state.paySubTab ? 'flex' : 'none';
+      if (btn) btn.className = 'bma-subtab' + (k === state.paySubTab ? ' active' : '');
+    });
+  }
+
+  function runOracleBridgeStep(step) {
+    if (!panelEl) return;
+    if (!bridgeStatus.connected) {
+      setStatus('🟡 ยังไม่ได้เปิดตัวช่วย Oracle Forms — ดับเบิลคลิก START_ORACLE_BRIDGE.bat หรือใช้ปุ่ม 📋 คัดลอกวาง', 'err');
+      alert(
+        'ยังไม่ได้เปิดตัวช่วย Oracle Forms (BMA MIS2 Bridge)\n\n' +
+        '• หากต้องการกรอกเข้าหน้าต่าง Oracle Forms อัตโนมัติ:\n  ให้ดับเบิลคลิก START_ORACLE_BRIDGE.bat (หรือ INSTALL_AUTOSTART_BRIDGE.bat)\n\n' +
+        '• หรือกดปุ่ม 📋 ข้างแต่ละช่องเพื่อคัดลอกไปกด Ctrl+V เองได้ทันทีครับ'
+      );
+      return;
+    }
+
+    const payload = {};
+    if (step === '1') {
+      payload.rcvNo = (panelEl.querySelector('#bma-pay-rcvno').value || '').trim();
+      payload.rcvYear = (panelEl.querySelector('#bma-pay-rcvyr').value || '').trim();
+      if (!payload.rcvNo) {
+        alert('กรุณาระบุเลขที่ใบตรวจรับก่อนครับ');
+        return;
+      }
+    } else if (step === '1.6') {
+      payload.vatAmount = (panelEl.querySelector('#bma-pay-vat').value || '').trim();
+      payload.whtAmount = (panelEl.querySelector('#bma-pay-wht').value || '').trim();
+    } else if (step === '2') {
+      const checks = state.payChecks || {};
+      const payToVal = (panelEl.querySelector('#bma-pay-to').value || '').trim();
+      const branchVal = (panelEl.querySelector('#bma-pay-branch').value || '').trim();
+      if (payToVal && branchVal) {
+        state.branchOverrides = state.branchOverrides || {};
+        state.branchOverrides[payToVal] = branchVal;
+        saveState();
+      }
+      if (checks.payTo !== false) payload.payTo = payToVal;
+      if (checks.assignTo !== false) payload.assignTo = (panelEl.querySelector('#bma-pay-assign').value || '').trim();
+      if (checks.bankCode !== false) payload.bankCode = (panelEl.querySelector('#bma-pay-bank').value || '').trim();
+      if (checks.branchCode !== false) payload.branchCode = branchVal;
+      if (checks.accountNo !== false) payload.accountNo = (panelEl.querySelector('#bma-pay-acct').value || '').trim();
+    } else if (step === '3') {
+      payload.requesterName = (panelEl.querySelector('#bma-pay-requester').value || '').trim();
+      payload.payDate = (panelEl.querySelector('#bma-pay-date').value || '').trim();
+      payload.description = (panelEl.querySelector('#bma-pay-desc').value || '').trim();
+    }
+
+    setStatus(`⚡ กำลังส่งคำสั่งขั้นที่ ${step} ไปยัง Oracle Forms... (กด ESC หยุดฉุกเฉิน)`, '');
+    sendBridgeRequest('/run-step', 'POST', { step, payload }, 45000, (res) => {
+      if (!res || !res.bridgeConnected) {
+        pollBridgeStatus(true);
+        setStatus('❌ ขาดการเชื่อมต่อกับตัวช่วย Oracle Forms', 'err');
+        return;
+      }
+      const d = res.data || {};
+      if (d.ok) {
+        setStatus('✓ ' + (d.message || `กรอกขั้นที่ ${step} สำเร็จ`), 'ok');
+        if (step === '1.6') switchPaySubTab('2');
+        if (step === '2') switchPaySubTab('3');
+      } else {
+        setStatus('⚠️ ' + (d.error || 'กรอกไม่สำเร็จ'), 'err');
+        if (d.needCalibration) {
+          const openCal = confirm(
+            (d.error || 'ยังไม่ได้ตั้งพิกัดหน้าจอ Oracle Forms') +
+            '\n\nต้องการเปิดหน้าต่างตั้งพิกัด (F8) ตอนนี้เลยไหมครับ?'
+          );
+          if (openCal) {
+            sendBridgeRequest('/calibrate', 'POST', {}, 300000, () => pollBridgeStatus(false));
+          }
+        }
+      }
+    });
+  }
+
+  function savePayDocToMiss() {
+    if (!panelEl) return;
+    const item = getSelectedItem();
+    const fy = String(state.fiscalYear || '70');
+    const entry = getCurrentFiscalYearEntry();
+    const payNo = (panelEl.querySelector('#bma-pay-docno').value || '').trim();
+    if (!payNo) {
+      alert('กรุณาพิมพ์เลขที่ใบขอเบิกที่ได้จากระบบ MIS2 ก่อนครับ');
+      return;
+    }
+    if (!item || !item.missRowIndex) {
+      alert(`รายการนี้ยังไม่ได้เชื่อมแถวในชีต MISS${fy} กรุณาเลือกรายการงบก่อนครับ`);
+      return;
+    }
+    setStatus(`💾 กำลังบันทึกเลขที่ใบขอเบิก '${payNo}' ลง MISS${fy} คอลัมน์ H...`, '');
+    chrome.runtime.sendMessage(
+      {
+        type: 'SAVE_PAY_DOC_NO',
+        gasWebAppUrl: state.gasWebAppUrl,
+        missRowIndex: item.missRowIndex,
+        payDocNo: payNo,
+        missSheetId: extractSheetId(entry.missSheetId),
+        missTabName: entry.missTabName || 'ชีต1'
+      },
+      (res) => {
+        if (res && res.ok) {
+          item.payDocNo = payNo;
+          saveState();
+          applyItemToPayFields(item);
+          setStatus(`✓ บันทึกเลขที่ใบขอเบิก '${payNo}' ลง MISS${fy} แถว ${item.missRowIndex} เรียบร้อย!`, 'ok');
+        } else {
+          const err = (res && res.error) || 'บันทึกไม่สำเร็จ';
+          setStatus('❌ ' + err, 'err');
+          alert('บันทึกไม่สำเร็จ: ' + err);
         }
       }
     );
@@ -1577,6 +2100,7 @@
     const page = detectCurrentPage();
     const fy = String(state.fiscalYear || '70');
     const curEntry = getCurrentFiscalYearEntry();
+    const checks = state.payChecks || { payTo: true, assignTo: true, bankCode: true, branchCode: true, accountNo: true };
     panelEl = document.createElement('div');
     panelEl.id = 'bma-mis-autofill-panel';
     if (state.minimized) panelEl.classList.add('minimized');
@@ -1584,8 +2108,8 @@
     panelEl.innerHTML = `
       <div class="bma-panel-header" id="bma-panel-drag">
         <div class="bma-panel-title">
-          <span>💊 BMA MIS Auto-Filler</span>
-          <span style="font-size:10.5px;font-weight:600;background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:4px;">by ARISSARA.K</span>
+          <span>💊 BMA MIS &amp; MIS2</span>
+          <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:4px;">by ARISSARA.K</span>
         </div>
         <div class="bma-panel-header-btns">
           <button type="button" class="bma-icon-btn" id="bma-btn-reload" title="ดึงข้อมูลล่าสุดจาก Google Sheet">🔄 ซิงค์</button>
@@ -1594,13 +2118,14 @@
       </div>
 
       <div class="bma-panel-body">
-        <div class="bma-page-badge">
-          <span id="bma-current-page-lbl">📍 ${page.title}</span>
+        <div class="bma-mode-tabs">
+          <button type="button" id="bma-tab-btn-purhire" class="bma-mode-tab ${state.activeMode !== 'pay' ? 'active' : ''}">📦 จัดซื้อ/ตรวจรับ (8 ขั้น)</button>
+          <button type="button" id="bma-tab-btn-pay" class="bma-mode-tab ${state.activeMode === 'pay' ? 'active pay-active' : ''}">💰 เบิกจ่าย MIS2 (ฎีกา)</button>
         </div>
 
         <div class="bma-field-group" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 9px;">
           <div class="bma-label" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-            <span style="color:#1e40af;font-weight:700;">📅 ปีงบประมาณ & ไฟล์ปลายทาง</span>
+            <span style="color:#1e40af;font-weight:700;">📅 ปีงบประมาณ &amp; ไฟล์ปลายทาง</span>
             <button type="button" id="bma-btn-toggle-fy-cfg" style="background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;border-radius:5px;padding:2px 7px;font-size:10.5px;font-weight:700;cursor:pointer;">
               ➕ เพิ่มปีงบ / ตั้งค่าไฟล์
             </button>
@@ -1627,7 +2152,7 @@
             </div>
             <div style="display:flex;gap:5px;">
               <button type="button" id="bma-btn-save-fy" style="flex:1;background:#1d4ed8;color:#fff;border:none;border-radius:5px;padding:5px 8px;font-size:11px;font-weight:700;cursor:pointer;">
-                💾 บันทึกปีงบ & โหลดไฟล์ใหม่
+                💾 บันทึกปีงบ &amp; โหลดไฟล์ใหม่
               </button>
               <button type="button" id="bma-btn-del-fy" style="background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:5px;padding:5px 8px;font-size:11px;font-weight:700;cursor:pointer;" title="ลบปีงบนี้ (ลบไม่ได้ถ้าเป็นปี 70)">
                 🗑️
@@ -1644,60 +2169,232 @@
           <select id="bma-item-select" class="bma-select"></select>
         </div>
 
-        <div class="bma-summary-card" id="bma-item-summary"></div>
+        <!-- ==================== TAB 1: จัดซื้อ / ตรวจรับ (8 ขั้นตอน) ==================== -->
+        <div id="bma-mode-purhire" style="display:${state.activeMode !== 'pay' ? 'flex' : 'none'};flex-direction:column;gap:9px;">
+          <div class="bma-page-badge">
+            <span id="bma-current-page-lbl">📍 ${page.title}</span>
+          </div>
 
-        <div class="bma-field-group">
-          <div class="bma-label"><span>รหัสอ้างอิงในระบบ MIS (ดึงอัตโนมัติ / แก้ไขได้)</span></div>
-          <div class="bma-grid-3">
-            <div>
-              <div id="bma-pur-lbl" style="font-size:10.5px;color:#64748b;">รหัสจัดซื้อ (1-X-${fy})</div>
-              <input type="text" id="bma-pur-no" class="bma-input" placeholder="เช่น 8" value="${state.purHireNo || ''}" />
+          <div class="bma-summary-card" id="bma-item-summary"></div>
+
+          <div class="bma-approval-box" id="bma-approval-gate" style="display:none;">
+            <div class="bma-approval-title" id="bma-approval-title">🔔 รออนุมัติก่อนบันทึก</div>
+            <div class="bma-approval-desc" id="bma-approval-desc"></div>
+            <button type="button" class="bma-btn bma-btn-approve" id="bma-btn-approve-save">✅ อนุมัติบันทึก</button>
+            <button type="button" class="bma-btn" id="bma-btn-goto-next" style="display:none;"></button>
+          </div>
+
+          <div class="bma-field-group">
+            <div class="bma-label"><span>รหัสอ้างอิงในระบบ MIS (ดึงอัตโนมัติ / แก้ไขได้)</span></div>
+            <div class="bma-grid-3">
+              <div>
+                <div id="bma-pur-lbl" style="font-size:10.5px;color:#64748b;">รหัสจัดซื้อ (1-X-${fy})</div>
+                <input type="text" id="bma-pur-no" class="bma-input" placeholder="เช่น 8" value="${state.purHireNo || ''}" />
+              </div>
+              <div>
+                <div id="bma-po-lbl" style="font-size:10.5px;color:#64748b;">เลขใบสั่งซื้อ (11-X-${fy})</div>
+                <input type="text" id="bma-po-no" class="bma-input" placeholder="เช่น 8" value="${state.poNo || ''}" />
+              </div>
+              <div>
+                <div id="bma-rcv-lbl" style="font-size:10.5px;color:#64748b;">เลขใบตรวจรับ (X-${fy})</div>
+                <input type="text" id="bma-rcv-no" class="bma-input" placeholder="เช่น 8" value="${state.rcvNo || ''}" />
+              </div>
             </div>
-            <div>
-              <div id="bma-po-lbl" style="font-size:10.5px;color:#64748b;">เลขใบสั่งซื้อ (11-X-${fy})</div>
-              <input type="text" id="bma-po-no" class="bma-input" placeholder="เช่น 8" value="${state.poNo || ''}" />
+          </div>
+
+          <div class="bma-grid-2">
+            <div class="bma-field-group">
+              <div class="bma-label"><span>เลขที่บิล (หน้าส่งมอบ)</span></div>
+              <input type="text" id="bma-inv-no" class="bma-input" placeholder="เลขที่เอกสารส่งมอบ..." value="${state.invoiceNo || ''}" />
             </div>
-            <div>
-              <div id="bma-rcv-lbl" style="font-size:10.5px;color:#64748b;">เลขใบตรวจรับ (X-${fy})</div>
-              <input type="text" id="bma-rcv-no" class="bma-input" placeholder="เช่น 8" value="${state.rcvNo || ''}" />
+            <div class="bma-field-group">
+              <div class="bma-label"><span>ชุดกรรมการตรวจรับ</span></div>
+              <select id="bma-committee-select" class="bma-select">
+                <option value="1" ${state.committeeSet === '1' ? 'selected' : ''}>ชุดที่ 1 (เบญญาภา)</option>
+                <option value="2" ${state.committeeSet === '2' ? 'selected' : ''}>ชุดที่ 2 (วีรวิชญ์)</option>
+              </select>
+            </div>
+          </div>
+
+          <label style="display:flex;align-items:center;gap:6px;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;padding:6px 9px;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;">
+            <input type="checkbox" id="bma-autofill-toggle" ${state.autoFillOnLoad !== false ? 'checked' : ''} style="accent-color:#16a34a;width:15px;height:15px;" />
+            <span>กรอกอัตโนมัติทันทีเมื่อเปิดหน้า (รอคนกดบันทึก)</span>
+          </label>
+
+          <button type="button" class="bma-btn bma-btn-primary" id="bma-btn-autofill">
+            ⚡ กรอกซ้ำอีกครั้ง (Auto-Fill)
+          </button>
+
+          <div class="bma-field-group">
+            <div class="bma-label"><span>หรือเลือกกดกรอกเฉพาะขั้นตอน (1-8):</span></div>
+            <div class="bma-step-pills">
+              <button type="button" class="bma-step-btn" data-step="1">1. เห็นชอบ</button>
+              <button type="button" class="bma-step-btn" data-step="2">2. เสนอราคา</button>
+              <button type="button" class="bma-step-btn" data-step="3">3. อนุมัติ</button>
+              <button type="button" class="bma-step-btn" data-step="4">4. สัญญา</button>
+              <button type="button" class="bma-step-btn" data-step="5">5. ส่งมอบ</button>
+              <button type="button" class="bma-step-btn" data-step="6">6. รายงานผลตรวจรับ</button>
+              <button type="button" class="bma-step-btn" data-step="7">7. กรรมการ (ข้อ12)</button>
+              <button type="button" class="bma-step-btn" data-step="8" style="grid-column: span 2;">8. พิมพ์ใบตรวจรับ (ข้อ13)</button>
             </div>
           </div>
         </div>
 
-        <div class="bma-grid-2">
-          <div class="bma-field-group">
-            <div class="bma-label"><span>เลขที่บิล (หน้าส่งมอบ)</span></div>
-            <input type="text" id="bma-inv-no" class="bma-input" placeholder="เลขที่เอกสารส่งมอบ..." value="${state.invoiceNo || ''}" />
+        <!-- ==================== TAB 2: เบิกจ่าย MIS2 (FRM_PAY_DOC) ==================== -->
+        <div id="bma-mode-pay" style="display:${state.activeMode === 'pay' ? 'flex' : 'none'};flex-direction:column;gap:8px;">
+          <div id="bma-bridge-bar" class="bma-bridge-bar offline">
+            <div id="bma-bridge-status-text">กำลังตรวจสอบตัวช่วย Oracle Forms...</div>
+            <div class="bma-bridge-actions">
+              <button type="button" class="bma-mini-btn" id="bma-bridge-open-ie" title="เปิดหน้าเว็บ MIS2 ใน Internet Explorer">🌐 เปิด MIS2 (IE)</button>
+              <button type="button" class="bma-mini-btn" id="bma-bridge-pick" title="เลือกหน้าต่าง Oracle Forms">🪟 เลือกหน้าต่าง</button>
+              <button type="button" class="bma-mini-btn" id="bma-bridge-calib" title="ตั้งพิกัดหน้าจอ Oracle Forms (F8)">🎯 ตั้งพิกัด</button>
+            </div>
           </div>
-          <div class="bma-field-group">
-            <div class="bma-label"><span>ชุดกรรมการตรวจรับ</span></div>
-            <select id="bma-committee-select" class="bma-select">
-              <option value="1" ${state.committeeSet === '1' ? 'selected' : ''}>ชุดที่ 1 (เบญญาภา)</option>
-              <option value="2" ${state.committeeSet === '2' ? 'selected' : ''}>ชุดที่ 2 (วีรวิชญ์)</option>
-            </select>
+
+          <div id="bma-pay-dup-alert" class="bma-dup-alert" style="display:none;font-size:11.5px;padding:6px 8px;"></div>
+          <div id="bma-pay-item-brief" class="bma-summary-card" style="padding:6px 8px;font-size:11.5px;"></div>
+
+          <div class="bma-subtabs">
+            <button type="button" id="bma-pay-subbtn-1" class="bma-subtab ${state.paySubTab === '1' ? 'active' : ''}">1. ใบตรวจรับ</button>
+            <button type="button" id="bma-pay-subbtn-2" class="bma-subtab ${state.paySubTab === '2' ? 'active' : ''}">2. ผู้รับเงิน</button>
+            <button type="button" id="bma-pay-subbtn-3" class="bma-subtab ${state.paySubTab === '3' ? 'active' : ''}">3. รายละเอียด</button>
           </div>
-        </div>
 
-        <label style="display:flex;align-items:center;gap:6px;background:#ecfdf5;border:1px solid #a7f3d0;color:#065f46;padding:6px 9px;border-radius:7px;font-size:11.5px;font-weight:700;cursor:pointer;">
-          <input type="checkbox" id="bma-autofill-toggle" ${state.autoFillOnLoad !== false ? 'checked' : ''} style="accent-color:#16a34a;width:15px;height:15px;" />
-          <span>กรอกอัตโนมัติทันทีเมื่อเปิดหน้า (รอคนกดบันทึก)</span>
-        </label>
+          <!-- Pay Sub-tab 1 -->
+          <div id="bma-pay-pane-1" style="display:${state.paySubTab === '1' ? 'flex' : 'none'};flex-direction:column;gap:7px;">
+            <div class="bma-grid-2">
+              <div class="bma-field-group">
+                <div class="bma-label"><span>เลขที่ใบตรวจรับ</span></div>
+                <div class="bma-input-row">
+                  <input type="text" id="bma-pay-rcvno" class="bma-input" placeholder="เช่น 54" />
+                  <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-rcvno" title="คัดลอก/วาง">📋</button>
+                </div>
+              </div>
+              <div class="bma-field-group">
+                <div class="bma-label"><span>ปีงบประมาณ</span></div>
+                <div class="bma-input-row">
+                  <input type="text" id="bma-pay-rcvyr" class="bma-input" value="${fy}" />
+                  <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-rcvyr" title="คัดลอก/วาง">📋</button>
+                </div>
+              </div>
+            </div>
 
-        <button type="button" class="bma-btn bma-btn-primary" id="bma-btn-autofill">
-          ⚡ กรอกซ้ำอีกครั้ง (Auto-Fill)
-        </button>
+            <div class="bma-grid-2">
+              <div class="bma-field-group">
+                <div class="bma-label"><span>ภาษีมูลค่าเพิ่ม (7%)</span></div>
+                <div class="bma-input-row">
+                  <input type="text" id="bma-pay-vat" class="bma-input" />
+                  <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-vat" title="คัดลอก/วาง">📋</button>
+                </div>
+              </div>
+              <div class="bma-field-group">
+                <div class="bma-label"><span>หักภาษีเงินได้ (1%)</span></div>
+                <div class="bma-input-row">
+                  <input type="text" id="bma-pay-wht" class="bma-input" />
+                  <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-wht" title="คัดลอก/วาง">📋</button>
+                </div>
+              </div>
+            </div>
 
-        <div class="bma-field-group">
-          <div class="bma-label"><span>หรือเลือกกดกรอกเฉพาะขั้นตอน (1-8):</span></div>
-          <div class="bma-step-pills">
-            <button type="button" class="bma-step-btn" data-step="1">1. เห็นชอบ</button>
-            <button type="button" class="bma-step-btn" data-step="2">2. เสนอราคา</button>
-            <button type="button" class="bma-step-btn" data-step="3">3. อนุมัติ</button>
-            <button type="button" class="bma-step-btn" data-step="4">4. สัญญา</button>
-            <button type="button" class="bma-step-btn" data-step="5">5. ส่งมอบ</button>
-            <button type="button" class="bma-step-btn" data-step="6">6. รายงานผลตรวจรับ</button>
-            <button type="button" class="bma-step-btn" data-step="7">7. กรรมการ (ข้อ12)</button>
-            <button type="button" class="bma-step-btn" data-step="8" style="grid-column: span 2;">8. พิมพ์ใบตรวจรับ (ข้อ13)</button>
+            <div id="bma-pay-tax-badge" class="bma-tax-box">สุทธิที่จ่าย: -</div>
+
+            <button type="button" class="bma-btn bma-btn-teal" id="bma-pay-run-1">⚡ ขั้น 1: กรอกใบตรวจรับ + กดแว่นขยาย 🔍</button>
+            <button type="button" class="bma-btn bma-btn-teal" id="bma-pay-run-15" style="background:#0e7490;border-color:#0e7490;">⚡ ขั้น 1.5: รายละเอียด ➔ ติ๊กงบ ➔ ตกลง</button>
+            <button type="button" class="bma-btn bma-btn-teal" id="bma-pay-run-16" style="background:#0369a1;border-color:#0369a1;">⚡ ขั้น 1.6: กรอก VAT 7% + หักภาษี 1%</button>
+          </div>
+
+          <!-- Pay Sub-tab 2 -->
+          <div id="bma-pay-pane-2" style="display:${state.paySubTab === '2' ? 'flex' : 'none'};flex-direction:column;gap:6px;">
+            <div class="bma-field-group">
+              <div class="bma-label"><span>ค้นหาบริษัท (ทะเบียนบริษัท EGP+MIS)</span></div>
+              <input type="text" id="bma-pay-vendor-search" class="bma-input" placeholder="พิมพ์ชื่อบริษัท / ธนาคาร / เลขบัญชี..." />
+              <select id="bma-pay-vendor-select" class="bma-select"></select>
+            </div>
+            <div id="bma-pay-bank-info" class="bma-bank-info">🏦 ธนาคาร: - | 📍 สาขา: -</div>
+
+            <div class="bma-check-row">
+              <label><input type="checkbox" id="bma-chk-payTo" ${checks.payTo !== false ? 'checked' : ''} /> จ่ายให้</label>
+              <div class="bma-input-row" style="flex:1;">
+                <input type="text" id="bma-pay-to" class="bma-input" />
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-to">📋</button>
+              </div>
+            </div>
+            <div class="bma-check-row">
+              <label><input type="checkbox" id="bma-chk-assignTo" ${checks.assignTo !== false ? 'checked' : ''} /> โดยมอบให้</label>
+              <div class="bma-input-row" style="flex:1;">
+                <input type="text" id="bma-pay-assign" class="bma-input" list="bma-assign-presets" />
+                <datalist id="bma-assign-presets">
+                  <option value="${ASSIGN_TO_PRESETS[0]}"></option>
+                  <option value="${ASSIGN_TO_PRESETS[1]}"></option>
+                </datalist>
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-assign">📋</button>
+              </div>
+            </div>
+            <div class="bma-check-row">
+              <label><input type="checkbox" id="bma-chk-bankCode" ${checks.bankCode !== false ? 'checked' : ''} /> รหัสธนาคาร</label>
+              <div class="bma-input-row" style="flex:1;">
+                <input type="text" id="bma-pay-bank" class="bma-input" placeholder="3 หลัก เช่น 004" />
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-bank">📋</button>
+              </div>
+            </div>
+            <div class="bma-check-row">
+              <label><input type="checkbox" id="bma-chk-branchCode" ${checks.branchCode !== false ? 'checked' : ''} /> รหัสสาขา</label>
+              <div class="bma-input-row" style="flex:1;">
+                <input type="text" id="bma-pay-branch" class="bma-input" placeholder="4 หลัก เช่น 0001" />
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-branch">📋</button>
+              </div>
+            </div>
+            <div class="bma-check-row">
+              <label><input type="checkbox" id="bma-chk-accountNo" ${checks.accountNo !== false ? 'checked' : ''} /> เลขที่บัญชี</label>
+              <div class="bma-input-row" style="flex:1;">
+                <input type="text" id="bma-pay-acct" class="bma-input" />
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-acct">📋</button>
+              </div>
+            </div>
+
+            <button type="button" class="bma-btn bma-btn-teal" id="bma-pay-run-2">⚡ ขั้น 2: กรอกแท็บ 'ผู้รับเงิน'</button>
+          </div>
+
+          <!-- Pay Sub-tab 3 -->
+          <div id="bma-pay-pane-3" style="display:${state.paySubTab === '3' ? 'flex' : 'none'};flex-direction:column;gap:7px;">
+            <div class="bma-field-group">
+              <div class="bma-label"><span>ชื่อผู้ขอเบิก</span></div>
+              <div class="bma-input-row">
+                <input type="text" id="bma-pay-requester" class="bma-input" value="${state.defaultRequester || 'นางอรชุมา หุตะโกวิท'}" />
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-requester">📋</button>
+              </div>
+            </div>
+            <div class="bma-field-group">
+              <div class="bma-label">
+                <span>วันที่เบิก (พ.ศ.)</span>
+                <span style="display:flex;gap:4px;">
+                  <button type="button" class="bma-mini-btn" id="bma-pay-dt-today" style="padding:1px 6px;">วันนี้</button>
+                  <button type="button" class="bma-mini-btn" id="bma-pay-dt-rcv" style="padding:1px 6px;">วันตรวจรับ</button>
+                </span>
+              </div>
+              <div class="bma-input-row">
+                <input type="text" id="bma-pay-date" class="bma-input" value="${getTodayThaiSlash()}" />
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-date">📋</button>
+              </div>
+            </div>
+            <div class="bma-field-group">
+              <div class="bma-label"><span>คำอธิบายรายการเบิก (MISS Col J)</span></div>
+              <div class="bma-input-row" style="align-items:flex-start;">
+                <textarea id="bma-pay-desc" class="bma-textarea"></textarea>
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-desc" data-copy-multi="1">📋</button>
+              </div>
+            </div>
+
+            <button type="button" class="bma-btn bma-btn-teal" id="bma-pay-run-3">⚡ ขั้น 3: กรอกแท็บ 'รายละเอียดเงินเบิกจ่าย'</button>
+            <div class="bma-safety-banner">🛑 โหมดปลอดภัย: หยุดก่อนบันทึกทุกครั้ง (คนตรวจและกด 💾 เอง) | กด ESC หยุดทันที</div>
+          </div>
+
+          <div class="bma-field-group" style="border-top:1px solid #e2e8f0;padding-top:7px;">
+            <div class="bma-label"><span>บันทึกเลขที่ใบขอเบิกกลับลงชีต MISS (คอลัมน์ H)</span></div>
+            <div class="bma-input-row">
+              <input type="text" id="bma-pay-docno" class="bma-input" placeholder="เช่น 123/${fy}" />
+              <button type="button" class="bma-btn bma-btn-green" id="bma-pay-save-doc" style="width:auto;padding:6px 10px;font-size:11px;white-space:nowrap;">💾 บันทึกลง MISS${fy}</button>
+            </div>
           </div>
         </div>
 
@@ -1710,6 +2407,7 @@
 
     document.body.appendChild(panelEl);
     renderFiscalYearDropdown();
+    renderPayVendorOptions();
 
     // ผูก Event ปุ่มต่างๆ
     panelEl.querySelector('#bma-btn-min').addEventListener('click', () => {
@@ -1721,6 +2419,105 @@
 
     panelEl.querySelector('#bma-btn-reload').addEventListener('click', () => {
       fetchSheetsData();
+      if (state.activeMode === 'pay') pollBridgeStatus(true);
+    });
+
+    panelEl.querySelector('#bma-tab-btn-purhire').addEventListener('click', () => switchUnifiedMode('purhire'));
+    panelEl.querySelector('#bma-tab-btn-pay').addEventListener('click', () => switchUnifiedMode('pay'));
+
+    panelEl.querySelector('#bma-pay-subbtn-1').addEventListener('click', () => switchPaySubTab('1'));
+    panelEl.querySelector('#bma-pay-subbtn-2').addEventListener('click', () => switchPaySubTab('2'));
+    panelEl.querySelector('#bma-pay-subbtn-3').addEventListener('click', () => switchPaySubTab('3'));
+
+    panelEl.querySelector('#bma-btn-approve-save').addEventListener('click', () => handleApproveSaveAndNext());
+
+    // Event สำหรับปุ่มตัวช่วย Oracle Forms Bridge
+    panelEl.querySelector('#bma-bridge-open-ie').addEventListener('click', () => {
+      if (bridgeStatus.connected) {
+        sendBridgeRequest('/open-mis2-ie', 'POST', { url: 'http://bmasso.bma.go.th/MIS2DirectLogins/index2.jsp' }, 10000, () => {
+          setStatus('🌐 เปิดหน้า MIS2 ใน Internet Explorer แล้ว', 'ok');
+        });
+      } else {
+        window.open('http://bmasso.bma.go.th/MIS2DirectLogins/index2.jsp', '_blank');
+      }
+    });
+
+    panelEl.querySelector('#bma-bridge-pick').addEventListener('click', () => {
+      if (!bridgeStatus.connected) {
+        pollBridgeStatus(false);
+        return;
+      }
+      setStatus('🪟 กำลังเปิดหน้าต่างเลือก Oracle Forms...', '');
+      sendBridgeRequest('/pick-window', 'POST', {}, 300000, () => pollBridgeStatus(false));
+    });
+
+    panelEl.querySelector('#bma-bridge-calib').addEventListener('click', () => {
+      if (!bridgeStatus.connected) {
+        alert('กรุณาดับเบิลคลิกเปิด START_ORACLE_BRIDGE.bat ก่อนกดตั้งพิกัดครับ');
+        pollBridgeStatus(false);
+        return;
+      }
+      setStatus('🎯 กำลังเปิดหน้าต่างตั้งพิกัด Oracle Forms (กด F8)...', '');
+      sendBridgeRequest('/calibrate', 'POST', {}, 300000, () => pollBridgeStatus(false));
+    });
+
+    panelEl.querySelector('#bma-pay-run-1').addEventListener('click', () => runOracleBridgeStep('1'));
+    panelEl.querySelector('#bma-pay-run-15').addEventListener('click', () => runOracleBridgeStep('1.5'));
+    panelEl.querySelector('#bma-pay-run-16').addEventListener('click', () => runOracleBridgeStep('1.6'));
+    panelEl.querySelector('#bma-pay-run-2').addEventListener('click', () => runOracleBridgeStep('2'));
+    panelEl.querySelector('#bma-pay-run-3').addEventListener('click', () => runOracleBridgeStep('3'));
+    panelEl.querySelector('#bma-pay-save-doc').addEventListener('click', () => savePayDocToMiss());
+
+    panelEl.querySelectorAll('.bma-copy-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const srcId = btn.getAttribute('data-copy-from');
+        const isMulti = btn.getAttribute('data-copy-multi') === '1';
+        const el = panelEl.querySelector('#' + srcId);
+        handleQuickCopyOrPaste(el ? el.value : '', isMulti, btn);
+      });
+    });
+
+    panelEl.querySelector('#bma-pay-vendor-search').addEventListener('input', () => renderPayVendorOptions());
+    panelEl.querySelector('#bma-pay-vendor-select').addEventListener('change', (e) => {
+      const comp = e.target.value;
+      const v = (state.vendors || []).find((x) => x.company === comp);
+      if (v) applyVendorToPayFields(v);
+    });
+
+    ['payTo', 'assignTo', 'bankCode', 'branchCode', 'accountNo'].forEach((k) => {
+      const chk = panelEl.querySelector('#bma-chk-' + k);
+      if (chk) {
+        chk.addEventListener('change', () => {
+          state.payChecks = state.payChecks || {};
+          state.payChecks[k] = chk.checked;
+          saveState();
+        });
+      }
+    });
+
+    panelEl.querySelector('#bma-pay-assign').addEventListener('change', (e) => {
+      if (!isItemAidsBudget(getSelectedItem())) {
+        state.defaultAssignTo = e.target.value.trim() || ASSIGN_TO_PRESETS[0];
+        saveState();
+      }
+    });
+
+    panelEl.querySelector('#bma-pay-requester').addEventListener('change', (e) => {
+      state.defaultRequester = e.target.value.trim() || 'นางอรชุมา หุตะโกวิท';
+      saveState();
+    });
+
+    panelEl.querySelector('#bma-pay-dt-today').addEventListener('click', () => {
+      panelEl.querySelector('#bma-pay-date').value = getTodayThaiSlash();
+    });
+
+    panelEl.querySelector('#bma-pay-dt-rcv').addEventListener('click', () => {
+      const it = getSelectedItem();
+      if (it && it.rcvDate) {
+        panelEl.querySelector('#bma-pay-date').value = it.rcvDate;
+      } else {
+        setStatus('⚠️ รายการนี้ไม่มีวันที่ตรวจรับใน Sheet', 'err');
+      }
     });
 
     // Event สำหรับเปลี่ยนปีงบประมาณ และเพิ่มปีงบประมาณ + เปลี่ยนไฟล์ปลายทาง (MISSxx / Auto Crat-EGPxx)
@@ -1729,7 +2526,7 @@
       saveState();
       renderFiscalYearDropdown();
       fetchSheetsData();
-      if (state.autoFillOnLoad !== false) {
+      if (state.autoFillOnLoad !== false && !isMis2PortalHost() && state.activeMode !== 'pay') {
         lastAutoFillSig = '';
         triggerSmartAutoFill();
       }
@@ -1808,7 +2605,7 @@
     panelEl.querySelector('#bma-pur-no').addEventListener('input', (e) => {
       state.purHireNo = e.target.value.trim();
       saveState();
-      if (state.autoFillOnLoad !== false) {
+      if (state.autoFillOnLoad !== false && !isMis2PortalHost()) {
         lastAutoFillSig = '';
         triggerSmartAutoFill();
       }
@@ -1817,7 +2614,7 @@
     panelEl.querySelector('#bma-po-no').addEventListener('input', (e) => {
       state.poNo = e.target.value.trim();
       saveState();
-      if (state.autoFillOnLoad !== false) {
+      if (state.autoFillOnLoad !== false && !isMis2PortalHost()) {
         lastAutoFillSig = '';
         triggerSmartAutoFill();
       }
@@ -1825,8 +2622,10 @@
 
     panelEl.querySelector('#bma-rcv-no').addEventListener('input', (e) => {
       state.rcvNo = e.target.value.trim();
+      const payRcv = panelEl.querySelector('#bma-pay-rcvno');
+      if (payRcv) payRcv.value = state.rcvNo;
       saveState();
-      if (state.autoFillOnLoad !== false) {
+      if (state.autoFillOnLoad !== false && !isMis2PortalHost()) {
         lastAutoFillSig = '';
         triggerSmartAutoFill();
       }
@@ -1835,7 +2634,7 @@
     panelEl.querySelector('#bma-inv-no').addEventListener('input', (e) => {
       state.invoiceNo = e.target.value.trim();
       saveState();
-      if (state.autoFillOnLoad !== false) {
+      if (state.autoFillOnLoad !== false && !isMis2PortalHost()) {
         lastAutoFillSig = '';
         triggerSmartAutoFill();
       }
@@ -1844,7 +2643,7 @@
     panelEl.querySelector('#bma-committee-select').addEventListener('change', (e) => {
       state.committeeSet = e.target.value;
       saveState();
-      if (state.autoFillOnLoad !== false) {
+      if (state.autoFillOnLoad !== false && !isMis2PortalHost()) {
         lastAutoFillSig = '';
         triggerSmartAutoFill();
       }
@@ -1853,7 +2652,7 @@
     panelEl.querySelector('#bma-autofill-toggle').addEventListener('change', (e) => {
       state.autoFillOnLoad = e.target.checked;
       saveState();
-      if (state.autoFillOnLoad) {
+      if (state.autoFillOnLoad && !isMis2PortalHost()) {
         lastAutoFillSig = '';
         triggerSmartAutoFill();
       }
@@ -1903,11 +2702,12 @@
 
     renderItemOptions();
     tryCaptureGeneratedCodes();
+    pollBridgeStatus(true);
 
-    // ถ้ายังไม่มีข้อมูลใน Cache ให้ดึงจาก Google Sheets อัตโนมัติ
-    if (!state.items || state.items.length === 0) {
+    // ถ้ายังไม่มีข้อมูลใน Cache หรือยังไม่มีทะเบียนบริษัท ให้ดึงจาก Google Sheets อัตโนมัติ
+    if (!state.items || state.items.length === 0 || !state.vendors || state.vendors.length === 0) {
       fetchSheetsData();
-    } else if (state.autoFillOnLoad !== false) {
+    } else if (state.autoFillOnLoad !== false && !isMis2PortalHost() && state.activeMode !== 'pay') {
       setTimeout(triggerSmartAutoFill, 250);
     }
   }
@@ -1939,6 +2739,7 @@
 
   function triggerSmartAutoFill() {
     if (state.autoFillOnLoad === false) return;
+    if (isMis2PortalHost() || state.activeMode === 'pay') return;
     const sig = computePageDomSignature();
     if (sig === lastAutoFillSig) return;
     lastAutoFillSig = sig;
@@ -1946,11 +2747,21 @@
   }
 
   // โหลด State แล้วสร้างแผงควบคุม
+  let bridgePollCounter = 0;
   loadState(() => {
+    if (isMis2PortalHost()) {
+      state.activeMode = 'pay';
+    }
     buildPanel();
     updateApprovalBoxUI();
     // ตรวจจับการเปลี่ยนหน้า/เปิด Popup/ดึงตารางใหม่ แล้วกรอกอัตโนมัติทันทีโดยไม่ต้องกดปุ่ม (รอคนอนุมัติก่อนบันทึก)
     setInterval(() => {
+      bridgePollCounter++;
+      if (state.activeMode === 'pay' && bridgePollCounter % 4 === 0) {
+        pollBridgeStatus(true);
+      }
+      if (isMis2PortalHost()) return;
+
       tryCaptureGeneratedCodes();
       if (panelEl) {
         const lbl = panelEl.querySelector('#bma-current-page-lbl');

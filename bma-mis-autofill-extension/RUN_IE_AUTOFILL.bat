@@ -1,12 +1,21 @@
 @echo off
 chcp 65001 >nul
-title ติดตั้ง/เปิดใช้งาน BMA MIS Auto-Filler บน Internet Explorer (IE / Edge IE Mode)
+title ติดตั้ง/เปิดใช้งาน BMA MIS & MIS2 Auto-Filler บน Internet Explorer (IE / Edge IE Mode)
 echo ====================================================================
-echo   กำลังสร้างปุ่มลัด "BMA MIS Auto-Filler" บนแถบ Favorites ของ IE
-echo   และฉีดแผงควบคุมเข้าหน้าต่าง IE ที่เปิดอยู่โดยอัตโนมัติ...
+echo   ระบบรวม 2 ระบบ (จัดซื้อ/ตรวจรับ 8 ขั้นตอน + เบิกจ่าย MIS2)
+echo   1. ตรวจสอบและเปิดตัวช่วย Oracle Forms (พอร์ต 47291) เบื้องหลัง
+echo   2. สร้างปุ่มลัด "BMA_MIS_AutoFill" บนแถบ Favorites ของ IE
+echo   3. ส่งแผงควบคุมเข้าหน้าต่าง IE ที่เปิดเว็บ bma.go.th อยู่ทันที
 echo ====================================================================
 
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; " ^
+  "$bridgeUp = $false; " ^
+  "try { $tc = New-Object System.Net.Sockets.TcpClient; $tc.Connect('127.0.0.1', 47291); $tc.Close(); $bridgeUp = $true } catch {} " ^
+  "if (-not $bridgeUp -and (Test-Path (Join-Path $PSScriptRoot 'oracle_bridge.ps1'))) { " ^
+  "  Start-Process powershell.exe -WindowStyle Hidden -ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-STA','-File',(Join-Path $PSScriptRoot 'oracle_bridge.ps1'); " ^
+  "  Write-Host '✓ เปิดตัวช่วย Oracle Forms (System Tray) เรียบร้อย!'; " ^
+  "} elseif ($bridgeUp) { Write-Host '✓ ตัวช่วย Oracle Forms เปิดทำงานอยู่แล้ว' }; " ^
   "$favDir = [Environment]::GetFolderPath('Favorites'); " ^
   "$barDir = Join-Path $favDir 'Links'; " ^
   "if (-not (Test-Path $barDir)) { $barDir = $favDir }; " ^
@@ -33,8 +42,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
 echo.
 echo ====================================================================
 echo   วิธีใช้งานใน IE / Microsoft Edge (IE Mode):
-echo   1. กดปุ่มดาว (Favorites) หรือดูที่แถบ Favorites Bar ด้านบนของ IE/Edge
-echo   2. คลิกที่ "BMA_MIS_AutoFill" 1 ครั้ง แผงควบคุมจะเด้งขึ้นมาบนหน้าเว็บทันที!
-echo   3. โค้ดจะดึงสดจาก GitHub ทุกครั้งที่คลิก ไม่ต้องดาวน์โหลดใหม่เวลาอัปเดตโค้ด
+echo   1. เปิดหน้าจัดซื้อ/ตรวจรับ (PurHire) หรือหน้าเบิกจ่าย (bmasso.bma.go.th)
+echo   2. กดปุ่มลัด "BMA_MIS_AutoFill" บนแถบ Favorites 1 ครั้ง
+echo   3. สลับแท็บด้านบนได้ทั้ง "จัดซื้อ/ตรวจรับ (8 ขั้น)" และ "เบิกจ่าย MIS2 (ฎีกา)"
 echo ====================================================================
 pause
