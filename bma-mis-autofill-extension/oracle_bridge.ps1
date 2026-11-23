@@ -266,6 +266,7 @@ public class Mis2BridgeWin32 {
 public class Mis2BridgeJob {
     public string Method;
     public string Path;
+    public string Query;
     public string Body;
     public string ResponseJson;
     public string ContentType;
@@ -336,6 +337,7 @@ public class Mis2BridgeHttpServer {
                 string rawPath = reqParts[1];
                 int qIdx = rawPath.IndexOf('?');
                 string path = qIdx >= 0 ? rawPath.Substring(0, qIdx) : rawPath;
+                string query = qIdx >= 0 ? rawPath.Substring(qIdx + 1) : "";
 
                 for (int i = 1; i < lines.Length; i++) {
                     if (lines[i].StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase)) {
@@ -360,10 +362,10 @@ public class Mis2BridgeHttpServer {
                 }
 
                 string bodyStr = contentLength > 0 ? Encoding.UTF8.GetString(bodyMs.ToArray(), 0, (int)bodyMs.Length) : "";
-                var job = new Mis2BridgeJob { Method = method, Path = path, Body = bodyStr };
+                var job = new Mis2BridgeJob { Method = method, Path = path, Query = query, Body = bodyStr };
                 Queue.Enqueue(job);
 
-                int waitMs = (path == "/calibrate" || path == "/pick-window") ? 300000 : 45000;
+                int waitMs = (path == "/calibrate" || path == "/pick-window" || query.IndexOf("calibrate") >= 0 || query.IndexOf("pick-window") >= 0) ? 300000 : 45000;
                 if (job.Done.Wait(waitMs)) {
                     WriteResponse(stream, "200 OK", job.ResponseJson ?? "{\"ok\":true}", string.IsNullOrEmpty(job.ContentType) ? "application/json; charset=utf-8" : job.ContentType);
                 } else {
@@ -822,8 +824,59 @@ function Get-StatusPayload {
     }
 }
 
+function Parse-QueryString([string]$qs) {
+    $map = @{}
+    if ([string]::IsNullOrWhiteSpace($qs)) { return $map }
+    foreach ($part in $qs.Split('&')) {
+        if ([string]::IsNullOrWhiteSpace($part)) { continue }
+        $idx = $part.IndexOf('=')
+        if ($idx -ge 0) {
+            $k = [Uri]::UnescapeDataString($part.Substring(0, $idx).Replace('+', ' '))
+            $v = [Uri]::UnescapeDataString($part.Substring($idx + 1).Replace('+', ' '))
+            $map[$k] = $v
+        } else {
+            $map[[Uri]::UnescapeDataString($part.Replace('+', ' '))] = ""
+        }
+    }
+    return $map
+}
+
 function Process-BridgeJob($job) {
     $path = [string]$job.Path
+
+    if ($path -eq "/jsonp") {
+        $qMap = Parse-QueryString ([string]$job.Query)
+        $cb = if ($qMap.ContainsKey("cb")) { ([string]$qMap["cb"]) -replace '[^a-zA-Z0-9_]', '' } else { "" }
+        $innerPath = if ($qMap.ContainsKey("path")) { [string]$qMap["path"] } else { "/status" }
+        $innerBody = ""
+        if ($qMap.ContainsKey("b64") -and -not [string]::IsNullOrWhiteSpace($qMap["b64"])) {
+            try {
+                $b64Str = ([string]$qMap["b64"]).Replace('-', '+').Replace('_', '/')
+                $pad = $b64Str.Length % 4
+                if ($pad -gt 0) { $b64Str += ('=' * (4 - $pad)) }
+                $innerBody = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64Str))
+            } catch {
+                $innerBody = ""
+            }
+        } elseif ($qMap.ContainsKey("data")) {
+            $innerBody = [string]$qMap["data"]
+        }
+        $innerJob = New-Object Mis2BridgeJob
+        $innerJob.Method = if ($innerBody) { "POST" } else { "GET" }
+        $innerJob.Path = $innerPath
+        $innerJob.Body = $innerBody
+        Process-BridgeJob $innerJob
+        $rawJson = if ([string]::IsNullOrWhiteSpace($innerJob.ResponseJson)) { '{"ok":false}' } else { $innerJob.ResponseJson }
+        $safeJson = $rawJson.Replace([string][char]0x2028, '\u2028').Replace([string][char]0x2029, '\u2029')
+        $job.ContentType = "application/javascript; charset=utf-8"
+        if ($cb) {
+            $job.ResponseJson = "try{$cb($safeJson);}catch(e){}"
+        } else {
+            $job.ResponseJson = $safeJson
+        }
+        return
+    }
+
     $bodyObj = $null
     if (-not [string]::IsNullOrWhiteSpace($job.Body)) {
         try { $bodyObj = $job.Body | ConvertFrom-Json } catch {}
@@ -833,6 +886,16 @@ function Process-BridgeJob($job) {
         if ($path -eq "/status") {
             $res = Get-StatusPayload
             $job.ResponseJson = ($res | ConvertTo-Json -Depth 4 -Compress)
+            return
+        }
+
+        if ($path -eq "/vendors-cache") {
+            $vFile = Join-Path $script:AppDir "vendors-cache.json"
+            if (Test-Path $vFile) {
+                $job.ResponseJson = [System.IO.File]::ReadAllText($vFile, [System.Text.Encoding]::UTF8)
+            } else {
+                $job.ResponseJson = '{"vendors":[]}'
+            }
             return
         }
 

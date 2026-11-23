@@ -49,6 +49,128 @@
     return m ? m[1] : s;
   }
 
+  function thaiToArabic(str) {
+    var s = String(str || '');
+    var th = '๐๑๒๓๔๕๖๗๘๙';
+    var out = '';
+    for (var i = 0; i < s.length; i++) {
+      var idx = th.indexOf(s.charAt(i));
+      out += idx !== -1 ? String(idx) : s.charAt(i);
+    }
+    return out;
+  }
+
+  function ieEscapeJsonStr(s) {
+    return '"' + String(s)
+      .replace(/\\/g, '\\\\')
+      .replace(/"/g, '\\"')
+      .replace(/\r/g, '\\r')
+      .replace(/\n/g, '\\n')
+      .replace(/\t/g, '\\t')
+      .replace(/\u2028/g, '\\u2028')
+      .replace(/\u2029/g, '\\u2029') + '"';
+  }
+
+  function ieJsonStringify(val) {
+    if (typeof window.JSON !== 'undefined' && window.JSON && typeof window.JSON.stringify === 'function') {
+      try { return window.JSON.stringify(val); } catch (e) {}
+    }
+    if (val === null || val === undefined) return 'null';
+    var t = typeof val;
+    if (t === 'number') return isFinite(val) ? String(val) : 'null';
+    if (t === 'boolean') return val ? 'true' : 'false';
+    if (t === 'string') return ieEscapeJsonStr(val);
+    if (Object.prototype.toString.call(val) === '[object Array]') {
+      var arr = [];
+      for (var i = 0; i < val.length; i++) {
+        arr.push(val[i] === undefined ? 'null' : ieJsonStringify(val[i]));
+      }
+      return '[' + arr.join(',') + ']';
+    }
+    if (t === 'object') {
+      var props = [];
+      for (var k in val) {
+        if (val.hasOwnProperty(k) && val[k] !== undefined && typeof val[k] !== 'function') {
+          props.push(ieEscapeJsonStr(k) + ':' + ieJsonStringify(val[k]));
+        }
+      }
+      return '{' + props.join(',') + '}';
+    }
+    return 'null';
+  }
+
+  function ieJsonParse(str) {
+    var s = String(str || '').replace(/^\s+|\s+$/g, '');
+    if (!s) return null;
+    if (typeof window.JSON !== 'undefined' && window.JSON && typeof window.JSON.parse === 'function') {
+      return window.JSON.parse(s);
+    }
+    return (new Function('return (' + s + ')'))();
+  }
+
+  function ieUtf8ToBase64Url(str) {
+    var s = String(str || '');
+    var bytes = [];
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i);
+      if (c < 0x80) {
+        bytes.push(c);
+      } else if (c < 0x800) {
+        bytes.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f));
+      } else if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length) {
+        var c2 = s.charCodeAt(++i);
+        var cp = 0x10000 + (((c & 0x3ff) << 10) | (c2 & 0x3ff));
+        bytes.push(
+          0xf0 | (cp >> 18),
+          0x80 | ((cp >> 12) & 0x3f),
+          0x80 | ((cp >> 6) & 0x3f),
+          0x80 | (cp & 0x3f)
+        );
+      } else {
+        bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f));
+      }
+    }
+    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+    var out = '';
+    for (var j = 0; j < bytes.length; j += 3) {
+      var b0 = bytes[j];
+      var has1 = j + 1 < bytes.length;
+      var has2 = j + 2 < bytes.length;
+      var b1 = has1 ? bytes[j + 1] : 0;
+      var b2 = has2 ? bytes[j + 2] : 0;
+      out += chars.charAt(b0 >> 2);
+      out += chars.charAt(((b0 & 3) << 4) | (b1 >> 4));
+      if (has1) out += chars.charAt(((b1 & 15) << 2) | (b2 >> 6));
+      if (has2) out += chars.charAt(b2 & 63);
+    }
+    return out;
+  }
+
+  function ieSetSelectOptions(sel, opts, selectedVal) {
+    if (!sel) return;
+    sel.options.length = 0;
+    var matchIdx = -1;
+    var targetVal = selectedVal !== undefined && selectedVal !== null ? String(selectedVal) : null;
+    for (var i = 0; i < opts.length; i++) {
+      var opt = document.createElement('option');
+      opt.value = String(opts[i].value !== undefined ? opts[i].value : '');
+      opt.text = String(opts[i].text !== undefined ? opts[i].text : '');
+      try {
+        sel.add(opt, null);
+      } catch (e) {
+        sel.add(opt);
+      }
+      if (targetVal !== null && opt.value === targetVal && matchIdx === -1) {
+        matchIdx = i;
+      }
+    }
+    if (matchIdx >= 0) {
+      sel.selectedIndex = matchIdx;
+    } else if (opts.length > 0) {
+      sel.selectedIndex = 0;
+    }
+  }
+
   var BRIDGE_URL = 'http://127.0.0.1:47291';
   var VENDORS_CACHE_URL = 'https://cdn.jsdelivr.net/gh/isaradec16-eng/po-pharmacy@main/bma-mis-autofill-extension/vendors-cache.json';
   var WHT_EXEMPT_KEYWORDS = ['สภากาชาด', 'เอเบิ้ล', 'เอเบิล', 'a-ble', 'abel', 'องค์การเภสัชกรรม', 'gpo', 'ยูนีซัน', 'unison'];
@@ -98,11 +220,15 @@
   };
 
   try {
-    var saved = localStorage.getItem('bma_mis_ie_state');
-    if (saved) {
-      var parsed = JSON.parse(saved);
-      for (var k in parsed) {
-        if (parsed.hasOwnProperty(k)) state[k] = parsed[k];
+    if (window.localStorage) {
+      var saved = window.localStorage.getItem('bma_mis_ie_state');
+      if (saved) {
+        var parsed = ieJsonParse(saved);
+        if (parsed && typeof parsed === 'object') {
+          for (var k in parsed) {
+            if (parsed.hasOwnProperty(k)) state[k] = parsed[k];
+          }
+        }
       }
     }
   } catch (e) {}
@@ -110,7 +236,9 @@
 
   function saveState() {
     try {
-      localStorage.setItem('bma_mis_ie_state', JSON.stringify(state));
+      if (window.localStorage) {
+        window.localStorage.setItem('bma_mis_ie_state', ieJsonStringify(state));
+      }
     } catch (e) {}
   }
 
@@ -202,30 +330,71 @@
     return false;
   }
 
+  function ieNextEl(node) {
+    var n = node ? node.nextSibling : null;
+    while (n && n.nodeType !== 1) n = n.nextSibling;
+    return n;
+  }
+
+  function ieFindFields(container) {
+    var out = [];
+    if (!container || !container.getElementsByTagName) return out;
+    var tags = ['input', 'select', 'textarea'];
+    for (var t = 0; t < tags.length; t++) {
+      var els = container.getElementsByTagName(tags[t]);
+      for (var i = 0; i < els.length; i++) {
+        var el = els[i];
+        if (tags[t] === 'input' && String(el.type || '').toLowerCase() === 'hidden') continue;
+        out.push(el);
+      }
+    }
+    return out;
+  }
+
+  function ieFindInputsByType(container, wantedType) {
+    var out = [];
+    if (!container || !container.getElementsByTagName) return out;
+    var els = container.getElementsByTagName('input');
+    var want = String(wantedType || 'text').toLowerCase();
+    for (var i = 0; i < els.length; i++) {
+      var tp = String(els[i].type || 'text').toLowerCase();
+      if (tp === want) out.push(els[i]);
+    }
+    return out;
+  }
+
+  function ieFindFirst(container, tagName, inputType) {
+    if (!container || !container.getElementsByTagName) return null;
+    var els = container.getElementsByTagName(tagName);
+    if (!inputType) return els.length > 0 ? els[0] : null;
+    var want = String(inputType).toLowerCase();
+    for (var i = 0; i < els.length; i++) {
+      if (String(els[i].type || 'text').toLowerCase() === want) return els[i];
+    }
+    return null;
+  }
+
   function findInputsAfterLabel(doc, labelText) {
-    var tds = doc.querySelectorAll('td, th, span, div');
+    var tds = [];
+    var tagList = ['td', 'th', 'span', 'div'];
+    for (var tl = 0; tl < tagList.length; tl++) {
+      var found = doc.getElementsByTagName(tagList[tl]);
+      for (var fi = 0; fi < found.length; fi++) tds.push(found[fi]);
+    }
     var cleanTarget = labelText.replace(/\s+/g, '').toLowerCase();
     for (var i = 0; i < tds.length; i++) {
       var td = tds[i];
       if (td.children && td.children.length > 3) continue;
       var txt = String(td.innerText || td.textContent || '').replace(/\s+/g, '').toLowerCase();
       if (txt.indexOf(cleanTarget) !== -1) {
-        var next = td.nextElementSibling;
+        var next = ieNextEl(td);
         while (next) {
-          var inputs = next.querySelectorAll('input:not([type="hidden"]), select, textarea');
-          if (inputs.length > 0) {
-            var arr = [];
-            for (var m = 0; m < inputs.length; m++) arr.push(inputs[m]);
-            return arr;
-          }
-          next = next.nextElementSibling;
+          var inputs = ieFindFields(next);
+          if (inputs.length > 0) return inputs;
+          next = ieNextEl(next);
         }
-        var selfInputs = td.querySelectorAll('input:not([type="hidden"]), select, textarea');
-        if (selfInputs.length > 0) {
-          var arr2 = [];
-          for (var n = 0; n < selfInputs.length; n++) arr2.push(selfInputs[n]);
-          return arr2;
-        }
+        var selfInputs = ieFindFields(td);
+        if (selfInputs.length > 0) return selfInputs;
       }
     }
     return [];
@@ -290,8 +459,8 @@
       var trs = doc.getElementsByTagName('tr');
       for (var r = 0; r < trs.length; r++) {
         var tr = trs[r];
-        var inps = tr.querySelectorAll('input[type="text"]');
-        var cb = tr.querySelector('input[type="checkbox"]');
+        var inps = ieFindInputsByType(tr, 'text');
+        var cb = ieFindFirst(tr, 'input', 'checkbox');
         var hasBg = false;
         var hasMed = false;
         var editable = [];
@@ -333,9 +502,9 @@
       }
 
       // รายละเอียดรายการที่เสนอ
-      var cbs = doc.querySelectorAll('input[type="checkbox"]');
+      var cbs = ieFindInputsByType(doc, 'checkbox');
       for (var c = 0; c < cbs.length; c++) {
-        var pTxt = (cbs[c].parentElement ? cbs[c].parentElement.innerText : '');
+        var pTxt = (cbs[c].parentNode ? (cbs[c].parentNode.innerText || cbs[c].parentNode.textContent || '') : '');
         if (pTxt.indexOf('ได้รับการคัดเลือก') !== -1 && !cbs[c].checked) {
           cbs[c].checked = true;
           fireEvents(cbs[c]);
@@ -346,7 +515,7 @@
       var trs = doc.getElementsByTagName('tr');
       for (var r = 0; r < trs.length; r++) {
         var tr = trs[r];
-        var inps = tr.querySelectorAll('input[type="text"]');
+        var inps = ieFindInputsByType(tr, 'text');
         var isMed = false;
         var hasTax = false;
         var editable = [];
@@ -357,11 +526,11 @@
           if (!inps[k].readOnly && !inps[k].disabled) editable.push(inps[k]);
         }
         if (hasTax) {
-          var cb1 = tr.querySelector('input[type="checkbox"]');
+          var cb1 = ieFindFirst(tr, 'input', 'checkbox');
           if (cb1 && !cb1.checked) { cb1.checked = true; fireEvents(cb1); count++; }
         }
         if (isMed && editable.length >= 2) {
-          var cb2 = tr.querySelector('input[type="checkbox"]');
+          var cb2 = ieFindFirst(tr, 'input', 'checkbox');
           if (cb2 && !cb2.checked) { cb2.checked = true; fireEvents(cb2); }
           setInputValue(editable[0], '-');
           setInputValue(editable[1], '-');
@@ -464,15 +633,15 @@
       for (var t = 0; t < tbls.length; t++) {
         var txt = tbls[t].innerText || '';
         if (txt.indexOf('การตรวจรับครั้งสุดท้าย') !== -1) {
-          var sel = tbls[t].querySelector('select');
+          var sel = ieFindFirst(tbls[t], 'select');
           if (sel && setSelectByTextOrVal(sel, '1')) count++;
-          var cb = tbls[t].querySelector('input[type="checkbox"]');
+          var cb = ieFindFirst(tbls[t], 'input', 'checkbox');
           if (cb && !cb.checked) { cb.checked = true; fireEvents(cb); count++; }
         }
         if (txt.indexOf('แจ้งส่ง') !== -1 && txt.indexOf('ตรวจรับ') !== -1) {
           var trs = tbls[t].getElementsByTagName('tr');
           for (var r = 0; r < trs.length; r++) {
-            var inps = trs[r].querySelectorAll('input[type="text"]');
+            var inps = ieFindInputsByType(trs[r], 'text');
             var isMed = false;
             for (var k = 0; k < inps.length; k++) {
               if (/09020600|เวชภัณฑ์/.test(inps[k].value)) isMed = true;
@@ -512,7 +681,7 @@
       }
 
       // ล้างคำว่า undefined ทั้งหมด
-      var allInps = doc.querySelectorAll('input[type="text"]');
+      var allInps = ieFindInputsByType(doc, 'text');
       for (var a = 0; a < allInps.length; a++) {
         if (allInps[a].value && allInps[a].value.replace(/^\s+|\s+$/g, '').toLowerCase() === 'undefined') {
           allInps[a].value = '';
@@ -526,15 +695,15 @@
           var trs = tbls[t].getElementsByTagName('tr');
           var dataRows = [];
           for (var r = 0; r < trs.length; r++) {
-            if (trs[r].querySelectorAll('input[type="text"]').length >= 2 && trs[r].querySelector('select')) {
+            if (ieFindInputsByType(trs[r], 'text').length >= 2 && ieFindFirst(trs[r], 'select')) {
               dataRows.push(trs[r]);
             }
           }
           for (var idx = 0; idx < dataRows.length; idx++) {
             var tr = dataRows[idx];
-            var tInps = tr.querySelectorAll('input[type="text"]');
-            var sel = tr.querySelector('select');
-            var cb = tr.querySelector('input[type="checkbox"]');
+            var tInps = ieFindInputsByType(tr, 'text');
+            var sel = ieFindFirst(tr, 'select');
+            var cb = ieFindFirst(tr, 'input', 'checkbox');
             if (idx < members.length) {
               var m = members[idx];
               setInputValue(tInps[0], m.name);
@@ -653,9 +822,9 @@
     var st = document.getElementById('bma-ie-status');
     if (count > 0) {
       highlightIeApprovalButtons();
-      if (st) st.innerHTML = '✓ กรอกอัตโนมัติ [' + item.code + '] แล้ว (' + count + ' จุด) • รอคุณกด [บันทึก]';
+      if (st) st.innerHTML = '[สำเร็จ] กรอกอัตโนมัติ [' + item.code + '] แล้ว (' + count + ' จุด) • รอคุณกด [บันทึก]';
     } else if (!isSilent && st) {
-      st.innerHTML = '⚠️ ไม่พบช่องที่ต้องกรอกในหน้านี้';
+      st.innerHTML = '[ไม่พบช่อง] ไม่พบช่องที่ต้องกรอกในหน้านี้';
     }
   }
 
@@ -777,35 +946,58 @@
     }
   }
 
+  var ieBridgeSeq = 0;
+
   function ieBridgeReq(endpoint, method, payload, cb) {
+    ieBridgeSeq++;
+    var cbName = '__bmaBrCb_' + ieBridgeSeq + '_' + new Date().getTime();
+    var done = false;
+    var sc = null;
+    var timer = null;
+
+    function finish(ok, data) {
+      if (done) return;
+      done = true;
+      if (timer) { try { clearTimeout(timer); } catch (e0) {} }
+      try { window[cbName] = undefined; delete window[cbName]; } catch (e1) { try { window[cbName] = null; } catch (e2) {} }
+      if (sc && sc.parentNode) { try { sc.parentNode.removeChild(sc); } catch (e3) {} }
+      if (cb) cb(ok, data);
+    }
+
     try {
-      var xhr = new XMLHttpRequest();
-      xhr.open(method || 'GET', BRIDGE_URL + endpoint, true);
-      if ((method || 'GET').toUpperCase() === 'POST') {
-        xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8');
+      window[cbName] = function (data) {
+        finish(true, data);
+      };
+      var url = BRIDGE_URL + '/jsonp?path=' + encodeURIComponent(endpoint || '/status') + '&cb=' + cbName;
+      if (payload !== undefined && payload !== null && (method || 'GET').toUpperCase() === 'POST') {
+        url += '&b64=' + ieUtf8ToBase64Url(ieJsonStringify(payload));
       }
-      xhr.onreadystatechange = function () {
-        if (xhr.readyState === 4) {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              var parsed = JSON.parse(xhr.responseText);
-              if (cb) cb(true, parsed);
-              return;
-            } catch (e) {}
-          }
-          if (cb) cb(false, null);
-        }
+      url += '&t=' + new Date().getTime();
+
+      var timeoutMs = 45000;
+      if (endpoint === '/status' || endpoint === '/vendors-cache') timeoutMs = 4500;
+      else if (endpoint === '/calibrate' || endpoint === '/pick-window') timeoutMs = 300000;
+
+      timer = setTimeout(function () {
+        finish(false, null);
+      }, timeoutMs);
+
+      sc = document.createElement('script');
+      sc.type = 'text/javascript';
+      sc.charset = 'utf-8';
+      sc.async = true;
+      sc.onerror = function () {
+        finish(false, null);
       };
-      xhr.onerror = function () {
-        if (cb) cb(false, null);
-      };
-      xhr.send((method || 'GET').toUpperCase() === 'POST' ? JSON.stringify(payload || {}) : null);
+      sc.src = url;
+      var target = document.getElementsByTagName('head')[0] || document.body || document.documentElement;
+      target.appendChild(sc);
     } catch (e) {
-      if (cb) cb(false, null);
+      finish(false, null);
     }
   }
 
-  // ==================== BUILD IE PANEL UI (CRISP IE11 / QUIRKS MODE SAFE) ====================
+  // ==================== BUILD IE PANEL UI (CRISP IE7/IE8/IE11 QUIRKS MODE SAFE) ====================
   function ieGetScrollTop() {
     return window.pageYOffset ||
       (document.documentElement && document.documentElement.scrollTop) ||
@@ -826,24 +1018,21 @@
   styleEl.id = 'bma-ie-style';
   styleEl.type = 'text/css';
   var cssText =
-    '#bma-ie-panel, #bma-ie-panel * { box-sizing: border-box; font-family: "Leelawadee UI", "Segoe UI", Tahoma, sans-serif !important; line-height: 1.45; }' +
-    '#bma-ie-panel { position: absolute !important; top: 10px; right: 12px; left: auto; bottom: auto; width: 410px; overflow-y: auto; background: #ffffff; border: 2px solid #1d4ed8; border-radius: 10px; box-shadow: 0 10px 28px rgba(15, 23, 42, 0.25); font-size: 13.5px; color: #0f172a; z-index: 2147483647; padding: 12px; text-align: left; }' +
-    '#bma-ie-panel input[type="text"], #bma-ie-panel select, #bma-ie-panel textarea { font-size: 13.5px; color: #0f172a; background: #ffffff; border: 1px solid #94a3b8; border-radius: 5px; padding: 6px 8px; width: 100%; }' +
+    '#bma-ie-panel, #bma-ie-panel * { box-sizing: border-box; font-family: "Leelawadee UI", "Segoe UI", Tahoma, sans-serif !important; line-height: 1.4; }' +
+    '#bma-ie-panel { position: absolute !important; top: 10px; right: 12px; left: auto; bottom: auto; width: 416px; overflow-y: auto; background: #ffffff; border: 2px solid #1d4ed8; border-radius: 10px; box-shadow: 0 10px 28px rgba(15, 23, 42, 0.25); font-size: 13.5px; color: #0f172a; z-index: 2147483647; padding: 12px; text-align: left; }' +
+    '#bma-ie-panel table.bma-ie-tbl { width: 100%; border-collapse: collapse; border-spacing: 0; border: 0; margin: 0 0 7px 0; padding: 0; background: transparent; table-layout: fixed; }' +
+    '#bma-ie-panel table.bma-ie-tbl-tight { width: 100%; border-collapse: collapse; border-spacing: 0; border: 0; margin: 0; padding: 0; background: transparent; }' +
+    '#bma-ie-panel table.bma-ie-tbl td, #bma-ie-panel table.bma-ie-tbl-tight td { border: 0; padding: 0; margin: 0; background: transparent; vertical-align: middle; text-align: left; font-size: 13px; }' +
+    '#bma-ie-panel td.bma-ie-pr6 { padding-right: 6px !important; }' +
+    '#bma-ie-panel td.bma-ie-btncol { width: 58px; padding-left: 5px !important; }' +
+    '#bma-ie-panel td.bma-ie-chkcol { width: 94px; font-size: 12.5px; font-weight: 600; color: #1e293b; white-space: nowrap; }' +
+    '#bma-ie-panel input[type="text"], #bma-ie-panel select, #bma-ie-panel textarea { font-size: 13.5px; color: #0f172a; background: #ffffff; border: 1px solid #94a3b8; border-radius: 5px; padding: 5px 7px; width: 100%; }' +
     '#bma-ie-panel input[type="text"]:focus, #bma-ie-panel select:focus, #bma-ie-panel textarea:focus { border-color: #2563eb; outline: none; }' +
     '#bma-ie-panel button { font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer; }' +
     '.bma-ie-lbl { font-size: 12.5px; font-weight: 600; color: #334155; margin-bottom: 3px; }' +
-    '.bma-ie-row { display: table; width: 100%; table-layout: fixed; margin-bottom: 7px; }' +
-    '.bma-ie-cell { display: table-cell; vertical-align: middle; }' +
-    '.bma-ie-pr6 { padding-right: 6px; }' +
-    '.bma-ie-inrow { display: table; width: 100%; }' +
-    '.bma-ie-inrow-field { display: table-cell; width: 100%; vertical-align: middle; }' +
-    '.bma-ie-inrow-btn { display: table-cell; width: 58px; padding-left: 5px; vertical-align: middle; }' +
-    '.bma-ie-copy { width: 54px; height: 32px; background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; font-size: 12px !important; font-weight: 600; padding: 0; }' +
+    '.bma-ie-copy { width: 54px; height: 30px; background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; font-size: 12px !important; font-weight: 600; padding: 0; }' +
     '.bma-ie-copy:hover { background: #bae6fd; }' +
-    '.bma-ie-actbtn { width: 100%; padding: 8px 10px; border: none; color: #ffffff; font-size: 13px !important; font-weight: 600; margin-bottom: 6px; text-align: center; }' +
-    '.bma-ie-chkrow { display: table; width: 100%; margin-bottom: 6px; }' +
-    '.bma-ie-chklbl { display: table-cell; width: 92px; vertical-align: middle; font-size: 12.5px; font-weight: 600; color: #1e293b; }' +
-    '.bma-ie-chkin { display: table-cell; vertical-align: middle; }';
+    '.bma-ie-actbtn { width: 100%; padding: 8px 10px; border: none; color: #ffffff; font-size: 13px !important; font-weight: 600; margin-bottom: 6px; text-align: center; }';
   if (styleEl.styleSheet) {
     styleEl.styleSheet.cssText = cssText;
   } else {
@@ -861,7 +1050,7 @@
   panel.style.right = '12px';
   panel.style.left = 'auto';
   panel.style.bottom = 'auto';
-  panel.style.width = '410px';
+  panel.style.width = '416px';
   panel.style.zIndex = '2147483647';
   panel.style.background = '#ffffff';
   panel.style.border = '2px solid #1d4ed8';
@@ -890,41 +1079,56 @@
   var curIeEntry = getCurrentIeFyEntry();
   var ieChecks = state.payChecks || { payTo: true, assignTo: true, bankCode: true, branchCode: true, accountNo: true };
 
-  function ieCopyBtnHtml(id, isMulti) {
-    return '<span class="bma-ie-inrow-btn"><button type="button" class="bma-ie-copy" data-src="' + id + '" data-multi="' + (isMulti ? '1' : '0') + '" title="คัดลอกหรือวางลงช่องที่เลือก">คัดลอก</button></span>';
+  function ieInRowHtml(fieldHtml, id, isMulti) {
+    return '<table class="bma-ie-tbl-tight"><tr>' +
+      '<td>' + fieldHtml + '</td>' +
+      '<td class="bma-ie-btncol"><button type="button" class="bma-ie-copy" data-src="' + id + '" data-multi="' + (isMulti ? '1' : '0') + '" title="คัดลอกหรือวางลงช่องที่เลือก">คัดลอก</button></td>' +
+    '</tr></table>';
+  }
+
+  function ieChkRowHtml(ckId, checked, label, inId) {
+    return '<table class="bma-ie-tbl-tight" style="margin-bottom:6px;"><tr>' +
+      '<td class="bma-ie-chkcol"><label style="cursor:pointer;"><input id="' + ckId + '" type="checkbox" ' + (checked ? 'checked="checked"' : '') + ' /> ' + label + '</label></td>' +
+      '<td><input id="' + inId + '" type="text" /></td>' +
+      '<td class="bma-ie-btncol"><button type="button" class="bma-ie-copy" data-src="' + inId + '" data-multi="0" title="คัดลอกหรือวางลงช่องที่เลือก">คัดลอก</button></td>' +
+    '</tr></table>';
   }
 
   panel.innerHTML =
-    '<div id="bma-ie-header" style="background:#1d4ed8;color:#ffffff;padding:9px 11px;border-radius:7px;margin-bottom:9px;display:table;width:100%;cursor:move;" title="ลากแถบนี้เพื่อย้ายตำแหน่งแผงควบคุม">' +
-      '<div style="display:table-cell;vertical-align:middle;font-size:14.5px;font-weight:700;">' +
-        'BMA MIS &amp; MIS2 <span style="font-size:11px;font-weight:600;background:rgba(255,255,255,0.22);padding:2px 6px;border-radius:4px;margin-left:4px;">ARISSARA.K</span>' +
-      '</div>' +
-      '<div style="display:table-cell;vertical-align:middle;text-align:right;width:96px;">' +
-        '<button id="bma-ie-sync" type="button" style="background:#3b82f6;color:#fff;border:none;padding:4px 9px;font-size:12px;margin-right:4px;">ซิงค์</button>' +
-        '<button id="bma-ie-min" type="button" style="background:rgba(255,255,255,0.22);color:#fff;border:none;padding:4px 8px;font-size:12px;">-</button>' +
-      '</div>' +
+    '<div id="bma-ie-header" style="background:#1d4ed8;color:#ffffff;padding:8px 10px;border-radius:7px;margin-bottom:9px;cursor:move;" title="ลากแถบนี้เพื่อย้ายตำแหน่งแผงควบคุม">' +
+      '<table class="bma-ie-tbl-tight"><tr>' +
+        '<td style="color:#ffffff;font-size:14.5px;font-weight:700;">' +
+          'BMA MIS &amp; MIS2 <span style="font-size:11px;font-weight:600;background:#2563eb;color:#ffffff;padding:2px 6px;border-radius:4px;margin-left:4px;">ARISSARA.K</span>' +
+        '</td>' +
+        '<td style="width:94px;text-align:right;">' +
+          '<button id="bma-ie-sync" type="button" style="background:#3b82f6;color:#ffffff;border:none;padding:4px 9px;font-size:12px;margin-right:4px;">ซิงค์</button>' +
+          '<button id="bma-ie-min" type="button" style="background:#1e40af;color:#ffffff;border:none;padding:4px 8px;font-size:12px;">-</button>' +
+        '</td>' +
+      '</tr></table>' +
     '</div>' +
 
     '<div id="bma-ie-body">' +
-      '<div class="bma-ie-row" style="background:#e2e8f0;padding:4px;border-radius:8px;margin-bottom:9px;">' +
-        '<div class="bma-ie-cell bma-ie-pr6"><button id="bma-ie-tab-pur" type="button" style="width:100%;padding:8px 6px;border:none;font-size:13px;">จัดซื้อ/ตรวจรับ (8 ขั้น)</button></div>' +
-        '<div class="bma-ie-cell"><button id="bma-ie-tab-pay" type="button" style="width:100%;padding:8px 6px;border:none;font-size:13px;">เบิกจ่าย MIS2 (ฎีกา)</button></div>' +
+      '<div style="background:#e2e8f0;padding:4px;border-radius:8px;margin-bottom:9px;">' +
+        '<table class="bma-ie-tbl" style="margin-bottom:0;"><tr>' +
+          '<td class="bma-ie-pr6"><button id="bma-ie-tab-pur" type="button" style="width:100%;padding:8px 4px;border:none;font-size:13px;">จัดซื้อ/ตรวจรับ (8 ขั้น)</button></td>' +
+          '<td><button id="bma-ie-tab-pay" type="button" style="width:100%;padding:8px 4px;border:none;font-size:13px;">เบิกจ่าย MIS2 (ฎีกา)</button></td>' +
+        '</tr></table>' +
       '</div>' +
 
       '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:7px;padding:8px 9px;margin-bottom:8px;">' +
-        '<div style="display:table;width:100%;margin-bottom:5px;">' +
-          '<div style="display:table-cell;vertical-align:middle;color:#1e3a8a;font-weight:700;font-size:12.5px;">ปีงบประมาณ &amp; ไฟล์ปลายทาง</div>' +
-          '<div style="display:table-cell;vertical-align:middle;text-align:right;">' +
+        '<table class="bma-ie-tbl-tight" style="margin-bottom:5px;"><tr>' +
+          '<td style="color:#1e3a8a;font-weight:700;font-size:12.5px;">ปีงบประมาณ &amp; ไฟล์ปลายทาง</td>' +
+          '<td style="width:130px;text-align:right;">' +
             '<button id="bma-ie-fy-toggle" type="button" style="background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;padding:3px 8px;font-size:11.5px;">+ เพิ่มปีงบ / ตั้งค่า</button>' +
-          '</div>' +
-        '</div>' +
+          '</td>' +
+        '</tr></table>' +
         '<select id="bma-ie-fy-select" style="border-color:#93c5fd;font-weight:600;color:#1e3a8a;"></select>' +
         '<div id="bma-ie-fy-box" style="display:none;margin-top:8px;padding-top:8px;border-top:1px dashed #93c5fd;">' +
           '<div class="bma-ie-lbl">ปีงบประมาณ (เช่น 70, 71, 72):</div>' +
-          '<div class="bma-ie-row">' +
-            '<div class="bma-ie-cell bma-ie-pr6" style="width:90px;"><input id="bma-ie-cfg-fy" type="text" value="' + state.fiscalYear + '" /></div>' +
-            '<div class="bma-ie-cell"><button id="bma-ie-add-next-fy" type="button" style="width:100%;padding:6px;background:#fff;color:#1d4ed8;border:1px solid #93c5fd;font-size:12px;">+ สร้างปีถัดไป</button></div>' +
-          '</div>' +
+          '<table class="bma-ie-tbl"><tr>' +
+            '<td class="bma-ie-pr6" style="width:90px;"><input id="bma-ie-cfg-fy" type="text" value="' + state.fiscalYear + '" /></td>' +
+            '<td><button id="bma-ie-add-next-fy" type="button" style="width:100%;padding:6px;background:#fff;color:#1d4ed8;border:1px solid #93c5fd;font-size:12px;">+ สร้างปีถัดไป</button></td>' +
+          '</tr></table>' +
           '<div class="bma-ie-lbl">ลิงก์/ID ไฟล์ Auto Crat-EGP:</div>' +
           '<input id="bma-ie-cfg-ac" type="text" value="' + (curIeEntry.autocratSheetId || '') + '" placeholder="วางลิงก์หรือ ID Google Sheet..." style="margin-bottom:6px;font-size:12px;" />' +
           '<div class="bma-ie-lbl">ลิงก์/ID ไฟล์ MISS:</div>' +
@@ -941,51 +1145,51 @@
       /* ===== MODE 1: จัดซื้อ/ตรวจรับ (8 ขั้นตอน) ===== */
       '<div id="bma-ie-mode-pur">' +
         '<div id="bma-ie-summary" style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:7px;padding:8px 10px;margin-bottom:8px;font-size:13px;">กำลังโหลดข้อมูลจาก Google Sheet...</div>' +
-        '<div class="bma-ie-row">' +
-          '<div class="bma-ie-cell bma-ie-pr6"><div class="bma-ie-lbl">รหัสจัดซื้อ</div><input id="bma-ie-purno" type="text" placeholder="เช่น 8" /></div>' +
-          '<div class="bma-ie-cell bma-ie-pr6"><div class="bma-ie-lbl">ใบสั่งซื้อ</div><input id="bma-ie-pono" type="text" placeholder="เช่น 8" /></div>' +
-          '<div class="bma-ie-cell"><div class="bma-ie-lbl">ใบตรวจรับ</div><input id="bma-ie-rcvno" type="text" placeholder="เช่น 8" /></div>' +
-        '</div>' +
-        '<div class="bma-ie-row">' +
-          '<div class="bma-ie-cell bma-ie-pr6" style="width:54%;"><div class="bma-ie-lbl">เลขที่บิล (หน้าส่งมอบ)</div><input id="bma-ie-inv" type="text" placeholder="เลขที่บิล..." /></div>' +
-          '<div class="bma-ie-cell"><div class="bma-ie-lbl">ชุดกรรมการ</div><select id="bma-ie-comm"><option value="1">ชุดที่ 1 (เบญญาภา)</option><option value="2">ชุดที่ 2 (วีรวิชญ์)</option></select></div>' +
-        '</div>' +
+        '<table class="bma-ie-tbl"><tr>' +
+          '<td class="bma-ie-pr6"><div class="bma-ie-lbl">รหัสจัดซื้อ</div><input id="bma-ie-purno" type="text" placeholder="เช่น 8" /></td>' +
+          '<td class="bma-ie-pr6"><div class="bma-ie-lbl">ใบสั่งซื้อ</div><input id="bma-ie-pono" type="text" placeholder="เช่น 8" /></td>' +
+          '<td><div class="bma-ie-lbl">ใบตรวจรับ</div><input id="bma-ie-rcvno" type="text" placeholder="เช่น 8" /></td>' +
+        '</tr></table>' +
+        '<table class="bma-ie-tbl"><tr>' +
+          '<td class="bma-ie-pr6" style="width:54%;"><div class="bma-ie-lbl">เลขที่บิล (หน้าส่งมอบ)</div><input id="bma-ie-inv" type="text" placeholder="เลขที่บิล..." /></td>' +
+          '<td><div class="bma-ie-lbl">ชุดกรรมการ</div><select id="bma-ie-comm"><option value="1">ชุดที่ 1 (เบญญาภา)</option><option value="2">ชุดที่ 2 (วีรวิชญ์)</option></select></td>' +
+        '</tr></table>' +
         '<button id="bma-ie-fillbtn" type="button" class="bma-ie-actbtn" style="background:#2563eb;">กรอกข้อมูลหน้านี้ (Auto-Fill)</button>' +
-        '<div class="bma-ie-row">' +
-          '<div class="bma-ie-cell bma-ie-pr6"><button id="bma-ie-step7" type="button" style="width:100%;padding:7px 6px;background:#eff6ff;color:#1e40af;border:1px solid #93c5fd;font-size:12.5px;">7. กรรมการ (ข้อ 12)</button></div>' +
-          '<div class="bma-ie-cell"><button id="bma-ie-step8" type="button" style="width:100%;padding:7px 6px;background:#eff6ff;color:#1e40af;border:1px solid #93c5fd;font-size:12.5px;">8. ใบตรวจรับ (ข้อ 13)</button></div>' +
-        '</div>' +
+        '<table class="bma-ie-tbl"><tr>' +
+          '<td class="bma-ie-pr6"><button id="bma-ie-step7" type="button" style="width:100%;padding:7px 6px;background:#eff6ff;color:#1e40af;border:1px solid #93c5fd;font-size:12.5px;">7. กรรมการ (ข้อ 12)</button></td>' +
+          '<td><button id="bma-ie-step8" type="button" style="width:100%;padding:7px 6px;background:#eff6ff;color:#1e40af;border:1px solid #93c5fd;font-size:12.5px;">8. ใบตรวจรับ (ข้อ 13)</button></td>' +
+        '</tr></table>' +
       '</div>' +
 
       /* ===== MODE 2: เบิกจ่าย MIS2 (FRM_PAY_DOC) ===== */
       '<div id="bma-ie-mode-pay" style="display:none;">' +
         '<div id="bma-ie-bridge-bar" style="background:#fffbeb;border:1px solid #f59e0b;color:#92400e;border-radius:7px;padding:8px 9px;font-size:12.5px;margin-bottom:8px;">' +
           '<div id="bma-ie-bridge-txt">กำลังตรวจสอบตัวช่วย Oracle Forms...</div>' +
-          '<div class="bma-ie-row" style="margin-top:6px;margin-bottom:5px;">' +
-            '<div class="bma-ie-cell bma-ie-pr6"><button id="bma-ie-br-pick" type="button" style="width:100%;padding:5px;font-size:12px;background:#fff;color:#1e293b;border:1px solid #94a3b8;">เลือกหน้าต่าง Oracle</button></div>' +
-            '<div class="bma-ie-cell"><button id="bma-ie-br-cal" type="button" style="width:100%;padding:5px;font-size:12px;background:#fff;color:#1e293b;border:1px solid #94a3b8;">ตั้งพิกัด (F8)</button></div>' +
-          '</div>' +
+          '<table class="bma-ie-tbl" style="margin-top:6px;margin-bottom:5px;"><tr>' +
+            '<td class="bma-ie-pr6"><button id="bma-ie-br-pick" type="button" style="width:100%;padding:5px;font-size:12px;background:#fff;color:#1e293b;border:1px solid #94a3b8;">เลือกหน้าต่าง Oracle</button></td>' +
+            '<td><button id="bma-ie-br-cal" type="button" style="width:100%;padding:5px;font-size:12px;background:#fff;color:#1e293b;border:1px solid #94a3b8;">ตั้งพิกัด (F8)</button></td>' +
+          '</tr></table>' +
           '<button id="bma-ie-br-float" type="button" style="width:100%;padding:6px;font-size:12.5px;background:#0f766e;color:#ffffff;border:none;">เปิดแผงลอยเบิกจ่าย (ลอยทับ Oracle Forms)</button>' +
         '</div>' +
         '<div id="bma-ie-pay-dup" style="display:none;background:#fef2f2;border:2px solid #dc2626;color:#b91c1c;padding:7px;border-radius:6px;font-weight:700;font-size:12.5px;text-align:center;margin-bottom:7px;"></div>' +
         '<div id="bma-ie-pay-brief" style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:7px 9px;font-size:13px;margin-bottom:8px;"></div>' +
 
-        '<div class="bma-ie-row" style="margin-bottom:8px;">' +
-          '<div class="bma-ie-cell bma-ie-pr6"><button id="bma-ie-psub-1" type="button" style="width:100%;padding:7px 4px;font-size:12.5px;border:1px solid #94a3b8;">1. ใบตรวจรับ</button></div>' +
-          '<div class="bma-ie-cell bma-ie-pr6"><button id="bma-ie-psub-2" type="button" style="width:100%;padding:7px 4px;font-size:12.5px;border:1px solid #94a3b8;">2. ผู้รับเงิน</button></div>' +
-          '<div class="bma-ie-cell"><button id="bma-ie-psub-3" type="button" style="width:100%;padding:7px 4px;font-size:12.5px;border:1px solid #94a3b8;">3. รายละเอียด</button></div>' +
-        '</div>' +
+        '<table class="bma-ie-tbl" style="margin-bottom:8px;"><tr>' +
+          '<td class="bma-ie-pr6"><button id="bma-ie-psub-1" type="button" style="width:100%;padding:7px 4px;font-size:12.5px;border:1px solid #94a3b8;">1. ใบตรวจรับ</button></td>' +
+          '<td class="bma-ie-pr6"><button id="bma-ie-psub-2" type="button" style="width:100%;padding:7px 4px;font-size:12.5px;border:1px solid #94a3b8;">2. ผู้รับเงิน</button></td>' +
+          '<td><button id="bma-ie-psub-3" type="button" style="width:100%;padding:7px 4px;font-size:12.5px;border:1px solid #94a3b8;">3. รายละเอียด</button></td>' +
+        '</tr></table>' +
 
         /* Pay Sub 1 */
         '<div id="bma-ie-ppane-1">' +
-          '<div class="bma-ie-row">' +
-            '<div class="bma-ie-cell bma-ie-pr6"><div class="bma-ie-lbl">เลขที่ใบตรวจรับ</div><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-rcvno" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-rcvno', false) + '</div></div>' +
-            '<div class="bma-ie-cell" style="width:140px;"><div class="bma-ie-lbl">ปีงบ</div><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-rcvyr" type="text" value="' + state.fiscalYear + '" /></span>' + ieCopyBtnHtml('bma-ie-pay-rcvyr', false) + '</div></div>' +
-          '</div>' +
-          '<div class="bma-ie-row">' +
-            '<div class="bma-ie-cell bma-ie-pr6"><div class="bma-ie-lbl">ภาษีมูลค่าเพิ่ม (7%)</div><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-vat" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-vat', false) + '</div></div>' +
-            '<div class="bma-ie-cell"><div class="bma-ie-lbl">หักภาษีเงินได้ (1%)</div><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-wht" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-wht', false) + '</div></div>' +
-          '</div>' +
+          '<table class="bma-ie-tbl"><tr>' +
+            '<td class="bma-ie-pr6"><div class="bma-ie-lbl">เลขที่ใบตรวจรับ</div>' + ieInRowHtml('<input id="bma-ie-pay-rcvno" type="text" />', 'bma-ie-pay-rcvno', false) + '</td>' +
+            '<td style="width:138px;"><div class="bma-ie-lbl">ปีงบ</div>' + ieInRowHtml('<input id="bma-ie-pay-rcvyr" type="text" value="' + state.fiscalYear + '" />', 'bma-ie-pay-rcvyr', false) + '</td>' +
+          '</tr></table>' +
+          '<table class="bma-ie-tbl"><tr>' +
+            '<td class="bma-ie-pr6"><div class="bma-ie-lbl">ภาษีมูลค่าเพิ่ม (7%)</div>' + ieInRowHtml('<input id="bma-ie-pay-vat" type="text" />', 'bma-ie-pay-vat', false) + '</td>' +
+            '<td><div class="bma-ie-lbl">หักภาษีเงินได้ (1%)</div>' + ieInRowHtml('<input id="bma-ie-pay-wht" type="text" />', 'bma-ie-pay-wht', false) + '</td>' +
+          '</tr></table>' +
           '<div id="bma-ie-pay-taxbadge" style="background:#f0fdf4;border:1px solid #86efac;color:#166534;padding:7px 9px;border-radius:6px;font-weight:700;font-size:13px;text-align:center;margin-bottom:8px;">ยอดสุทธิที่จ่าย: -</div>' +
           '<button id="bma-ie-prun-1" type="button" class="bma-ie-actbtn" style="background:#0284c7;">ขั้น 1: กรอกใบตรวจรับ + กดแว่นขยาย</button>' +
           '<button id="bma-ie-prun-15" type="button" class="bma-ie-actbtn" style="background:#0e7490;">ขั้น 1.5: รายละเอียด &raquo; ติ๊กงบ &raquo; ตกลง</button>' +
@@ -997,29 +1201,35 @@
           '<input id="bma-ie-vsearch" type="text" placeholder="ค้นหาบริษัทในทะเบียนบริษัท..." style="margin-bottom:5px;" />' +
           '<select id="bma-ie-vselect" style="margin-bottom:6px;"></select>' +
           '<div id="bma-ie-bankinfo" style="background:#f0f9ff;border:1px solid #7dd3fc;color:#0c4a6e;padding:6px 8px;border-radius:6px;font-size:12.5px;margin-bottom:7px;">ธนาคาร: - | สาขา: -</div>' +
-          '<div class="bma-ie-chkrow"><label class="bma-ie-chklbl"><input id="bma-ie-ck-payTo" type="checkbox" ' + (ieChecks.payTo !== false ? 'checked' : '') + ' /> จ่ายให้</label><div class="bma-ie-chkin"><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-to" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-to', false) + '</div></div></div>' +
-          '<div class="bma-ie-chkrow"><label class="bma-ie-chklbl"><input id="bma-ie-ck-assignTo" type="checkbox" ' + (ieChecks.assignTo !== false ? 'checked' : '') + ' /> โดยมอบให้</label><div class="bma-ie-chkin"><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-assign" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-assign', false) + '</div></div></div>' +
-          '<div class="bma-ie-chkrow"><label class="bma-ie-chklbl"><input id="bma-ie-ck-bankCode" type="checkbox" ' + (ieChecks.bankCode !== false ? 'checked' : '') + ' /> ธนาคาร</label><div class="bma-ie-chkin"><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-bank" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-bank', false) + '</div></div></div>' +
-          '<div class="bma-ie-chkrow"><label class="bma-ie-chklbl"><input id="bma-ie-ck-branchCode" type="checkbox" ' + (ieChecks.branchCode !== false ? 'checked' : '') + ' /> สาขา 4 หลัก</label><div class="bma-ie-chkin"><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-branch" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-branch', false) + '</div></div></div>' +
-          '<div class="bma-ie-chkrow"><label class="bma-ie-chklbl"><input id="bma-ie-ck-accountNo" type="checkbox" ' + (ieChecks.accountNo !== false ? 'checked' : '') + ' /> เลขบัญชี</label><div class="bma-ie-chkin"><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-acct" type="text" /></span>' + ieCopyBtnHtml('bma-ie-pay-acct', false) + '</div></div></div>' +
+          ieChkRowHtml('bma-ie-ck-payTo', ieChecks.payTo !== false, 'จ่ายให้', 'bma-ie-pay-to') +
+          ieChkRowHtml('bma-ie-ck-assignTo', ieChecks.assignTo !== false, 'โดยมอบให้', 'bma-ie-pay-assign') +
+          ieChkRowHtml('bma-ie-ck-bankCode', ieChecks.bankCode !== false, 'ธนาคาร', 'bma-ie-pay-bank') +
+          ieChkRowHtml('bma-ie-ck-branchCode', ieChecks.branchCode !== false, 'สาขา 4 หลัก', 'bma-ie-pay-branch') +
+          ieChkRowHtml('bma-ie-ck-accountNo', ieChecks.accountNo !== false, 'เลขบัญชี', 'bma-ie-pay-acct') +
           '<button id="bma-ie-prun-2" type="button" class="bma-ie-actbtn" style="background:#0284c7;">ขั้น 2: กรอกแท็บ \'ผู้รับเงิน\'</button>' +
         '</div>' +
 
         /* Pay Sub 3 */
         '<div id="bma-ie-ppane-3" style="display:none;">' +
-          '<div style="margin-bottom:6px;"><div class="bma-ie-lbl">ชื่อผู้ขอเบิก</div><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-req" type="text" value="' + (state.defaultRequester || 'นางอรชุมา หุตะโกวิท') + '" /></span>' + ieCopyBtnHtml('bma-ie-pay-req', false) + '</div></div>' +
-          '<div style="margin-bottom:6px;"><div style="display:table;width:100%;margin-bottom:3px;"><span style="display:table-cell;font-size:12.5px;font-weight:600;color:#334155;">วันที่เบิก (พ.ศ.)</span><span style="display:table-cell;text-align:right;"><button id="bma-ie-dt-today" type="button" style="font-size:11.5px;padding:2px 7px;background:#f1f5f9;border:1px solid #cbd5e1;margin-right:4px;">วันนี้</button><button id="bma-ie-dt-rcv" type="button" style="font-size:11.5px;padding:2px 7px;background:#f1f5f9;border:1px solid #cbd5e1;">วันตรวจรับ</button></span></div><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><input id="bma-ie-pay-date" type="text" value="' + ieTodayThaiSlash() + '" /></span>' + ieCopyBtnHtml('bma-ie-pay-date', false) + '</div></div>' +
-          '<div style="margin-bottom:7px;"><div class="bma-ie-lbl">คำอธิบายรายการเบิก</div><div class="bma-ie-inrow"><span class="bma-ie-inrow-field"><textarea id="bma-ie-pay-desc" style="height:62px;"></textarea></span>' + ieCopyBtnHtml('bma-ie-pay-desc', true) + '</div></div>' +
+          '<div style="margin-bottom:6px;"><div class="bma-ie-lbl">ชื่อผู้ขอเบิก</div>' + ieInRowHtml('<input id="bma-ie-pay-req" type="text" value="' + (state.defaultRequester || 'นางอรชุมา หุตะโกวิท') + '" />', 'bma-ie-pay-req', false) + '</div>' +
+          '<div style="margin-bottom:6px;">' +
+            '<table class="bma-ie-tbl-tight" style="margin-bottom:3px;"><tr>' +
+              '<td style="font-size:12.5px;font-weight:600;color:#334155;">วันที่เบิก (พ.ศ.)</td>' +
+              '<td style="width:130px;text-align:right;"><button id="bma-ie-dt-today" type="button" style="font-size:11.5px;padding:2px 7px;background:#f1f5f9;border:1px solid #cbd5e1;margin-right:4px;">วันนี้</button><button id="bma-ie-dt-rcv" type="button" style="font-size:11.5px;padding:2px 7px;background:#f1f5f9;border:1px solid #cbd5e1;">วันตรวจรับ</button></td>' +
+            '</tr></table>' +
+            ieInRowHtml('<input id="bma-ie-pay-date" type="text" value="' + ieTodayThaiSlash() + '" />', 'bma-ie-pay-date', false) +
+          '</div>' +
+          '<div style="margin-bottom:7px;"><div class="bma-ie-lbl">คำอธิบายรายการเบิก</div>' + ieInRowHtml('<textarea id="bma-ie-pay-desc" style="height:62px;"></textarea>', 'bma-ie-pay-desc', true) + '</div>' +
           '<button id="bma-ie-prun-3" type="button" class="bma-ie-actbtn" style="background:#0284c7;">ขั้น 3: กรอกแท็บ \'รายละเอียดเบิก\'</button>' +
           '<div style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:6px 8px;border-radius:6px;font-size:12px;font-weight:600;text-align:center;margin-bottom:8px;">หยุดก่อนบันทึกทุกครั้ง (คนตรวจและกดบันทึกเอง) | กด ESC หยุดทันที</div>' +
         '</div>' +
 
         '<div style="border-top:1px solid #cbd5e1;padding-top:8px;margin-bottom:8px;">' +
           '<div class="bma-ie-lbl">บันทึกเลขที่ใบขอเบิกลง MISS (คอลัมน์ H)</div>' +
-          '<div class="bma-ie-inrow">' +
-            '<span class="bma-ie-inrow-field"><input id="bma-ie-pay-docno" type="text" placeholder="เช่น 123/' + state.fiscalYear + '" /></span>' +
-            '<span style="display:table-cell;width:105px;padding-left:6px;vertical-align:middle;"><button id="bma-ie-pay-savedoc" type="button" style="width:100%;height:33px;background:#16a34a;color:#fff;border:none;font-size:12.5px;">ลง MISS' + state.fiscalYear + '</button></span>' +
-          '</div>' +
+          '<table class="bma-ie-tbl-tight"><tr>' +
+            '<td><input id="bma-ie-pay-docno" type="text" placeholder="เช่น 123/' + state.fiscalYear + '" /></td>' +
+            '<td style="width:105px;padding-left:6px;"><button id="bma-ie-pay-savedoc" type="button" style="width:100%;height:32px;background:#16a34a;color:#fff;border:none;font-size:12.5px;">ลง MISS' + state.fiscalYear + '</button></td>' +
+          '</tr></table>' +
         '</div>' +
       '</div>' +
 
@@ -1159,9 +1369,10 @@
     var sel = document.getElementById('bma-ie-vselect');
     var qIn = document.getElementById('bma-ie-vsearch');
     if (!sel) return;
+    var curVal = sel.value || '';
     var q = String((qIn && qIn.value) || '').replace(/^\s+|\s+$/g, '').toLowerCase();
     var list = state.vendors || [];
-    var html = '<option value="">-- เลือกบริษัทจากทะเบียนบริษัท (' + list.length + ') --</option>';
+    var opts = [{ value: '', text: '-- เลือกบริษัทจากทะเบียนบริษัท (' + list.length + ') --' }];
     for (var i = 0; i < list.length; i++) {
       var v = list[i];
       var match = !q ||
@@ -1170,10 +1381,10 @@
         String(v.accountNo || '').indexOf(q) !== -1;
       if (match) {
         var bTag = v.bank ? ' [' + (v.bankCode || '') + ' ' + v.bank + ']' : '';
-        html += '<option value="' + String(v.company || '').replace(/"/g, '&quot;') + '">' + v.company + bTag + '</option>';
+        opts.push({ value: String(v.company || ''), text: String(v.company || '') + bTag });
       }
     }
-    sel.innerHTML = html;
+    ieSetSelectOptions(sel, opts, curVal);
   }
 
   function applyVendorToIePay(v) {
@@ -1187,7 +1398,7 @@
       ? (v.company || '')
       : (state.defaultAssignTo || ASSIGN_TO_PRESETS[0]);
     document.getElementById('bma-ie-bankinfo').innerHTML =
-      '🏦 ธนาคาร (B): <b>' + (v.bank || '-') + ' (' + (v.bankCode || '-') + ')</b><br/>📍 สาขา (C): <b>' + (v.branch || '-') + '</b>';
+      'ธนาคาร (B): <b>' + (v.bank || '-') + ' (' + (v.bankCode || '-') + ')</b><br/>สาขา (C): <b>' + (v.branch || '-') + '</b>';
     updateIeTaxDisplay(item ? item.amount : 0, v.company || '');
   }
 
@@ -1198,17 +1409,17 @@
     document.getElementById('bma-ie-pay-rcvyr').value = fy;
     document.getElementById('bma-ie-pay-desc').value = ieFormatPayDesc(item);
     document.getElementById('bma-ie-pay-docno').value = item.payDocNo || '';
-    document.getElementById('bma-ie-pay-savedoc').innerHTML = '💾 ลง MISS' + fy;
+    document.getElementById('bma-ie-pay-savedoc').innerHTML = 'ลง MISS' + fy;
 
     var rcvDisp = item.rcvNo ? (item.rcvNo + '/' + fy) : '(ยังไม่มีเลขตรวจรับ)';
     document.getElementById('bma-ie-pay-brief').innerHTML =
-      '<b>[' + item.code + ']</b> ใบตรวจรับ: <b>' + rcvDisp + '</b> | <b style="color:#16a34a;">' + item.amountFormatted + ' ฿</b><br/>' +
+      '<b>[' + item.code + ']</b> ใบตรวจรับ: <b>' + rcvDisp + '</b> | <b style="color:#16a34a;">' + item.amountFormatted + ' บาท</b><br/>' +
       '<span style="color:#475569;">' + (item.vendorName || '-') + '</span>';
 
     var dup = document.getElementById('bma-ie-pay-dup');
     if (item.payDocNo) {
       dup.style.display = 'block';
-      dup.innerHTML = '⛔ มีประวัติขอเบิกแล้วใน MISS' + fy + ' (เลขที่: ' + item.payDocNo + ') — ระวังเบิกซ้ำ!';
+      dup.innerHTML = '[เตือน] มีประวัติขอเบิกแล้วใน MISS' + fy + ' (เลขที่: ' + item.payDocNo + ') — ระวังเบิกซ้ำ!';
     } else {
       dup.style.display = 'none';
     }
@@ -1228,7 +1439,7 @@
       document.getElementById('bma-ie-pay-bank').value = '';
       document.getElementById('bma-ie-pay-branch').value = '';
       document.getElementById('bma-ie-pay-acct').value = '';
-      document.getElementById('bma-ie-bankinfo').innerHTML = '⚠️ ไม่พบบริษัทในทะเบียนบริษัท — เลือกจากช่องด้านบนได้';
+      document.getElementById('bma-ie-bankinfo').innerHTML = '[ไม่พบในทะเบียนบริษัท] สามารถเลือกบริษัทจากช่องด้านบนได้';
     }
   }
 
@@ -1269,7 +1480,7 @@
 
   function runIeBridgeStep(step) {
     if (!ieBridgeStatus.connected) {
-      alert('ยังไม่ได้เปิดตัวช่วย Oracle Forms\n\n• ดับเบิลคลิก START_ORACLE_BRIDGE.bat เพื่อกรอกอัตโนมัติ\n• หรือกดปุ่ม 📋 ข้างแต่ละช่องเพื่อคัดลอกไป Ctrl+V เองได้ทันที');
+      alert('ยังไม่ได้เปิดตัวช่วย Oracle Forms\n\n- ดับเบิลคลิก START_ORACLE_BRIDGE.bat เพื่อกรอกอัตโนมัติ\n- หรือกดปุ่ม คัดลอก ข้างแต่ละช่องเพื่อนำไปกด Ctrl+V เองได้ทันที');
       pollIeBridge();
       return;
     }
@@ -1300,19 +1511,19 @@
       payload.description = String(document.getElementById('bma-ie-pay-desc').value || '').replace(/^\s+|\s+$/g, '');
     }
 
-    setIeStatus('⚡ กำลังกรอกขั้นที่ ' + step + ' ลง Oracle Forms... (กด ESC หยุดทันที)');
+    setIeStatus('กำลังกรอกขั้นที่ ' + step + ' ลง Oracle Forms... (กด ESC หยุดทันที)');
     ieBridgeReq('/run-step', 'POST', { step: step, payload: payload }, function (ok, d) {
       if (!ok || !d) {
-        setIeStatus('❌ ติดต่อตัวช่วย Oracle Forms ไม่ได้');
+        setIeStatus('[ผิดพลาด] ติดต่อตัวช่วย Oracle Forms ไม่ได้');
         pollIeBridge();
         return;
       }
       if (d.ok) {
-        setIeStatus('✓ ' + (d.message || ('กรอกขั้นที่ ' + step + ' สำเร็จ')));
+        setIeStatus('[สำเร็จ] ' + (d.message || ('กรอกขั้นที่ ' + step + ' สำเร็จ')));
         if (step === '1.6') switchIePaySub('2');
         if (step === '2') switchIePaySub('3');
       } else {
-        setIeStatus('⚠️ ' + (d.error || 'กรอกไม่สำเร็จ'));
+        setIeStatus('[เตือน] ' + (d.error || 'กรอกไม่สำเร็จ'));
         if (d.needCalibration && confirm((d.error || 'ยังไม่ได้ตั้งพิกัด') + '\n\nเปิดหน้าต่างตั้งพิกัด (F8) ตอนนี้เลยไหมครับ?')) {
           ieBridgeReq('/calibrate', 'POST', {}, function () { pollIeBridge(); });
         }
@@ -1343,59 +1554,66 @@
       setIeStatus('บันทึกเลขใบขอเบิก ' + payNo + ' ลง MISS' + fy + ' เรียบร้อย!');
     }
 
-    function trySaveViaBridge() {
-      ieBridgeReq('/fetch-gas', 'POST', { url: GAS_URL, method: 'POST', payload: postPayload }, function (ok, res) {
-        if (ok && res && res.ok) {
-          onSaved();
-        } else {
+    function trySaveViaXhr() {
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', GAS_URL, true);
+        xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8');
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState === 4) {
+            try {
+              var res = ieJsonParse(xhr.responseText);
+              if (res && res.ok) {
+                onSaved();
+                return;
+              }
+            } catch (e) {}
+            setIeStatus('บันทึก MISS' + fy + ' ไม่สำเร็จ (เปิด START_ORACLE_BRIDGE.bat แล้วลองใหม่)');
+          }
+        };
+        xhr.onerror = function () {
           setIeStatus('บันทึก MISS' + fy + ' ไม่สำเร็จ (เปิด START_ORACLE_BRIDGE.bat แล้วลองใหม่)');
-        }
-      });
+        };
+        xhr.send(ieJsonStringify(postPayload));
+      } catch (e2) {
+        setIeStatus('บันทึก MISS' + fy + ' ไม่สำเร็จ (เปิด START_ORACLE_BRIDGE.bat แล้วลองใหม่)');
+      }
     }
 
-    try {
-      var xhr = new XMLHttpRequest();
-      xhr.open('POST', GAS_URL, true);
-      xhr.setRequestHeader('Content-Type', 'text/plain;charset=utf-8');
-      xhr.onreadystatechange = function () {
-        if (xhr.readyState === 4) {
-          try {
-            var res = JSON.parse(xhr.responseText);
-            if (res && res.ok) {
-              onSaved();
-              return;
-            }
-          } catch (e) {}
-          trySaveViaBridge();
-        }
-      };
-      xhr.onerror = trySaveViaBridge;
-      xhr.send(JSON.stringify(postPayload));
-    } catch (e2) {
-      trySaveViaBridge();
-    }
+    ieBridgeReq('/fetch-gas', 'POST', { url: GAS_URL, method: 'POST', payload: postPayload }, function (ok, res) {
+      if (ok && res && res.ok) {
+        onSaved();
+        return;
+      }
+      trySaveViaXhr();
+    });
   }
 
   function loadFallbackVendorsCache() {
     if (state.vendors && state.vendors.length > 0) return;
-    try {
-      var xhr = new XMLHttpRequest();
-      xhr.open('GET', VENDORS_CACHE_URL + '?t=' + new Date().getTime(), true);
-      xhr.onreadystatechange = function () {
-        if (xhr.readyState === 4 && xhr.status >= 200 && xhr.status < 300) {
-          try {
-            var data = JSON.parse(xhr.responseText);
-            var arr = (data && data.vendors) ? data.vendors : (data instanceof Array ? data : []);
-            if (arr.length > 0) {
-              state.vendors = arr;
-              renderIeVendors();
-              applyItemToIePay(getSelectedItem());
-            }
-          } catch (e) {}
-        }
-      };
-      xhr.send();
-    } catch (e2) {}
+    function applyVendorArr(data) {
+      var arr = (data && data.vendors) ? data.vendors : (data instanceof Array ? data : []);
+      if (arr.length > 0) {
+        state.vendors = arr;
+        renderIeVendors();
+        applyItemToIePay(getSelectedItem());
+        return true;
+      }
+      return false;
+    }
+    ieBridgeReq('/vendors-cache', 'GET', null, function (ok, data) {
+      if (ok && applyVendorArr(data)) return;
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', VENDORS_CACHE_URL + '?t=' + new Date().getTime(), true);
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState === 4 && xhr.status >= 200 && xhr.status < 300) {
+            try { applyVendorArr(ieJsonParse(xhr.responseText)); } catch (e) {}
+          }
+        };
+        xhr.send();
+      } catch (e2) {}
+    });
   }
 
   function renderIeFiscalYearDropdown() {
@@ -1409,15 +1627,14 @@
     yrs.sort(function (a, b) {
       return (parseInt(a, 10) || 0) - (parseInt(b, 10) || 0);
     });
-    var html = '';
+    var opts = [];
     for (var i = 0; i < yrs.length; i++) {
       var y = yrs[i];
       var info = state.fiscalYears[y] || {};
       var lbl = info.label || ('ปีงบ ' + y + ' (MISS' + y + ' / Auto Crat-EGP' + y + ')');
-      html += '<option value="' + y + '">' + lbl + '</option>';
+      opts.push({ value: y, text: lbl });
     }
-    sel.innerHTML = html;
-    sel.value = String(state.fiscalYear || '70');
+    ieSetSelectOptions(sel, opts, String(state.fiscalYear || '70'));
 
     var entry = getCurrentIeFyEntry();
     var fyIn = document.getElementById('bma-ie-cfg-fy');
@@ -1459,18 +1676,22 @@
     });
 
     if (list.length === 0) {
-      sel.innerHTML = '<option value="">-- ไม่พบรายการ --</option>';
+      ieSetSelectOptions(sel, [{ value: '', text: '-- ไม่พบรายการ --' }], '');
       return;
     }
-    var html = '';
+    var opts = [];
+    var keepSelected = false;
     for (var k = 0; k < list.length; k++) {
       var x = list[k];
-      var recTag = isItemAlreadyRecorded(x) ? '⛔(ลงแล้ว) ' : '';
-      html += '<option value="' + x.code + '">' + recTag + '[' + x.code + '] ' + String(x.subject || '').slice(0, 28) + ' (' + x.amountFormatted + ')</option>';
+      var recTag = isItemAlreadyRecorded(x) ? '[ลงแล้ว] ' : '';
+      opts.push({
+        value: x.code,
+        text: recTag + '[' + x.code + '] ' + String(x.subject || '').slice(0, 28) + ' (' + x.amountFormatted + ')'
+      });
+      if (state.selectedCode && x.code === state.selectedCode) keepSelected = true;
     }
-    sel.innerHTML = html;
-    state.selectedCode = list[0].code;
-    sel.value = state.selectedCode;
+    state.selectedCode = keepSelected ? state.selectedCode : list[0].code;
+    ieSetSelectOptions(sel, opts, state.selectedCode);
     onIeItemChange();
   }
 
@@ -1491,7 +1712,7 @@
     var btn = document.getElementById('bma-ie-fillbtn');
     var sum = document.getElementById('bma-ie-summary');
     var warnHtml = rec
-      ? '<div style="background:#fef2f2;border:2px solid #dc2626;color:#b91c1c;padding:5px;border-radius:4px;font-weight:bold;text-align:center;margin-bottom:5px;">⛔ มีประวัติการลงข้อมูลแล้ว<br/>(ล็อกขั้น 1-6 • แก้ไขขั้น 7 และ 8 ได้)</div>'
+      ? '<div style="background:#fef2f2;border:2px solid #dc2626;color:#b91c1c;padding:5px;border-radius:4px;font-weight:bold;text-align:center;margin-bottom:5px;">[ลงแล้ว] มีประวัติการลงข้อมูลแล้ว<br/>(ล็อกขั้น 1-6 • แก้ไขขั้น 7 และ 8 ได้)</div>'
       : '';
     sum.innerHTML =
       warnHtml +
@@ -1503,7 +1724,7 @@
 
     btn.disabled = !allowMain;
     btn.style.background = !allowMain ? '#94a3b8' : '#2563eb';
-    btn.innerHTML = !allowMain ? '⛔ มีประวัติการลงข้อมูลแล้ว (ล็อกขั้น 1-6)' : '⚡ กรอกซ้ำอีกครั้ง (Auto-Fill)';
+    btn.innerHTML = !allowMain ? '[ล็อกขั้น 1-6] มีประวัติการลงข้อมูลแล้ว' : 'กรอกซ้ำอีกครั้ง (Auto-Fill)';
     applyItemToIePay(item);
     saveState();
 
@@ -1516,10 +1737,17 @@
   function highlightIeApprovalButtons() {
     var docs = getTargetDocs();
     for (var d = 0; d < docs.length; d++) {
-      var btns = docs[d].querySelectorAll('input[type="button"], input[type="submit"], button');
+      var btns = [];
+      var inps = docs[d].getElementsByTagName('input');
+      for (var ii = 0; ii < inps.length; ii++) {
+        var tp = String(inps[ii].type || '').toLowerCase();
+        if (tp === 'button' || tp === 'submit') btns.push(inps[ii]);
+      }
+      var bEls = docs[d].getElementsByTagName('button');
+      for (var bi = 0; bi < bEls.length; bi++) btns.push(bEls[bi]);
       for (var i = 0; i < btns.length; i++) {
         var b = btns[i];
-        var txt = String(b.value || b.innerText || '').replace(/\s+/g, '');
+        var txt = String(b.value || b.innerText || b.textContent || '').replace(/\s+/g, '');
         if (/^(บันทึก|ตกลง|แสดงรายงาน|รายละเอียด)$/.test(txt)) {
           b.style.border = '2px solid #16a34a';
           b.style.fontWeight = 'bold';
@@ -1555,40 +1783,45 @@
       '&missSheetId=' + encodeURIComponent(extractSheetId(entry.missSheetId)) +
       '&t=' + new Date().getTime();
 
-    function tryViaBridge() {
-      ieBridgeReq('/fetch-gas', 'POST', { url: url, method: 'GET' }, function (ok, res) {
-        if (ok && applyLoadedSheetsResponse(res, fy, ' ผ่านตัวช่วย')) {
-          return;
-        }
-        if (state.items && state.items.length > 0) {
-          renderIeVendors();
-          renderIeList();
-          setIeStatus('ใช้ข้อมูลในแคช (' + state.items.length + ' รายการ) — เปิด START_ORACLE_BRIDGE.bat เพื่อซิงค์สดบน IE');
-        } else {
-          setIeStatus('โหลดข้อมูลไม่สำเร็จ — เปิด START_ORACLE_BRIDGE.bat แล้วกด ซิงค์ อีกครั้ง');
-        }
-      });
+    function showCacheOrFail() {
+      if (state.items && state.items.length > 0) {
+        renderIeVendors();
+        renderIeList();
+        setIeStatus('ใช้ข้อมูลในแคช (' + state.items.length + ' รายการ) — เปิด START_ORACLE_BRIDGE.bat เพื่อซิงค์สดบน IE');
+      } else {
+        ieSetSelectOptions(document.getElementById('bma-ie-select'), [{ value: '', text: '-- ยังไม่เชื่อมข้อมูล (เปิด START_ORACLE_BRIDGE.bat แล้วกด ซิงค์) --' }], '');
+        setIeStatus('โหลดข้อมูลไม่สำเร็จ — เปิด START_ORACLE_BRIDGE.bat แล้วกด ซิงค์ อีกครั้ง');
+      }
     }
 
-    try {
-      var xhr = new XMLHttpRequest();
-      xhr.open('GET', url, true);
-      xhr.onreadystatechange = function () {
-        if (xhr.readyState === 4) {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              var res = JSON.parse(xhr.responseText);
-              if (applyLoadedSheetsResponse(res, fy, '')) return;
-            } catch (e) {}
+    function tryDirectXhr() {
+      try {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.onreadystatechange = function () {
+          if (xhr.readyState === 4) {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                var res = ieJsonParse(xhr.responseText);
+                if (applyLoadedSheetsResponse(res, fy, '')) return;
+              } catch (e) {}
+            }
+            showCacheOrFail();
           }
-          tryViaBridge();
-        }
-      };
-      xhr.onerror = tryViaBridge;
-      xhr.send();
-    } catch (e2) {
-      tryViaBridge();
+        };
+        xhr.onerror = showCacheOrFail;
+        xhr.send();
+      } catch (e2) {
+        showCacheOrFail();
+      }
     }
+
+    ieBridgeReq('/fetch-gas', 'POST', { url: url, method: 'GET' }, function (ok, res) {
+      if (ok && applyLoadedSheetsResponse(res, fy, ' ผ่านตัวช่วย')) {
+        return;
+      }
+      tryDirectXhr();
+    });
   }
 
   document.getElementById('bma-ie-min').onclick = function () {
@@ -1669,21 +1902,22 @@
     saveState();
   };
 
-  var copyBtns = panel.querySelectorAll('.bma-ie-copy');
-  for (var ci = 0; ci < copyBtns.length; ci++) {
-    copyBtns[ci].onclick = function () {
+  var allPanelBtns = panel.getElementsByTagName('button');
+  for (var ci = 0; ci < allPanelBtns.length; ci++) {
+    if ((' ' + (allPanelBtns[ci].className || '') + ' ').indexOf(' bma-ie-copy ') === -1) continue;
+    allPanelBtns[ci].onclick = function () {
       var srcId = this.getAttribute('data-src');
       var isMulti = this.getAttribute('data-multi') === '1';
       var el = document.getElementById(srcId);
       var val = el ? String(el.value || '').replace(/^\s+|\s+$/g, '') : '';
-      if (!val) { setIeStatus('⚠️ ไม่มีข้อมูลในช่องนี้'); return; }
+      if (!val) { setIeStatus('[เตือน] ไม่มีข้อมูลในช่องนี้'); return; }
       ieCopyClipboard(val);
       if (ieBridgeStatus.connected && ieBridgeStatus.targetFound) {
         ieBridgeReq('/paste', 'POST', { text: val, isMultiline: isMulti }, function (ok, d) {
-          setIeStatus(ok && d && d.pasted ? '✓ วางลง Oracle Forms แล้ว' : '📋 คัดลอกแล้ว (กด Ctrl+V ใน Oracle Forms)');
+          setIeStatus(ok && d && d.pasted ? '[สำเร็จ] วางลง Oracle Forms แล้ว' : 'คัดลอกแล้ว (กด Ctrl+V ใน Oracle Forms)');
         });
       } else {
-        setIeStatus('📋 คัดลอกแล้ว (กด Ctrl+V ใน Oracle Forms)');
+        setIeStatus('คัดลอกแล้ว (กด Ctrl+V ใน Oracle Forms)');
       }
     };
   }
@@ -1745,6 +1979,11 @@
   document.getElementById('bma-ie-rcvno').onchange = function () { state.rcvNo = this.value; document.getElementById('bma-ie-pay-rcvno').value = this.value; saveState(); if (!isIeMis2Portal()) runAutoFill(undefined, true); };
   document.getElementById('bma-ie-inv').onchange = function () { state.invoiceNo = this.value; saveState(); if (!isIeMis2Portal()) runAutoFill(undefined, true); };
   document.getElementById('bma-ie-comm').onchange = function () { state.committeeSet = this.value; saveState(); if (!isIeMis2Portal()) runAutoFill(undefined, true); };
+
+  var commSel = document.getElementById('bma-ie-comm');
+  if (commSel) commSel.value = state.committeeSet || '1';
+  ieSetSelectOptions(document.getElementById('bma-ie-select'), [{ value: '', text: '-- กำลังโหลดรายการจาก Google Sheet... --' }], '');
+  ieSetSelectOptions(document.getElementById('bma-ie-vselect'), [{ value: '', text: '-- กำลังโหลดทะเบียนบริษัท... --' }], '');
 
   switchIeMode(state.activeMode);
   switchIePaySub(state.paySubTab);
