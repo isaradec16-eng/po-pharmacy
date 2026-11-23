@@ -2487,6 +2487,9 @@ $btnSavePayDoc.Add_Click({
 
 # --- Initial Load on Form Shown ---
 $form.Add_Shown({
+    $form.TopMost = $true
+    $form.BringToFront()
+    $form.Activate()
     Refresh-FiscalYearUi
     $statusBar.Text = "🔄 กำลังโหลดฐานข้อมูลจาก Google Sheets..."
     [System.Windows.Forms.Application]::DoEvents()

@@ -489,6 +489,15 @@ function Find-OracleFormsWindow {
 }
 
 function Open-FloatingPayPanel {
+    # If already open, restore and bring to front immediately
+    try {
+        $existing = [Mis2BridgeWin32]::GetVisibleWindows() | Where-Object { $_.Title -match "BMA MIS2 เบิกจ่ายอัตโนมัติ" } | Select-Object -First 1
+        if ($existing) {
+            [Mis2BridgeWin32]::FocusWindow($existing.Hwnd) | Out-Null
+            return $true
+        }
+    } catch {}
+
     $candidates = @(
         (Join-Path $script:AppDir "mis2_pay_autofill.ps1"),
         (Join-Path (Split-Path -Parent $script:AppDir) "bma-mis2-pay-autofill\mis2_pay_autofill.ps1")
@@ -496,7 +505,8 @@ function Open-FloatingPayPanel {
     $panelScript = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
     if ($panelScript) {
         try {
-            Start-Process powershell.exe -WindowStyle Hidden -ArgumentList "-NoProfile","-ExecutionPolicy","Bypass","-STA","-File",$panelScript
+            $argStr = "-NoProfile -ExecutionPolicy Bypass -STA -WindowStyle Hidden -File `"$panelScript`""
+            Start-Process -FilePath "powershell.exe" -ArgumentList $argStr -WindowStyle Hidden
             return $true
         } catch {}
     }

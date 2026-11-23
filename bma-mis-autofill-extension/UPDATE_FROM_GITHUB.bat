@@ -9,7 +9,7 @@ echo ========================================================
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; " ^
   "$base = 'https://raw.githubusercontent.com/isaradec16-eng/po-pharmacy/main/bma-mis-autofill-extension'; " ^
-  "$files = @('manifest.json','background.js','content.js','panel.css','remote-config.json','google-apps-script.gs','ie-autofill.js','vendors-cache.json','config.json','mis2_pay_autofill.ps1','oracle_bridge.ps1','START_ORACLE_BRIDGE.bat','INSTALL_AUTOSTART_BRIDGE.bat','RUN_IE_AUTOFILL.bat','README.md'); " ^
+  "$files = @('manifest.json','background.js','content.js','panel.css','remote-config.json','google-apps-script.gs','ie-autofill.js','vendors-cache.json','config.json','mis2_pay_autofill.ps1','oracle_bridge.ps1','START_ORACLE_BRIDGE.bat','START_MIS2_PAY_PANEL.bat','INSTALL_AUTOSTART_BRIDGE.bat','RUN_IE_AUTOFILL.bat','README.md'); " ^
   "foreach ($f in $files) { " ^
   "  Write-Host ('กำลังอัปเดต ' + $f + ' ...'); " ^
   "  Invoke-WebRequest -Uri ($base + '/' + $f + '?t=' + [DateTimeOffset]::Now.ToUnixTimeSeconds()) -OutFile (Join-Path $PSScriptRoot $f) -UseBasicParsing; " ^
