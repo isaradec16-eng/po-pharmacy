@@ -770,14 +770,16 @@ function Load-VendorsFromCache {
             $obj = $raw | ConvertFrom-Json
             if ($obj.vendors) {
                 foreach ($v in $obj.vendors) {
+                    $at = if ($v.PSObject.Properties["accountType"]) { ([string]$v.accountType).Trim() } else { "" }
                     $list += [PSCustomObject]@{
-                        company   = [string]$v.company
-                        bank      = [string]$v.bank
-                        bankCode  = if ($v.bankCode) { [string]$v.bankCode } else { Get-BankCode ([string]$v.bank) }
-                        branch    = [string]$v.branch
-                        accountNo = [string]$v.accountNo
-                        address   = [string]$v.address
-                        taxId     = [string]$v.taxId
+                        company     = [string]$v.company
+                        bank        = [string]$v.bank
+                        bankCode    = if ($v.bankCode) { [string]$v.bankCode } else { Get-BankCode ([string]$v.bank) }
+                        branch      = [string]$v.branch
+                        accountNo   = [string]$v.accountNo
+                        accountType = $at
+                        address     = [string]$v.address
+                        taxId       = [string]$v.taxId
                     }
                 }
             }
@@ -800,24 +802,26 @@ function Load-VendorsFromGvizCsv {
         foreach ($row in $rows) {
             $props = @($row.PSObject.Properties)
             if ($props.Count -lt 7) { continue }
-            $company = ([regex]::Replace([string]$props[0].Value, "\s+", " ")).Trim()
+            $company  = ([regex]::Replace([string]$props[0].Value, "\s+", " ")).Trim()
             if ([string]::IsNullOrWhiteSpace($company)) { continue }
-            $bank    = ([regex]::Replace([string]$props[1].Value, "\s+", " ")).Trim()
-            $branch  = ([regex]::Replace([string]$props[2].Value, "\s+", " ")).Trim()
-            $acctTh  = ([string]$props[3].Value).Trim()
-            $acctMis = (Convert-ThaiDigits (if ([string]::IsNullOrWhiteSpace([string]$props[4].Value)) { $acctTh } else { [string]$props[4].Value })).Trim()
-            $addr    = ([regex]::Replace([string]$props[6].Value, "\s+", " ")).Trim()
-            $taxRaw  = if ($props.Count -ge 8) { [string]$props[7].Value } else { "" }
-            $taxId   = [regex]::Replace((Convert-ThaiDigits $taxRaw), "\D", "")
+            $bank     = ([regex]::Replace([string]$props[1].Value, "\s+", " ")).Trim()
+            $branch   = ([regex]::Replace([string]$props[2].Value, "\s+", " ")).Trim()
+            $acctTh   = ([string]$props[3].Value).Trim()
+            $acctMis  = (Convert-ThaiDigits (if ([string]::IsNullOrWhiteSpace([string]$props[4].Value)) { $acctTh } else { [string]$props[4].Value })).Trim()
+            $acctType = ([regex]::Replace([string]$props[5].Value, "\s+", " ")).Trim()
+            $addr     = ([regex]::Replace([string]$props[6].Value, "\s+", " ")).Trim()
+            $taxRaw   = if ($props.Count -ge 8) { [string]$props[7].Value } else { "" }
+            $taxId    = [regex]::Replace((Convert-ThaiDigits $taxRaw), "\D", "")
             if ($taxId -eq "000000") { $taxId = "" }
             $list += [PSCustomObject]@{
-                company   = $company
-                bank      = $bank
-                bankCode  = Get-BankCode $bank
-                branch    = $branch
-                accountNo = $acctMis
-                address   = $addr
-                taxId     = $taxId
+                company     = $company
+                bank        = $bank
+                bankCode    = Get-BankCode $bank
+                branch      = $branch
+                accountNo   = $acctMis
+                accountType = $acctType
+                address     = $addr
+                taxId       = $taxId
             }
         }
     } catch {}
@@ -872,20 +876,38 @@ function Sync-GoogleSheetsData {
                 $statusParts += "ปีงบ $fy (MISS$fy): $($script:Items.Count) รายการ"
             }
             if ($json.ok -and $json.vendors -and $json.vendors.Count -gt 0) {
+                $cachedAtByTax = @{}
+                $cachedAtByKey = @{}
+                foreach ($cv in (Load-VendorsFromCache)) {
+                    if (-not [string]::IsNullOrWhiteSpace([string]$cv.accountType)) {
+                        $ctx = [regex]::Replace((Convert-ThaiDigits ([string]$cv.taxId)), "\D", "")
+                        if ($ctx) { $cachedAtByTax[$ctx] = [string]$cv.accountType }
+                        $ck = Normalize-CompanyKey ([string]$cv.company)
+                        if ($ck) { $cachedAtByKey[$ck] = [string]$cv.accountType }
+                    }
+                }
                 $script:Vendors = @()
                 foreach ($v in $json.vendors) {
+                    $at = if ($v.PSObject.Properties["accountType"] -and -not [string]::IsNullOrWhiteSpace([string]$v.accountType)) { ([string]$v.accountType).Trim() } else { "" }
+                    if (-not $at) {
+                        $vtx = [regex]::Replace((Convert-ThaiDigits ([string]$v.taxId)), "\D", "")
+                        $vk = Normalize-CompanyKey ([string]$v.company)
+                        if ($vtx -and $cachedAtByTax.ContainsKey($vtx)) { $at = $cachedAtByTax[$vtx] }
+                        elseif ($vk -and $cachedAtByKey.ContainsKey($vk)) { $at = $cachedAtByKey[$vk] }
+                    }
                     $script:Vendors += [PSCustomObject]@{
-                        company   = [string]$v.company
-                        bank      = [string]$v.bank
-                        bankCode  = if ($v.bankCode) { [string]$v.bankCode } else { Get-BankCode ([string]$v.bank) }
-                        branch    = [string]$v.branch
-                        accountNo = [string]$v.accountNo
-                        address   = [string]$v.address
-                        taxId     = [string]$v.taxId
+                        company     = [string]$v.company
+                        bank        = [string]$v.bank
+                        bankCode    = if ($v.bankCode) { [string]$v.bankCode } else { Get-BankCode ([string]$v.bank) }
+                        branch      = [string]$v.branch
+                        accountNo   = [string]$v.accountNo
+                        accountType = $at
+                        address     = [string]$v.address
+                        taxId       = [string]$v.taxId
                     }
                 }
                 $loadedVendorsFromGas = $true
-                # Refresh local cache
+                # Refresh local cache (preserving accountType)
                 try {
                     $cacheObj = @{ updatedAt = (Get-Date -Format "yyyy-MM-dd HH:mm"); source = "Apps Script Live"; vendors = $script:Vendors }
                     [System.IO.File]::WriteAllText($script:VendorCachePath, ($cacheObj | ConvertTo-Json -Depth 5), (New-Object System.Text.UTF8Encoding($false)))
@@ -1997,6 +2019,32 @@ function Test-IsAidsBudget($item) {
     return ($codeStr -match "งบเอดส์|เอดส์|aids" -or $bType -match "เอดส์|อุดหนุน")
 }
 
+function Format-PayDescription($item, $vendor) {
+    if (-not $item) { return "" }
+    $subjRaw = if ($item.missSubject) { ([string]$item.missSubject).Trim() } else { ([string]$item.subject).Trim() }
+    $tpl = [string]$script:Config["descriptionTemplate"]
+    if ([string]::IsNullOrWhiteSpace($tpl)) { $tpl = "(ค่า{subject})" }
+    if ($tpl -eq "(ค่า{subject})" -and $subjRaw.StartsWith("ค่า")) {
+        $baseDesc = "($subjRaw)"
+    } else {
+        $baseDesc = $tpl.Replace("{subject}", $subjRaw)
+        $baseDesc = $baseDesc.Replace("{poNo}", [string]$item.poNo)
+        $baseDesc = $baseDesc.Replace("{rcvNo}", [string]$item.rcvNo)
+        $baseDesc = $baseDesc.Replace("{year}", [string]$script:Config["fiscalYear"])
+        $baseDesc = $baseDesc.Replace("{poSignDate}", [string]$item.poSignDate)
+        $baseDesc = $baseDesc.Replace("{rcvDate}", [string]$item.rcvDate)
+    }
+    $acctType = ""
+    if ($vendor -and $vendor.PSObject.Properties["accountType"]) {
+        $acctType = ([string]$vendor.accountType).Trim()
+    }
+    if (-not [string]::IsNullOrWhiteSpace($acctType) -and -not [string]::IsNullOrWhiteSpace($baseDesc)) {
+        return "$acctType`r`n$baseDesc"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($baseDesc)) { return $baseDesc }
+    return $acctType
+}
+
 function Apply-VendorToFields($v) {
     if (-not $v) { return }
     $script:SelectedVendor = $v
@@ -2012,6 +2060,10 @@ function Apply-VendorToFields($v) {
     $bName   = if ($v.bank) { $v.bank } else { "-" }
     $bBranch = if ($v.branch) { $v.branch } else { "-" }
     $lblBankBranchInfo.Text = "🏦 ธนาคาร (B): $bName ($($v.bankCode))`r`n📍 สาขา (C): $bBranch"
+
+    if ($script:SelectedItem) {
+        $txtDesc.Text = Format-PayDescription $script:SelectedItem $v
+    }
 
     $amtNow = if ($script:SelectedItem -and $script:SelectedItem.amount) { [double]$script:SelectedItem.amount } else { 0.0 }
     Update-TaxFieldsFromCurrent -amountVal $amtNow -companyName ([string]$v.company)
@@ -2040,21 +2092,8 @@ function Apply-ItemToFields($item) {
     $amtVal = if ($item.amount) { [double]$item.amount } else { 0.0 }
     Update-TaxFieldsFromCurrent -amountVal $amtVal -companyName ([string]$item.vendorName)
 
-    # Description template (linked directly from MISS70 Column J: ชื่อโครงการ -> (ค่า...))
-    $subjRaw = if ($item.missSubject) { ([string]$item.missSubject).Trim() } else { ([string]$item.subject).Trim() }
-    $tpl = [string]$script:Config["descriptionTemplate"]
-    if ([string]::IsNullOrWhiteSpace($tpl)) { $tpl = "(ค่า{subject})" }
-    if ($tpl -eq "(ค่า{subject})" -and $subjRaw.StartsWith("ค่า")) {
-        $desc = "($subjRaw)"
-    } else {
-        $desc = $tpl.Replace("{subject}", $subjRaw)
-        $desc = $desc.Replace("{poNo}", [string]$item.poNo)
-        $desc = $desc.Replace("{rcvNo}", [string]$item.rcvNo)
-        $desc = $desc.Replace("{year}", [string]$script:Config["fiscalYear"])
-        $desc = $desc.Replace("{poSignDate}", [string]$item.poSignDate)
-        $desc = $desc.Replace("{rcvDate}", [string]$item.rcvDate)
-    }
-    $txtDesc.Text = $desc
+    # Description template (Column F ประเภทบัญชี on line 1 + MISS Column J (ค่า...) on line 2)
+    $txtDesc.Text = Format-PayDescription $item $null
 
     if ($script:Config["defaultDateMode"] -eq "rcvDate" -and $item.rcvDate) {
         $txtPayDate.Text = [string]$item.rcvDate
@@ -2077,12 +2116,10 @@ function Apply-ItemToFields($item) {
         $lblAlert.Text = "✓ พร้อมเบิกจ่าย ($($item.code) | ใบตรวจรับ $($item.rcvNo)/$($script:Config['fiscalYear']) | ยอด $amtDisplay)"
     }
 
-    # Match vendor profile from EGP+MIS ทะเบียนบริษัท
-    $matched = $null
-    if ($item.vendorProfile -and $item.vendorProfile.company) {
+    # Match vendor profile from EGP+MIS ทะเบียนบริษัท (prefer enriched $script:Vendors with accountType)
+    $matched = Find-MatchingVendor -vendorName ([string]$item.vendorName) -taxId ([string]$item.vendorTaxId)
+    if (-not $matched -and $item.vendorProfile -and $item.vendorProfile.company) {
         $matched = $item.vendorProfile
-    } else {
-        $matched = Find-MatchingVendor -vendorName ([string]$item.vendorName) -taxId ([string]$item.vendorTaxId)
     }
 
     if ($matched) {

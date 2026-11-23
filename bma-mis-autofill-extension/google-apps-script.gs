@@ -141,6 +141,7 @@ function getVendorsRegistry() {
       const branch = String(row[2] || '').replace(/\s+/g, ' ').trim();  // Col C: สาขา
       const acctThai = String(row[3] || '').trim();                     // Col D: เลขที่บัญชี (ไทย)
       const acctMis2 = thaiToArabic(String(row[4] || '').trim() || acctThai).trim(); // Col E: MIs2
+      const accountType = String(row[5] || '').replace(/\s+/g, ' ').trim(); // Col F: ประเภทบัญชี
       const address = String(row[6] || '').replace(/\s+/g, ' ').trim(); // Col G: ที่อยู่
       let taxId = thaiToArabic(String(row[7] || '')).replace(/\D/g, ''); // Col H: เลขผู้เสียภาษี
       if (taxId === '000000') taxId = '';
@@ -155,6 +156,7 @@ function getVendorsRegistry() {
         branch: branch,
         branchCode: branchCode,
         accountNo: acctMis2,
+        accountType: accountType,
         address: address,
         taxId: taxId
       };

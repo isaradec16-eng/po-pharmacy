@@ -1655,12 +1655,13 @@
     return /งบเอดส์|เอดส์|aids/i.test(String(item.code || '')) || /เอดส์|อุดหนุน/i.test(String(item.budgetType || ''));
   }
 
-  function formatPayDescription(item) {
+  function formatPayDescription(item, vendor) {
     if (!item) return '';
     const subjRaw = String(item.missSubject || item.subject || '').trim();
-    if (!subjRaw) return '';
-    if (subjRaw.startsWith('ค่า')) return `(${subjRaw})`;
-    return `(ค่า${subjRaw})`;
+    const parenDesc = !subjRaw ? '' : (subjRaw.startsWith('ค่า') ? `(${subjRaw})` : `(ค่า${subjRaw})`);
+    const acctType = vendor && vendor.accountType ? String(vendor.accountType).trim() : '';
+    if (acctType && parenDesc) return `${acctType}\n${parenDesc}`;
+    return parenDesc || acctType;
   }
 
   function getBranchCodeForVendor(v) {
@@ -1886,6 +1887,10 @@
     }
     if (infoBox) {
       infoBox.innerHTML = `🏦 ธนาคาร (B): <b>${v.bank || '-'} (${v.bankCode || '-'})</b><br/>📍 สาขา (C): <b>${v.branch || '-'}</b>`;
+    }
+    const descIn = panelEl.querySelector('#bma-pay-desc');
+    if (descIn && item) {
+      descIn.value = formatPayDescription(item, v);
     }
     updatePayTaxDisplay(item ? item.amount : 0, v.company || '');
   }

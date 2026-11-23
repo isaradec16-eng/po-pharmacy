@@ -983,6 +983,7 @@ function parseVendorsFromCsv(rows) {
     const branch = String(row[2] || "").replace(/\s+/g, " ").trim();
     const acctThai = String(row[3] || "").trim();
     const acctMis2 = thaiToArabic(String(row[4] || "").trim() || acctThai).trim();
+    const accountType = String(row[5] || "").replace(/\s+/g, " ").trim();
     const address = String(row[6] || "").replace(/\s+/g, " ").trim();
     let taxId = thaiToArabic(String(row[7] || "")).replace(/\D/g, "");
     if (taxId === "000000") taxId = "";
@@ -995,11 +996,36 @@ function parseVendorsFromCsv(rows) {
       branch,
       branchCode,
       accountNo: acctMis2,
+      accountType,
       address,
       taxId
     });
   }
   return vendors;
+}
+
+function mergeAccountTypesFromCache(vendors, items, cachedVendors) {
+  if (!Array.isArray(cachedVendors) || cachedVendors.length === 0) return;
+  const norm = (s) => thaiToArabic(String(s || "")).replace(/บริษัท|ห้างหุ้นส่วนจำกัด|หจก\.?|จำกัด|\(มหาชน\)|\(ประเทศไทย\)|\.|,|-|\s+/gi, "").toLowerCase();
+  const byTax = {};
+  const byKey = {};
+  for (const cv of cachedVendors) {
+    const at = String(cv.accountType || "").trim();
+    if (!at) continue;
+    const tx = thaiToArabic(String(cv.taxId || "")).replace(/\D/g, "");
+    if (tx) byTax[tx] = at;
+    const k = norm(cv.company);
+    if (k) byKey[k] = at;
+  }
+  const fillProfile = (p) => {
+    if (!p || (p.accountType && String(p.accountType).trim())) return;
+    const tx = thaiToArabic(String(p.taxId || "")).replace(/\D/g, "");
+    const k = norm(p.company);
+    if (tx && byTax[tx]) p.accountType = byTax[tx];
+    else if (k && byKey[k]) p.accountType = byKey[k];
+  };
+  if (Array.isArray(vendors)) vendors.forEach(fillProfile);
+  if (Array.isArray(items)) items.forEach((it) => { if (it && it.vendorProfile) fillProfile(it.vendorProfile); });
 }
 
 async function fetchAllFromGoogleSheets(cfg) {
@@ -1031,6 +1057,7 @@ async function fetchAllFromGoogleSheets(cfg) {
       const gasMatchedSheet = !data.autocratSheetId || data.autocratSheetId === acSheetId;
       if (data && data.ok && Array.isArray(data.items) && data.items.length > 0 && (!isCustomYearOrSheet || gasMatchedSheet)) {
         const vendors = (Array.isArray(data.vendors) && data.vendors.length > 0) ? data.vendors : cachedVendors;
+        mergeAccountTypesFromCache(vendors, data.items, cachedVendors);
         return { items: data.items, vendors, source: `Apps Script (ปีงบ ${fy})` };
       }
     } catch (e) {}

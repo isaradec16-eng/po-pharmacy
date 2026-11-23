@@ -877,12 +877,13 @@
     return /งบเอดส์|เอดส์|aids/i.test(String(item.code || '')) || /เอดส์|อุดหนุน/i.test(String(item.budgetType || ''));
   }
 
-  function ieFormatPayDesc(item) {
+  function ieFormatPayDesc(item, vendor) {
     if (!item) return '';
     var subj = String(item.missSubject || item.subject || '').replace(/^\s+|\s+$/g, '');
-    if (!subj) return '';
-    if (subj.indexOf('ค่า') === 0) return '(' + subj + ')';
-    return '(ค่า' + subj + ')';
+    var parenDesc = !subj ? '' : (subj.indexOf('ค่า') === 0 ? '(' + subj + ')' : '(ค่า' + subj + ')');
+    var acctType = vendor && vendor.accountType ? String(vendor.accountType).replace(/^\s+|\s+$/g, '') : '';
+    if (acctType && parenDesc) return acctType + '\n' + parenDesc;
+    return parenDesc || acctType;
   }
 
   function ieGetBranchCode(v) {
@@ -1399,6 +1400,9 @@
       : (state.defaultAssignTo || ASSIGN_TO_PRESETS[0]);
     document.getElementById('bma-ie-bankinfo').innerHTML =
       'ธนาคาร (B): <b>' + (v.bank || '-') + ' (' + (v.bankCode || '-') + ')</b><br/>สาขา (C): <b>' + (v.branch || '-') + '</b>';
+    if (item) {
+      document.getElementById('bma-ie-pay-desc').value = ieFormatPayDesc(item, v);
+    }
     updateIeTaxDisplay(item ? item.amount : 0, v.company || '');
   }
 
@@ -1589,12 +1593,57 @@
     });
   }
 
+  function ieMergeAccountTypes(cacheArr) {
+    if (!cacheArr || !cacheArr.length) return;
+    var byTax = {};
+    var byKey = {};
+    var i, cv, at, tx, k;
+    for (i = 0; i < cacheArr.length; i++) {
+      cv = cacheArr[i];
+      at = String(cv.accountType || '').replace(/^\s+|\s+$/g, '');
+      if (!at) continue;
+      tx = thaiToArabic(String(cv.taxId || '')).replace(/\D/g, '');
+      if (tx) byTax[tx] = at;
+      k = ieNormalizeCompany(cv.company);
+      if (k) byKey[k] = at;
+    }
+    function fillProf(p) {
+      if (!p || (p.accountType && String(p.accountType).replace(/^\s+|\s+$/g, ''))) return;
+      var ptx = thaiToArabic(String(p.taxId || '')).replace(/\D/g, '');
+      var pk = ieNormalizeCompany(p.company);
+      if (ptx && byTax[ptx]) p.accountType = byTax[ptx];
+      else if (pk && byKey[pk]) p.accountType = byKey[pk];
+    }
+    if (state.vendors) {
+      for (i = 0; i < state.vendors.length; i++) fillProf(state.vendors[i]);
+    }
+    if (state.items) {
+      for (i = 0; i < state.items.length; i++) {
+        if (state.items[i] && state.items[i].vendorProfile) fillProf(state.items[i].vendorProfile);
+      }
+    }
+  }
+
+  function ieVendorsHaveAccountType() {
+    if (!state.vendors || state.vendors.length === 0) return false;
+    for (var i = 0; i < state.vendors.length; i++) {
+      if (state.vendors[i].accountType && String(state.vendors[i].accountType).replace(/^\s+|\s+$/g, '')) return true;
+    }
+    return false;
+  }
+
   function loadFallbackVendorsCache() {
-    if (state.vendors && state.vendors.length > 0) return;
+    var needFull = !(state.vendors && state.vendors.length > 0);
+    var needAcctTypes = !ieVendorsHaveAccountType();
+    if (!needFull && !needAcctTypes) return;
     function applyVendorArr(data) {
       var arr = (data && data.vendors) ? data.vendors : (data instanceof Array ? data : []);
       if (arr.length > 0) {
-        state.vendors = arr;
+        if (needFull) {
+          state.vendors = arr;
+        } else {
+          ieMergeAccountTypes(arr);
+        }
         renderIeVendors();
         applyItemToIePay(getSelectedItem());
         return true;
@@ -1761,6 +1810,9 @@
       state.items = res.items;
       if (res.vendors && res.vendors.length > 0) {
         state.vendors = res.vendors;
+        if (!ieVendorsHaveAccountType()) {
+          loadFallbackVendorsCache();
+        }
       } else {
         loadFallbackVendorsCache();
       }
