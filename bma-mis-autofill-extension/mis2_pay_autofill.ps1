@@ -584,8 +584,8 @@ function Show-FiscalYearSettingsDialog([string]$initialYear) {
         $yKey = [string]$cmbY.SelectedItem
         if (-not $yKey) { return }
         $ent = Get-FiscalYearEntry $yKey
-        $lblMiss.Text   = "ลิงก์หรือ ID ไฟล์ MISS$yKey (ปลายทางคอลัมน์ D/H/J):"
-        $lblAc.Text     = "ลิงก์หรือ ID ไฟล์ Auto Crat-EGP$yKey:"
+        $lblMiss.Text   = "ลิงก์หรือ ID ไฟล์ MISS${yKey} (ปลายทางคอลัมน์ D/H/J):"
+        $lblAc.Text     = "ลิงก์หรือ ID ไฟล์ Auto Crat-EGP${yKey}:"
         $txtMissUrl.Text = [string]$ent["missSheetId"]
         $txtMissTab.Text = if ($ent["missTabName"]) { [string]$ent["missTabName"] } else { "ชีต1" }
         $txtAcUrl.Text   = [string]$ent["autocratSheetId"]
