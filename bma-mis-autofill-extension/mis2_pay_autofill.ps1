@@ -2047,12 +2047,12 @@ function Apply-ItemToFields($item) {
     if ($tpl -eq "(ค่า{subject})" -and $subjRaw.StartsWith("ค่า")) {
         $desc = "($subjRaw)"
     } else {
-        $desc = $tpl.Replace("{subject}", $subjRaw) `
-                    .Replace("{poNo}", [string]$item.poNo) `
-                    .Replace("{rcvNo}", [string]$item.rcvNo) `
-                    .Replace("{year}", [string]$script:Config["fiscalYear"]) `
-                    .Replace("{poSignDate}", [string]$item.poSignDate) `
-                    .Replace("{rcvDate}", [string]$item.rcvDate)
+        $desc = $tpl.Replace("{subject}", $subjRaw)
+        $desc = $desc.Replace("{poNo}", [string]$item.poNo)
+        $desc = $desc.Replace("{rcvNo}", [string]$item.rcvNo)
+        $desc = $desc.Replace("{year}", [string]$script:Config["fiscalYear"])
+        $desc = $desc.Replace("{poSignDate}", [string]$item.poSignDate)
+        $desc = $desc.Replace("{rcvDate}", [string]$item.rcvDate)
     }
     $txtDesc.Text = $desc
 
