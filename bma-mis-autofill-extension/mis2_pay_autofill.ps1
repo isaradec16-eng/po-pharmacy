@@ -58,6 +58,8 @@ public class Mis2Win32 {
         public string ClassName;
         public int Left;
         public int Top;
+        public int ClientLeft;
+        public int ClientTop;
         public int Width;
         public int Height;
         public override string ToString() {
@@ -69,6 +71,19 @@ public class Mis2Win32 {
 
     [DllImport("user32.dll")]
     public static extern bool SetProcessDPIAware();
+
+    [DllImport("user32.dll")]
+    private static extern bool SetProcessDpiAwarenessContext(IntPtr dpiContext);
+
+    public static void SetBestDpiAwareness() {
+        try {
+            if (SetProcessDpiAwarenessContext(new IntPtr(-4))) return;
+        } catch {}
+        try { SetProcessDPIAware(); } catch {}
+    }
+
+    [DllImport("user32.dll")]
+    private static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
 
     [DllImport("user32.dll")]
     private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
@@ -142,12 +157,14 @@ public class Mis2Win32 {
     private const int  SW_RESTORE           = 9;
     private const uint GA_ROOT              = 2;
 
+    public const int  VK_LBUTTON = 0x01;
     public const byte VK_BACK    = 0x08;
     public const byte VK_TAB     = 0x09;
     public const byte VK_RETURN  = 0x0D;
     public const byte VK_SHIFT   = 0x10;
     public const byte VK_CONTROL = 0x11;
     public const byte VK_ESCAPE  = 0x1B;
+    public const int  VK_SPACE   = 0x20;
     public const byte VK_END     = 0x23;
     public const byte VK_HOME    = 0x24;
     public const byte VK_DELETE  = 0x2E;
@@ -171,12 +188,16 @@ public class Mis2Win32 {
             int w = r.Right - r.Left;
             int h = r.Bottom - r.Top;
             if (w < 100 || h < 60) return true;
+            POINT cp = new POINT { X = 0, Y = 0 };
+            if (!ClientToScreen(hWnd, ref cp)) { cp.X = r.Left; cp.Y = r.Top; }
             list.Add(new WinInfo {
                 Hwnd = hWnd,
                 Title = sbTitle.ToString().Trim(),
                 ClassName = sbClass.ToString().Trim(),
                 Left = r.Left,
                 Top = r.Top,
+                ClientLeft = cp.X,
+                ClientTop = cp.Y,
                 Width = w,
                 Height = h
             });
@@ -194,12 +215,16 @@ public class Mis2Win32 {
         GetClassName(hWnd, sbClass, sbClass.Capacity);
         RECT r;
         GetWindowRect(hWnd, out r);
+        POINT cp = new POINT { X = 0, Y = 0 };
+        if (!ClientToScreen(hWnd, ref cp)) { cp.X = r.Left; cp.Y = r.Top; }
         return new WinInfo {
             Hwnd = hWnd,
             Title = sbTitle.ToString().Trim(),
             ClassName = sbClass.ToString().Trim(),
             Left = r.Left,
             Top = r.Top,
+            ClientLeft = cp.X,
+            ClientTop = cp.Y,
             Width = r.Right - r.Left,
             Height = r.Bottom - r.Top
         };
@@ -329,7 +354,7 @@ public class Mis2Win32 {
 "@
 
 Add-Type -TypeDefinition $win32Code -Language CSharp
-[Mis2Win32]::SetProcessDPIAware() | Out-Null
+[Mis2Win32]::SetBestDpiAwareness()
 
 $script:PanelMutex = New-Object System.Threading.Mutex($false, "Local\BmaMis2PayPanel_ARISSARA")
 if (-not $script:PanelMutex.WaitOne(0, $false)) {
@@ -643,11 +668,13 @@ function Load-Calibration {
             $raw = [System.IO.File]::ReadAllText($script:CalibrationPath, [System.Text.Encoding]::UTF8)
             $obj = $raw | ConvertFrom-Json
             foreach ($prop in $obj.PSObject.Properties) {
+                $rm = if ($prop.Value.PSObject.Properties["refMode"]) { [string]$prop.Value.refMode } else { "window" }
                 $script:Calibration[$prop.Name] = @{
-                    dx   = [int]$prop.Value.dx
-                    dy   = [int]$prop.Value.dy
-                    winW = [int]$prop.Value.winW
-                    winH = [int]$prop.Value.winH
+                    dx      = [int]$prop.Value.dx
+                    dy      = [int]$prop.Value.dy
+                    winW    = [int]$prop.Value.winW
+                    winH    = [int]$prop.Value.winH
+                    refMode = $rm
                 }
             }
         } catch {}
@@ -974,8 +1001,13 @@ function Resolve-CalibPoint([string]$key) {
     $info = [Mis2Win32]::GetWindowInfo($script:TargetHwnd)
     if (-not $info) { return $null }
     $pt = $script:Calibration[$key]
-    $absX = $info.Left + [int]$pt.dx
-    $absY = $info.Top  + [int]$pt.dy
+    if ($pt.ContainsKey("refMode") -and $pt["refMode"] -eq "client") {
+        $absX = $info.ClientLeft + [int]$pt.dx
+        $absY = $info.ClientTop  + [int]$pt.dy
+    } else {
+        $absX = $info.Left + [int]$pt.dx
+        $absY = $info.Top  + [int]$pt.dy
+    }
     return @{ X = $absX; Y = $absY; Win = $info }
 }
 
@@ -1051,8 +1083,39 @@ function Invoke-FillCalibratedField([string]$key, [string]$text, [bool]$isMultil
 }
 
 # ==============================================================================
-# 5. Calibration Wizard Dialog (1-Time Per PC — Hover + F8, F9 to Skip)
+# 5. High-Precision Calibration Wizard (3x Magnifier + Click-to-Capture + Nudge)
 # ==============================================================================
+function Show-TargetMarker([int]$x, [int]$y) {
+    try {
+        $mk = New-Object System.Windows.Forms.Form
+        $mk.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::None
+        $mk.StartPosition = [System.Windows.Forms.FormStartPosition]::Manual
+        $mk.Size = New-Object System.Drawing.Size(36, 36)
+        $mk.Location = New-Object System.Drawing.Point(($x - 18), ($y - 18))
+        $mk.BackColor = [System.Drawing.Color]::Magenta
+        $mk.TransparencyKey = [System.Drawing.Color]::Magenta
+        $mk.TopMost = $true
+        $mk.ShowInTaskbar = $false
+        $mk.Add_Paint({
+            param($s, $e)
+            $pen = New-Object System.Drawing.Pen([System.Drawing.Color]::Red, 2.5)
+            $e.Graphics.DrawEllipse($pen, 4, 4, 27, 27)
+            $e.Graphics.DrawLine($pen, 18, 0, 18, 35)
+            $e.Graphics.DrawLine($pen, 0, 18, 35, 18)
+            $pen.Dispose()
+        })
+        $mkTimer = New-Object System.Windows.Forms.Timer
+        $mkTimer.Interval = 1100
+        $mkTimer.Add_Tick({
+            $mkTimer.Stop()
+            $mkTimer.Dispose()
+            try { $mk.Close(); $mk.Dispose() } catch {}
+        })
+        $mk.Show()
+        $mkTimer.Start()
+    } catch {}
+}
+
 function Show-CalibrationDialog {
     if ($script:TargetHwnd -eq [IntPtr]::Zero -or -not [Mis2Win32]::IsWindow($script:TargetHwnd)) {
         $auto = Find-OracleFormsWindow
@@ -1063,8 +1126,8 @@ function Show-CalibrationDialog {
     }
 
     $dlg = New-Object System.Windows.Forms.Form
-    $dlg.Text = "🎯 ตั้งพิกัดหน้าจอ Oracle Forms (ทำครั้งเดียวต่อเครื่อง)"
-    $dlg.Size = New-Object System.Drawing.Size(560, 560)
+    $dlg.Text = "ตั้งพิกัดหน้าจอ Oracle Forms แบบแม่นยำสูง (แว่นขยาย 3x + คลิกจับจุด)"
+    $dlg.Size = New-Object System.Drawing.Size(700, 595)
     $dlg.StartPosition = "CenterScreen"
     $dlg.TopMost = $true
     $dlg.Font = New-Object System.Drawing.Font("Segoe UI", 9.5)
@@ -1072,31 +1135,94 @@ function Show-CalibrationDialog {
 
     $lblHelp = New-Object System.Windows.Forms.Label
     $lblHelp.Location = New-Object System.Drawing.Point(12, 10)
-    $lblHelp.Size = New-Object System.Drawing.Size(520, 62)
+    $lblHelp.Size = New-Object System.Drawing.Size(660, 62)
     $lblHelp.BackColor = [System.Drawing.Color]::FromArgb(224, 242, 254)
     $lblHelp.ForeColor = [System.Drawing.Color]::FromArgb(12, 74, 110)
     $lblHelp.Padding = New-Object System.Windows.Forms.Padding(8)
-    $lblHelp.Text = "วิธีตั้งพิกัด (ใช้เวลาไม่ถึง 1 นาที):`r`n1. เปิดหน้าต่าง Oracle Forms (FRM_PAY_DOC) ไว้ข้างๆ`r`n2. เลือกรายการด้านล่าง ➔ เลื่อนเมาส์ไปวางบนช่องนั้น ➔ กดปุ่ม [F8] เพื่อบันทึก (กด [F9] เพื่อข้าม)"
+    $lblHelp.Text = "วิธีตั้งพิกัดให้ตรงเป๊ะ 100% (ทำครั้งเดียวต่อเครื่อง):`r`n1. กดปุ่มสีส้ม [คลิกเพื่อจับพิกัด] แล้วเอาเมาส์ชี้กลางช่อง (ดูเป้ากากบาทแดงในจอขยาย 3x ด้านขวา) แล้วคลิกซ้าย 1 ที`r`n2. หรือเลื่อนเมาส์ชี้แล้วกด [F8] (กด [F9] เพื่อข้าม) • ปรับเลื่อนทีละ 2px ได้ด้วยปุ่มลูกศรด้านขวา"
     $dlg.Controls.Add($lblHelp)
 
     $lblWin = New-Object System.Windows.Forms.Label
     $lblWin.Location = New-Object System.Drawing.Point(12, 78)
-    $lblWin.Size = New-Object System.Drawing.Size(520, 22)
+    $lblWin.Size = New-Object System.Drawing.Size(660, 22)
     $lblWin.ForeColor = [System.Drawing.Color]::FromArgb(15, 118, 110)
     $lblWin.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
-    $lblWin.Text = if ($script:TargetWinTitle) { "หน้าต่างเป้าหมาย: $($script:TargetWinTitle)" } else { "⚠️ ยังไม่ได้เลือกหน้าต่างเป้าหมาย — วางเมาส์บน Oracle Forms แล้วกดปุ่ม F8 ระบบจะจับให้อัตโนมัติ" }
+    $lblWin.Text = if ($script:TargetWinTitle) { "หน้าต่างเป้าหมาย: $($script:TargetWinTitle)" } else { "ยังไม่ล็อกหน้าต่างเป้าหมาย — คลิกหรือกด F8 บน Oracle Forms ระบบจะจับให้อัตโนมัติ" }
     $dlg.Controls.Add($lblWin)
 
     $lv = New-Object System.Windows.Forms.ListView
     $lv.Location = New-Object System.Drawing.Point(12, 105)
-    $lv.Size = New-Object System.Drawing.Size(520, 315)
+    $lv.Size = New-Object System.Drawing.Size(498, 345)
     $lv.View = [System.Windows.Forms.View]::Details
     $lv.FullRowSelect = $true
     $lv.GridLines = $true
-    $lv.Columns.Add("กลุ่ม", 145) | Out-Null
-    $lv.Columns.Add("ช่องเป้าหมายใน Oracle Forms", 255) | Out-Null
-    $lv.Columns.Add("สถานะพิกัด", 100) | Out-Null
+    $lv.HideSelection = $false
+    $lv.Columns.Add("กลุ่ม", 132) | Out-Null
+    $lv.Columns.Add("ช่องเป้าหมายใน Oracle Forms", 252) | Out-Null
+    $lv.Columns.Add("สถานะพิกัด", 94) | Out-Null
     $dlg.Controls.Add($lv)
+
+    # Right Side: 3x Live Pixel Magnifier + Nudge Pad
+    $lblZoom = New-Object System.Windows.Forms.Label
+    $lblZoom.Text = "จอขยาย 3x (เป้ากากบาทแดง)"
+    $lblZoom.Location = New-Object System.Drawing.Point(520, 105)
+    $lblZoom.Size = New-Object System.Drawing.Size(152, 20)
+    $lblZoom.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+    $lblZoom.ForeColor = [System.Drawing.Color]::FromArgb(185, 28, 28)
+    $dlg.Controls.Add($lblZoom)
+
+    $picZoom = New-Object System.Windows.Forms.PictureBox
+    $picZoom.Location = New-Object System.Drawing.Point(522, 127)
+    $picZoom.Size = New-Object System.Drawing.Size(144, 144)
+    $picZoom.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
+    $picZoom.BackColor = [System.Drawing.Color]::White
+    $dlg.Controls.Add($picZoom)
+
+    $btnArmClick = New-Object System.Windows.Forms.Button
+    $btnArmClick.Text = "คลิกจับพิกัดแถวนี้`r`n(ไม่ต้องกด F8)"
+    $btnArmClick.Location = New-Object System.Drawing.Point(522, 280)
+    $btnArmClick.Size = New-Object System.Drawing.Size(144, 46)
+    $btnArmClick.BackColor = [System.Drawing.Color]::FromArgb(234, 88, 12)
+    $btnArmClick.ForeColor = [System.Drawing.Color]::White
+    $btnArmClick.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    $btnArmClick.FlatStyle = "Flat"
+    $dlg.Controls.Add($btnArmClick)
+
+    $lblNudge = New-Object System.Windows.Forms.Label
+    $lblNudge.Text = "ปรับละเอียดทีละ 2px:"
+    $lblNudge.Location = New-Object System.Drawing.Point(522, 336)
+    $lblNudge.Size = New-Object System.Drawing.Size(144, 20)
+    $lblNudge.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+    $lblNudge.TextAlign = "MiddleCenter"
+    $dlg.Controls.Add($lblNudge)
+
+    $btnUp = New-Object System.Windows.Forms.Button
+    $btnUp.Text = "▲"
+    $btnUp.Location = New-Object System.Drawing.Point(574, 358)
+    $btnUp.Size = New-Object System.Drawing.Size(40, 28)
+    $btnUp.FlatStyle = "Flat"
+    $dlg.Controls.Add($btnUp)
+
+    $btnLeft = New-Object System.Windows.Forms.Button
+    $btnLeft.Text = "◀"
+    $btnLeft.Location = New-Object System.Drawing.Point(530, 388)
+    $btnLeft.Size = New-Object System.Drawing.Size(40, 28)
+    $btnLeft.FlatStyle = "Flat"
+    $dlg.Controls.Add($btnLeft)
+
+    $btnRight = New-Object System.Windows.Forms.Button
+    $btnRight.Text = "▶"
+    $btnRight.Location = New-Object System.Drawing.Point(618, 388)
+    $btnRight.Size = New-Object System.Drawing.Size(40, 28)
+    $btnRight.FlatStyle = "Flat"
+    $dlg.Controls.Add($btnRight)
+
+    $btnDown = New-Object System.Windows.Forms.Button
+    $btnDown.Text = "▼"
+    $btnDown.Location = New-Object System.Drawing.Point(574, 418)
+    $btnDown.Size = New-Object System.Drawing.Size(40, 28)
+    $btnDown.FlatStyle = "Flat"
+    $dlg.Controls.Add($btnDown)
 
     $refreshCalibList = {
         $selIdx = if ($lv.SelectedIndices.Count -gt 0) { $lv.SelectedIndices[0] } else { 0 }
@@ -1106,7 +1232,7 @@ function Show-CalibrationDialog {
             $item.SubItems.Add($def.Label) | Out-Null
             if ($script:Calibration.ContainsKey($def.Key)) {
                 $p = $script:Calibration[$def.Key]
-                $item.SubItems.Add("✓ ($($p.dx), $($p.dy))") | Out-Null
+                $item.SubItems.Add("OK ($($p.dx), $($p.dy))") | Out-Null
                 $item.BackColor = [System.Drawing.Color]::FromArgb(236, 253, 245)
             } else {
                 $item.SubItems.Add("ยังไม่ตั้ง") | Out-Null
@@ -1122,18 +1248,38 @@ function Show-CalibrationDialog {
     }
     & $refreshCalibList
 
+    $nudgeSelected = {
+        param([int]$ddx, [int]$ddy)
+        if ($lv.SelectedItems.Count -eq 0) { return }
+        $def = $lv.SelectedItems[0].Tag
+        if (-not $script:Calibration.ContainsKey($def.Key)) { return }
+        $script:Calibration[$def.Key]["dx"] = [int]$script:Calibration[$def.Key]["dx"] + $ddx
+        $script:Calibration[$def.Key]["dy"] = [int]$script:Calibration[$def.Key]["dy"] + $ddy
+        Save-Calibration
+        & $refreshCalibList
+        $pos = Resolve-CalibPoint $def.Key
+        if ($pos) {
+            [Mis2Win32]::SetCursorPos($pos.X, $pos.Y) | Out-Null
+            Show-TargetMarker $pos.X $pos.Y
+        }
+    }
+    $btnUp.Add_Click({ & $nudgeSelected 0 -2 })
+    $btnDown.Add_Click({ & $nudgeSelected 0 2 })
+    $btnLeft.Add_Click({ & $nudgeSelected -2 0 })
+    $btnRight.Add_Click({ & $nudgeSelected 2 0 })
+
     $lblLive = New-Object System.Windows.Forms.Label
-    $lblLive.Location = New-Object System.Drawing.Point(12, 428)
-    $lblLive.Size = New-Object System.Drawing.Size(520, 36)
+    $lblLive.Location = New-Object System.Drawing.Point(12, 458)
+    $lblLive.Size = New-Object System.Drawing.Size(660, 40)
     $lblLive.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
     $lblLive.ForeColor = [System.Drawing.Color]::FromArgb(30, 64, 175)
-    $lblLive.Text = "วางเมาส์บนช่องเป้าหมายแล้วกด F8..."
+    $lblLive.Text = "กดปุ่มสีส้มด้านขวาแล้วคลิกกลางช่องใน Oracle Forms หรือวางเมาส์แล้วกด F8..."
     $dlg.Controls.Add($lblLive)
 
     $btnTest = New-Object System.Windows.Forms.Button
-    $btnTest.Text = "🔍 ทดสอบชี้ตำแหน่ง (ไม่คลิก)"
-    $btnTest.Location = New-Object System.Drawing.Point(12, 472)
-    $btnTest.Size = New-Object System.Drawing.Size(185, 34)
+    $btnTest.Text = "ทดสอบชี้ตำแหน่ง + เป้าแดง"
+    $btnTest.Location = New-Object System.Drawing.Point(12, 506)
+    $btnTest.Size = New-Object System.Drawing.Size(200, 36)
     $btnTest.BackColor = [System.Drawing.Color]::FromArgb(224, 242, 254)
     $btnTest.FlatStyle = "Flat"
     $btnTest.Add_Click({
@@ -1147,13 +1293,14 @@ function Show-CalibrationDialog {
         [Mis2Win32]::FocusWindow($script:TargetHwnd) | Out-Null
         Start-Sleep -Milliseconds 120
         [Mis2Win32]::SetCursorPos($pos.X, $pos.Y) | Out-Null
+        Show-TargetMarker $pos.X $pos.Y
     })
     $dlg.Controls.Add($btnTest)
 
     $btnDel = New-Object System.Windows.Forms.Button
-    $btnDel.Text = "🗑️ ล้างพิกัดแถวนี้"
-    $btnDel.Location = New-Object System.Drawing.Point(205, 472)
-    $btnDel.Size = New-Object System.Drawing.Size(130, 34)
+    $btnDel.Text = "ล้างพิกัดแถวนี้"
+    $btnDel.Location = New-Object System.Drawing.Point(220, 506)
+    $btnDel.Size = New-Object System.Drawing.Size(125, 36)
     $btnDel.BackColor = [System.Drawing.Color]::FromArgb(254, 226, 226)
     $btnDel.FlatStyle = "Flat"
     $btnDel.Add_Click({
@@ -1168,70 +1315,130 @@ function Show-CalibrationDialog {
     $dlg.Controls.Add($btnDel)
 
     $btnClose = New-Object System.Windows.Forms.Button
-    $btnClose.Text = "✓ เสร็จสิ้น"
-    $btnClose.Location = New-Object System.Drawing.Point(412, 472)
-    $btnClose.Size = New-Object System.Drawing.Size(120, 34)
+    $btnClose.Text = "เสร็จสิ้น"
+    $btnClose.Location = New-Object System.Drawing.Point(542, 506)
+    $btnClose.Size = New-Object System.Drawing.Size(130, 36)
     $btnClose.BackColor = [System.Drawing.Color]::FromArgb(16, 185, 129)
     $btnClose.ForeColor = [System.Drawing.Color]::White
+    $btnClose.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
     $btnClose.FlatStyle = "Flat"
     $btnClose.Add_Click({ $dlg.Close() })
     $dlg.Controls.Add($btnClose)
 
     $script:lastF8Down = $false
     $script:lastF9Down = $false
+    $script:lastLBtnDown = $false
+    $script:ArmClickCapture = $false
+    $script:WaitReleaseBeforeArm = $false
+
+    $btnArmClick.Add_Click({
+        if ($lv.SelectedItems.Count -eq 0) { return }
+        $script:ArmClickCapture = $true
+        $script:WaitReleaseBeforeArm = $true
+        $btnArmClick.BackColor = [System.Drawing.Color]::FromArgb(220, 38, 38)
+        $btnArmClick.Text = "กำลังรอคลิกซ้าย...`r`n(คลิกกลางช่องได้เลย)"
+    })
+
+    $capturePointAtCursor = {
+        param($ptObj)
+        if ($lv.SelectedItems.Count -eq 0) { return }
+        if ($script:TargetHwnd -eq [IntPtr]::Zero -or -not [Mis2Win32]::IsWindow($script:TargetHwnd)) {
+            $under = [Mis2Win32]::GetTopWindowAtCursor()
+            if ($under -ne [IntPtr]::Zero -and $under -ne $dlg.Handle) {
+                $wi = [Mis2Win32]::GetWindowInfo($under)
+                if ($wi) {
+                    $script:TargetHwnd = $wi.Hwnd
+                    $script:TargetWinTitle = $wi.Title
+                    $lblWin.Text = "หน้าต่างเป้าหมาย: $($wi.Title)"
+                }
+            }
+        }
+        if ($script:TargetHwnd -ne [IntPtr]::Zero -and [Mis2Win32]::IsWindow($script:TargetHwnd)) {
+            $w = [Mis2Win32]::GetWindowInfo($script:TargetHwnd)
+            $def = $lv.SelectedItems[0].Tag
+            $script:Calibration[$def.Key] = @{
+                dx      = [int]($ptObj.X - $w.ClientLeft)
+                dy      = [int]($ptObj.Y - $w.ClientTop)
+                winW    = [int]$w.Width
+                winH    = [int]$w.Height
+                refMode = "client"
+            }
+            Save-Calibration
+            [System.Media.SystemSounds]::Asterisk.Play()
+            Show-TargetMarker $ptObj.X $ptObj.Y
+            $nextIdx = $lv.SelectedIndices[0] + 1
+            & $refreshCalibList
+            if ($nextIdx -lt $lv.Items.Count) {
+                $lv.Items[$nextIdx].Selected = $true
+                $lv.Items[$nextIdx].EnsureVisible()
+            }
+        }
+    }
+
+    $zoomBmp = New-Object System.Drawing.Bitmap(144, 144)
+    $capBmp  = New-Object System.Drawing.Bitmap(48, 48)
+    $redPen  = New-Object System.Drawing.Pen([System.Drawing.Color]::Red, 2)
 
     $timer = New-Object System.Windows.Forms.Timer
     $timer.Interval = 70
     $timer.Add_Tick({
         $pt = New-Object Mis2Win32+POINT
         [Mis2Win32]::GetCursorPos([ref]$pt) | Out-Null
+
+        # Update 3x live pixel magnifier with red crosshair
+        try {
+            $gCap = [System.Drawing.Graphics]::FromImage($capBmp)
+            $gCap.CopyFromScreen(($pt.X - 24), ($pt.Y - 24), 0, 0, (New-Object System.Drawing.Size(48, 48)))
+            $gCap.Dispose()
+
+            $gZoom = [System.Drawing.Graphics]::FromImage($zoomBmp)
+            $gZoom.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
+            $gZoom.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
+            $gZoom.DrawImage($capBmp, (New-Object System.Drawing.Rectangle(0, 0, 144, 144)))
+            $gZoom.DrawLine($redPen, 72, 0, 72, 144)
+            $gZoom.DrawLine($redPen, 0, 72, 144, 72)
+            $gZoom.DrawRectangle($redPen, 68, 68, 8, 8)
+            $gZoom.Dispose()
+            $picZoom.Image = $zoomBmp
+            $picZoom.Invalidate()
+        } catch {}
+
         $relText = "เมาส์: ($($pt.X), $($pt.Y))"
         if ($script:TargetHwnd -ne [IntPtr]::Zero -and [Mis2Win32]::IsWindow($script:TargetHwnd)) {
             $w = [Mis2Win32]::GetWindowInfo($script:TargetHwnd)
             if ($w) {
-                $relText += "  |  สัมพัทธ์กับ Oracle: dx=$($pt.X - $w.Left), dy=$($pt.Y - $w.Top)"
+                $relText += "  |  พิกัดภายใน Oracle: dx=$($pt.X - $w.ClientLeft), dy=$($pt.Y - $w.ClientTop)"
             }
         }
         $curLabel = if ($lv.SelectedItems.Count -gt 0) { $lv.SelectedItems[0].Tag.Label } else { "-" }
-        $lblLive.Text = "กำลังตั้ง: $curLabel`r`n$relText"
+        $armHint = if ($script:ArmClickCapture) { "  [คลิกซ้ายกลางช่องเพื่อบันทึก!]" } else { "" }
+        $lblLive.Text = "กำลังตั้ง: $curLabel$armHint`r`n$relText"
 
-        $f8Down = [Mis2Win32]::IsKeyDown([Mis2Win32]::VK_F8)
-        if ($f8Down -and -not $script:lastF8Down) {
-            if ($lv.SelectedItems.Count -gt 0) {
-                # Auto-detect window under cursor if TargetHwnd not locked yet
-                if ($script:TargetHwnd -eq [IntPtr]::Zero -or -not [Mis2Win32]::IsWindow($script:TargetHwnd)) {
-                    $under = [Mis2Win32]::GetTopWindowAtCursor()
-                    if ($under -ne [IntPtr]::Zero -and $under -ne $dlg.Handle) {
-                        $wi = [Mis2Win32]::GetWindowInfo($under)
-                        if ($wi) {
-                            $script:TargetHwnd = $wi.Hwnd
-                            $script:TargetWinTitle = $wi.Title
-                            $lblWin.Text = "หน้าต่างเป้าหมาย: $($wi.Title)"
-                        }
-                    }
-                }
-                if ($script:TargetHwnd -ne [IntPtr]::Zero -and [Mis2Win32]::IsWindow($script:TargetHwnd)) {
-                    $w = [Mis2Win32]::GetWindowInfo($script:TargetHwnd)
-                    $def = $lv.SelectedItems[0].Tag
-                    $script:Calibration[$def.Key] = @{
-                        dx   = [int]($pt.X - $w.Left)
-                        dy   = [int]($pt.Y - $w.Top)
-                        winW = [int]$w.Width
-                        winH = [int]$w.Height
-                    }
-                    Save-Calibration
-                    [System.Media.SystemSounds]::Asterisk.Play()
-                    $nextIdx = $lv.SelectedIndices[0] + 1
-                    & $refreshCalibList
-                    if ($nextIdx -lt $lv.Items.Count) {
-                        $lv.Items[$nextIdx].Selected = $true
-                        $lv.Items[$nextIdx].EnsureVisible()
-                    }
+        # 1) Click-to-Capture mode (no F8 hand jitter!)
+        $lBtnDown = [Mis2Win32]::IsKeyDown([Mis2Win32]::VK_LBUTTON)
+        if ($script:ArmClickCapture) {
+            if ($script:WaitReleaseBeforeArm) {
+                if (-not $lBtnDown) { $script:WaitReleaseBeforeArm = $false }
+            } elseif ($lBtnDown -and -not $script:lastLBtnDown) {
+                $insideDlg = ($pt.X -ge $dlg.Left -and $pt.X -le $dlg.Right -and $pt.Y -ge $dlg.Top -and $pt.Y -le $dlg.Bottom)
+                if (-not $insideDlg) {
+                    $script:ArmClickCapture = $false
+                    $btnArmClick.BackColor = [System.Drawing.Color]::FromArgb(234, 88, 12)
+                    $btnArmClick.Text = "คลิกจับพิกัดแถวนี้`r`n(ไม่ต้องกด F8)"
+                    & $capturePointAtCursor $pt
                 }
             }
         }
+        $script:lastLBtnDown = $lBtnDown
+
+        # 2) F8 hotkey capture
+        $f8Down = [Mis2Win32]::IsKeyDown([Mis2Win32]::VK_F8)
+        if ($f8Down -and -not $script:lastF8Down) {
+            & $capturePointAtCursor $pt
+        }
         $script:lastF8Down = $f8Down
 
+        # 3) F9 skip
         $f9Down = [Mis2Win32]::IsKeyDown([Mis2Win32]::VK_F9)
         if ($f9Down -and -not $script:lastF9Down) {
             if ($lv.SelectedItems.Count -gt 0) {
@@ -1245,7 +1452,11 @@ function Show-CalibrationDialog {
         $script:lastF9Down = $f9Down
     })
     $dlg.Add_Shown({ $timer.Start() })
-    $dlg.Add_FormClosing({ $timer.Stop(); $timer.Dispose() })
+    $dlg.Add_FormClosing({
+        $timer.Stop()
+        $timer.Dispose()
+        try { $redPen.Dispose(); $capBmp.Dispose(); $zoomBmp.Dispose() } catch {}
+    })
     $dlg.ShowDialog() | Out-Null
 }
 

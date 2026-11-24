@@ -63,6 +63,8 @@ public class Mis2BridgeWin32 {
         public string ClassName;
         public int Left;
         public int Top;
+        public int ClientLeft;
+        public int ClientTop;
         public int Width;
         public int Height;
         public override string ToString() {
@@ -73,6 +75,12 @@ public class Mis2BridgeWin32 {
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
 
     [DllImport("user32.dll")] public static extern bool SetProcessDPIAware();
+    [DllImport("user32.dll")] private static extern bool SetProcessDpiAwarenessContext(IntPtr dpiContext);
+    public static void SetBestDpiAwareness() {
+        try { if (SetProcessDpiAwarenessContext(new IntPtr(-4))) return; } catch {}
+        try { SetProcessDPIAware(); } catch {}
+    }
+    [DllImport("user32.dll")] private static extern bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
     [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
     [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr hWnd);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr hWnd);
@@ -128,12 +136,16 @@ public class Mis2BridgeWin32 {
             int w = r.Right - r.Left;
             int h = r.Bottom - r.Top;
             if (w < 100 || h < 60) return true;
+            POINT cp = new POINT { X = 0, Y = 0 };
+            if (!ClientToScreen(hWnd, ref cp)) { cp.X = r.Left; cp.Y = r.Top; }
             list.Add(new WinInfo {
                 Hwnd = hWnd,
                 Title = sbTitle.ToString().Trim(),
                 ClassName = sbClass.ToString().Trim(),
                 Left = r.Left,
                 Top = r.Top,
+                ClientLeft = cp.X,
+                ClientTop = cp.Y,
                 Width = w,
                 Height = h
             });
@@ -151,12 +163,16 @@ public class Mis2BridgeWin32 {
         GetClassName(hWnd, sbClass, sbClass.Capacity);
         RECT r;
         GetWindowRect(hWnd, out r);
+        POINT cp = new POINT { X = 0, Y = 0 };
+        if (!ClientToScreen(hWnd, ref cp)) { cp.X = r.Left; cp.Y = r.Top; }
         return new WinInfo {
             Hwnd = hWnd,
             Title = sbTitle.ToString().Trim(),
             ClassName = sbClass.ToString().Trim(),
             Left = r.Left,
             Top = r.Top,
+            ClientLeft = cp.X,
+            ClientTop = cp.Y,
             Width = r.Right - r.Left,
             Height = r.Bottom - r.Top
         };
@@ -413,7 +429,7 @@ public class Mis2BridgeHttpServer {
 "@
 
 Add-Type -TypeDefinition $bridgeCs -Language CSharp
-[Mis2BridgeWin32]::SetProcessDPIAware() | Out-Null
+[Mis2BridgeWin32]::SetBestDpiAwareness()
 
 # ==============================================================================
 # 2. Calibration Definitions & Persistence (NEVER includes Save!)
@@ -461,9 +477,11 @@ function Load-Calibration {
             $raw = [System.IO.File]::ReadAllText($script:CalibrationPath, [System.Text.Encoding]::UTF8)
             $obj = $raw | ConvertFrom-Json
             foreach ($p in $obj.PSObject.Properties) {
+                $rm = if ($p.Value.PSObject.Properties["refMode"]) { [string]$p.Value.refMode } else { "window" }
                 $script:Calibration[$p.Name] = @{
-                    dx = [int]$p.Value.dx
-                    dy = [int]$p.Value.dy
+                    dx      = [int]$p.Value.dx
+                    dy      = [int]$p.Value.dy
+                    refMode = $rm
                 }
             }
         } catch {}
@@ -582,8 +600,13 @@ function Invoke-FillCalibratedField([string]$key, [string]$text, [bool]$isMultil
     if ($null -eq $info) { throw "ไม่พบหน้าต่าง Oracle Forms (กรุณาเปิดหน้า FRM_PAY_DOC แล้วกด 'เลือกหน้าต่าง')" }
 
     $pt = $script:Calibration[$key]
-    $absX = $info.Left + [int]$pt.dx
-    $absY = $info.Top  + [int]$pt.dy
+    if ($pt.ContainsKey("refMode") -and $pt["refMode"] -eq "client") {
+        $absX = $info.ClientLeft + [int]$pt.dx
+        $absY = $info.ClientTop  + [int]$pt.dy
+    } else {
+        $absX = $info.Left + [int]$pt.dx
+        $absY = $info.Top  + [int]$pt.dy
+    }
 
     [Mis2BridgeWin32]::FocusWindow($info.Hwnd) | Out-Null
     Start-Sleep -Milliseconds 90
@@ -824,12 +847,13 @@ function Show-CalibrationDialog {
 # 5. Bridge Request Dispatcher (Runs safely on WinForms STA Thread)
 # ==============================================================================
 function Get-StatusPayload {
+    Load-Calibration
     $info = Get-ActiveTargetInfo
     $keys = @($script:Calibration.Keys)
     return @{
         ok              = $true
         running         = $true
-        version         = "2.2.0"
+        version         = "2.3.0"
         targetFound     = ($null -ne $info)
         targetTitle     = if ($info) { [string]$info.Title } else { "" }
         calibratedCount = $script:Calibration.Count
@@ -985,6 +1009,7 @@ function Process-BridgeJob($job) {
         }
 
         if ($path -eq "/run-step") {
+            Load-Calibration
             $step = if ($bodyObj -and $bodyObj.step) { [string]$bodyObj.step } else { "" }
             $p    = if ($bodyObj -and $bodyObj.payload) { $bodyObj.payload } else { $bodyObj }
 
