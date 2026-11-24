@@ -2029,10 +2029,10 @@
     if (state.minimized) panelEl.classList.add('minimized');
 
     panelEl.innerHTML = `
-      <div class="bma-panel-header" id="bma-panel-drag">
+      <div class="bma-panel-header" id="bma-panel-drag" title="ลากเพื่อย้ายตำแหน่ง / ดับเบิลคลิกเพื่อย่อ-ขยาย">
         <div class="bma-panel-title">
           <span>💊 BMA MIS &amp; MIS2</span>
-          <span style="font-size:10px;font-weight:600;background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:4px;">by ARISSARA.K</span>
+          <span class="bma-title-credit" style="font-size:10px;font-weight:600;background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:4px;">by ARISSARA.K</span>
         </div>
         <div class="bma-panel-header-btns">
           <button type="button" class="bma-icon-btn" id="bma-btn-reload" title="ดึงข้อมูลล่าสุดจาก Google Sheet">🔄 ซิงค์</button>
@@ -2323,11 +2323,17 @@
     renderPayVendorOptions();
 
     // ผูก Event ปุ่มต่างๆ
-    panelEl.querySelector('#bma-btn-min').addEventListener('click', () => {
+    const toggleMinimizePanel = () => {
       state.minimized = !state.minimized;
       panelEl.classList.toggle('minimized', state.minimized);
       panelEl.querySelector('#bma-btn-min').textContent = state.minimized ? '➕' : '➖';
       saveState();
+    };
+
+    panelEl.querySelector('#bma-btn-min').addEventListener('click', toggleMinimizePanel);
+    panelEl.querySelector('#bma-panel-drag').addEventListener('dblclick', (e) => {
+      if (e.target && e.target.closest && e.target.closest('button')) return;
+      toggleMinimizePanel();
     });
 
     panelEl.querySelector('#bma-btn-reload').addEventListener('click', () => {
