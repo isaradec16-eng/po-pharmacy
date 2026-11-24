@@ -525,7 +525,7 @@ function Find-OracleFormsWindow {
 function Open-FloatingPayPanel {
     # If already open, restore and force on top of maximized Oracle Forms immediately
     try {
-        $existing = [Mis2BridgeWin32]::GetVisibleWindows() | Where-Object { $_.Title -match "BMA MIS2 เบิกจ่ายอัตโนมัติ" } | Select-Object -First 1
+        $existing = [Mis2BridgeWin32]::GetVisibleWindows() | Where-Object { $_.Title -match "BMA MIS2 (เบิกจ่ายอัตโนมัติ|ข้อมูลช่วยกรอกเบิกจ่าย)" } | Select-Object -First 1
         if ($existing) {
             [Mis2BridgeWin32]::ForceTopMost($existing.Hwnd)
             return $true
@@ -1139,21 +1139,15 @@ try {
 }
 
 $trayMenu = New-Object System.Windows.Forms.ContextMenuStrip
-$miHeader = $trayMenu.Items.Add("💊 BMA MIS2 Oracle Forms Bridge (ARISSARA.K)")
+$miHeader = $trayMenu.Items.Add("💊 BMA MIS & MIS2 Bridge (ARISSARA.K)")
 $miHeader.Enabled = $false
 $trayMenu.Items.Add("-") | Out-Null
 
 $miOpenIE = $trayMenu.Items.Add("🌐 เปิดหน้าเว็บ MIS2 ใน Internet Explorer (IE)")
 $miOpenIE.Add_Click({ Open-Mis2InIE | Out-Null })
 
-$miPick = $trayMenu.Items.Add("🪟 เลือกหน้าต่าง Oracle Forms...")
-$miPick.Add_Click({ Show-WindowPickerDialog | Out-Null })
-
-$miOpenPayPanel = $trayMenu.Items.Add("📌 เปิดแผงลอยเบิกจ่าย (ทับ Oracle Forms)")
+$miOpenPayPanel = $trayMenu.Items.Add("📌 เปิดแผงลอยข้อมูลช่วยกรอกเบิกจ่าย (ลอยทับ Oracle Forms)")
 $miOpenPayPanel.Add_Click({ Open-FloatingPayPanel | Out-Null })
-
-$miCalib = $trayMenu.Items.Add("🎯 ตั้งพิกัดหน้าจอ Oracle Forms (F8)...")
-$miCalib.Add_Click({ Show-CalibrationDialog })
 
 $script:AutoInjectIE = $true
 $miAutoIe = New-Object System.Windows.Forms.ToolStripMenuItem("✓ เปิดแผงอัตโนมัติใน IE ทุกหน้า (Auto-Inject)")
@@ -1165,7 +1159,7 @@ $miAutoIe.Add_Click({
 $trayMenu.Items.Add($miAutoIe) | Out-Null
 
 $script:AutoPopOraclePay = $true
-$miAutoPop = New-Object System.Windows.Forms.ToolStripMenuItem("✓ เปิดแผงเบิกจ่ายลอยทับ Oracle Forms อัตโนมัติ")
+$miAutoPop = New-Object System.Windows.Forms.ToolStripMenuItem("✓ เปิดแผงข้อมูลเบิกจ่ายลอยทับ Oracle Forms อัตโนมัติ")
 $miAutoPop.Checked = $true
 $miAutoPop.Add_Click({
     $script:AutoPopOraclePay = -not $script:AutoPopOraclePay
@@ -1174,7 +1168,7 @@ $miAutoPop.Add_Click({
 $trayMenu.Items.Add($miAutoPop) | Out-Null
 
 $trayMenu.Items.Add("-") | Out-Null
-$miExit = $trayMenu.Items.Add("❌ ปิดตัวช่วย Oracle Forms")
+$miExit = $trayMenu.Items.Add("❌ ปิดตัวช่วย BMA MIS & MIS2")
 $miExit.Add_Click({
     $script:TrayIcon.Visible = $false
     $script:HttpServer.Stop()
@@ -1190,7 +1184,7 @@ $script:TrayIcon.Add_DoubleClick({ Open-FloatingPayPanel | Out-Null })
 $script:TrayIcon.ShowBalloonTip(
     3500,
     "BMA MIS & MIS2 Bridge พร้อมทำงาน",
-    "เปิดแผงอัตโนมัติใน IE ทุกหน้า และเปิดแผงลอยทับ Oracle Forms (ระบบการเงินจ่าย) ให้อัตโนมัติ",
+    "เปิดแผงช่วยกรอกใน IE และเปิดแผงลอยข้อมูลเบิกจ่ายทับ Oracle Forms อัตโนมัติ (หรือกด Ctrl+Shift+M)",
     [System.Windows.Forms.ToolTipIcon]::Info
 )
 

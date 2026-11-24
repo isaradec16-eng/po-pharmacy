@@ -1750,16 +1750,14 @@
     if (!bar || !txt) return;
     if (bridgeStatus.connected) {
       bar.className = 'bma-bridge-bar connected';
-      const winText = bridgeStatus.targetFound
-        ? `🪟 ล็อกหน้าต่าง: ${String(bridgeStatus.targetTitle || 'Oracle Forms').slice(0, 26)}`
-        : '⚠️ ยังไม่พบหน้าต่าง Oracle Forms (เปิด FRM_PAY_DOC แล้วกดเลือกหน้าต่าง)';
       txt.innerHTML =
-        `<b>🟢 เชื่อมตัวช่วย Oracle Forms แล้ว</b> (พิกัด ${bridgeStatus.calibratedCount}/${bridgeStatus.totalCalibCount})<br/>${winText}`;
+        `<b>🟢 โหมดข้อมูลช่วยกรอก (พร้อมเปิดแผงลอยทับ Oracle Forms)</b><br/>` +
+        `กดปุ่ม 📋 คัดลอกข้างแต่ละช่อง แล้วกด <b>Ctrl+V</b> วางใน FRM_PAY_DOC`;
     } else {
       bar.className = 'bma-bridge-bar offline';
       txt.innerHTML =
-        `<b>🟡 โหมดคัดลอกวาง (ยังไม่เปิดตัวช่วย Oracle Forms)</b><br/>` +
-        `กดปุ่ม 📋 คัดลอกไปวางได้เลย หรือดับเบิลคลิก <b>START_ORACLE_BRIDGE.bat</b> เพื่อกรอกอัตโนมัติ`;
+        `<b>📋 โหมดข้อมูลช่วยกรอก (คัดลอก-วางด้วย Ctrl+V)</b><br/>` +
+        `กดปุ่ม 📋 ข้างแต่ละช่องเพื่อคัดลอกได้เลย (หรือเปิด <b>START_MIS2_PAY_PANEL.bat</b> สำหรับแผงลอย)`;
     }
   }
 
@@ -1786,9 +1784,9 @@
       if (!silent) {
         setStatus(
           bridgeStatus.connected
-            ? `✓ เชื่อมตัวช่วย Oracle Forms แล้ว (พิกัด ${bridgeStatus.calibratedCount}/${bridgeStatus.totalCalibCount})`
-            : '🟡 ยังไม่เปิดตัวช่วย Oracle Forms • ใช้ปุ่ม 📋 คัดลอกวางได้ทันที',
-          bridgeStatus.connected ? 'ok' : ''
+            ? '✓ พร้อมใช้งานโหมดข้อมูลช่วยกรอก • กดปุ่ม 📋 คัดลอกแล้ว Ctrl+V วางได้เลย'
+            : '📋 โหมดข้อมูลช่วยกรอก • กดปุ่ม 📋 คัดลอกแล้ว Ctrl+V วางใน FRM_PAY_DOC',
+          'ok'
         );
       }
     });
@@ -1797,7 +1795,7 @@
   function handleQuickCopyOrPaste(val, isMultiline, btnEl) {
     const clean = String(val || '').trim();
     if (!clean) {
-      setStatus('⚠️ ไม่มีข้อมูลในช่องนี้ให้คัดลอก/วาง', 'err');
+      setStatus('⚠️ ไม่มีข้อมูลในช่องนี้ให้คัดลอก', 'err');
       return;
     }
     copyTextToBrowserClipboard(clean);
@@ -1806,17 +1804,7 @@
       btnEl.textContent = '✓';
       setTimeout(() => { btnEl.textContent = orig; }, 900);
     }
-    if (bridgeStatus.connected && bridgeStatus.targetFound) {
-      sendBridgeRequest('/paste', 'POST', { text: clean, isMultiline: Boolean(isMultiline) }, 10000, (res) => {
-        if (res && res.ok && res.data && res.data.pasted) {
-          setStatus('✓ วางข้อมูลลงช่องที่เลือกใน Oracle Forms แล้ว', 'ok');
-        } else {
-          setStatus('📋 คัดลอกลงคลิปบอร์ดแล้ว (กด Ctrl+V ใน Oracle Forms)', 'ok');
-        }
-      });
-    } else {
-      setStatus('📋 คัดลอกลงคลิปบอร์ดแล้ว (กด Ctrl+V ใน Oracle Forms)', 'ok');
-    }
+    setStatus('📋 คัดลอกลงคลิปบอร์ดแล้ว — กด Ctrl+V วางใน FRM_PAY_DOC ได้เลย', 'ok');
   }
 
   function updatePayTaxDisplay(amountVal, companyName) {
@@ -1985,76 +1973,6 @@
       const btn = panelEl.querySelector('#bma-pay-subbtn-' + k);
       if (pane) pane.style.display = k === state.paySubTab ? 'flex' : 'none';
       if (btn) btn.className = 'bma-subtab' + (k === state.paySubTab ? ' active' : '');
-    });
-  }
-
-  function runOracleBridgeStep(step) {
-    if (!panelEl) return;
-    if (!bridgeStatus.connected) {
-      setStatus('🟡 ยังไม่ได้เปิดตัวช่วย Oracle Forms — ดับเบิลคลิก START_ORACLE_BRIDGE.bat หรือใช้ปุ่ม 📋 คัดลอกวาง', 'err');
-      alert(
-        'ยังไม่ได้เปิดตัวช่วย Oracle Forms (BMA MIS2 Bridge)\n\n' +
-        '• หากต้องการกรอกเข้าหน้าต่าง Oracle Forms อัตโนมัติ:\n  ให้ดับเบิลคลิก START_ORACLE_BRIDGE.bat (หรือ INSTALL_AUTOSTART_BRIDGE.bat)\n\n' +
-        '• หรือกดปุ่ม 📋 ข้างแต่ละช่องเพื่อคัดลอกไปกด Ctrl+V เองได้ทันทีครับ'
-      );
-      return;
-    }
-
-    const payload = {};
-    if (step === '1') {
-      payload.rcvNo = (panelEl.querySelector('#bma-pay-rcvno').value || '').trim();
-      payload.rcvYear = (panelEl.querySelector('#bma-pay-rcvyr').value || '').trim();
-      if (!payload.rcvNo) {
-        alert('กรุณาระบุเลขที่ใบตรวจรับก่อนครับ');
-        return;
-      }
-    } else if (step === '1.6') {
-      payload.vatAmount = (panelEl.querySelector('#bma-pay-vat').value || '').trim();
-      payload.whtAmount = (panelEl.querySelector('#bma-pay-wht').value || '').trim();
-    } else if (step === '2') {
-      const checks = state.payChecks || {};
-      const payToVal = (panelEl.querySelector('#bma-pay-to').value || '').trim();
-      const branchVal = (panelEl.querySelector('#bma-pay-branch').value || '').trim();
-      if (payToVal && branchVal) {
-        state.branchOverrides = state.branchOverrides || {};
-        state.branchOverrides[payToVal] = branchVal;
-        saveState();
-      }
-      if (checks.payTo !== false) payload.payTo = payToVal;
-      if (checks.assignTo !== false) payload.assignTo = (panelEl.querySelector('#bma-pay-assign').value || '').trim();
-      if (checks.bankCode !== false) payload.bankCode = (panelEl.querySelector('#bma-pay-bank').value || '').trim();
-      if (checks.branchCode !== false) payload.branchCode = branchVal;
-      if (checks.accountNo !== false) payload.accountNo = (panelEl.querySelector('#bma-pay-acct').value || '').trim();
-    } else if (step === '3') {
-      payload.requesterName = (panelEl.querySelector('#bma-pay-requester').value || '').trim();
-      payload.payDate = (panelEl.querySelector('#bma-pay-date').value || '').trim();
-      payload.description = (panelEl.querySelector('#bma-pay-desc').value || '').trim();
-    }
-
-    setStatus(`⚡ กำลังส่งคำสั่งขั้นที่ ${step} ไปยัง Oracle Forms... (กด ESC หยุดฉุกเฉิน)`, '');
-    sendBridgeRequest('/run-step', 'POST', { step, payload }, 45000, (res) => {
-      if (!res || !res.bridgeConnected) {
-        pollBridgeStatus(true);
-        setStatus('❌ ขาดการเชื่อมต่อกับตัวช่วย Oracle Forms', 'err');
-        return;
-      }
-      const d = res.data || {};
-      if (d.ok) {
-        setStatus('✓ ' + (d.message || `กรอกขั้นที่ ${step} สำเร็จ`), 'ok');
-        if (step === '1.6') switchPaySubTab('2');
-        if (step === '2') switchPaySubTab('3');
-      } else {
-        setStatus('⚠️ ' + (d.error || 'กรอกไม่สำเร็จ'), 'err');
-        if (d.needCalibration) {
-          const openCal = confirm(
-            (d.error || 'ยังไม่ได้ตั้งพิกัดหน้าจอ Oracle Forms') +
-            '\n\nต้องการเปิดหน้าต่างตั้งพิกัด (F8) ตอนนี้เลยไหมครับ?'
-          );
-          if (openCal) {
-            sendBridgeRequest('/calibrate', 'POST', {}, 300000, () => pollBridgeStatus(false));
-          }
-        }
-      }
     });
   }
 
@@ -2245,16 +2163,14 @@
           </div>
         </div>
 
-        <!-- ==================== TAB 2: เบิกจ่าย MIS2 (FRM_PAY_DOC) ==================== -->
+        <!-- ==================== TAB 2: ข้อมูลช่วยกรอกเบิกจ่าย MIS2 (FRM_PAY_DOC) ==================== -->
         <div id="bma-mode-pay" style="display:${state.activeMode === 'pay' ? 'flex' : 'none'};flex-direction:column;gap:8px;">
           <div id="bma-bridge-bar" class="bma-bridge-bar offline">
-            <div id="bma-bridge-status-text">กำลังตรวจสอบตัวช่วย Oracle Forms...</div>
+            <div id="bma-bridge-status-text">📋 โหมดข้อมูลช่วยกรอก • กดปุ่ม 📋 ข้างแต่ละช่องแล้ว Ctrl+V วางใน FRM_PAY_DOC</div>
             <div class="bma-bridge-actions">
               <button type="button" class="bma-mini-btn" id="bma-bridge-open-ie" title="เปิดหน้าเว็บ MIS2 ใน Internet Explorer">🌐 เปิด MIS2 (IE)</button>
-              <button type="button" class="bma-mini-btn" id="bma-bridge-pick" title="เลือกหน้าต่าง Oracle Forms">🪟 เลือกหน้าต่าง</button>
-              <button type="button" class="bma-mini-btn" id="bma-bridge-calib" title="ตั้งพิกัดหน้าจอ Oracle Forms (F8)">🎯 ตั้งพิกัด</button>
+              <button type="button" class="bma-mini-btn" id="bma-bridge-open-float" style="flex:1;background:#0f766e;color:#ffffff;border-color:#0f766e;">📌 เปิดแผงลอยช่วยกรอก</button>
             </div>
-            <button type="button" class="bma-mini-btn" id="bma-bridge-open-float" style="width:100%;background:#0f766e;color:#ffffff;border-color:#0f766e;padding:5px;">📌 เปิดแผงลอยเบิกจ่าย (ลอยทับหน้าต่าง Oracle Forms)</button>
           </div>
 
           <div id="bma-pay-dup-alert" class="bma-dup-alert" style="display:none;font-size:11.5px;padding:6px 8px;"></div>
@@ -2273,14 +2189,14 @@
                 <div class="bma-label"><span>เลขที่ใบตรวจรับ</span></div>
                 <div class="bma-input-row">
                   <input type="text" id="bma-pay-rcvno" class="bma-input" placeholder="เช่น 54" />
-                  <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-rcvno" title="คัดลอก/วาง">📋</button>
+                  <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-rcvno" title="คัดลอกลงคลิปบอร์ด">📋</button>
                 </div>
               </div>
               <div class="bma-field-group">
                 <div class="bma-label"><span>ปีงบประมาณ</span></div>
                 <div class="bma-input-row">
                   <input type="text" id="bma-pay-rcvyr" class="bma-input" value="${fy}" />
-                  <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-rcvyr" title="คัดลอก/วาง">📋</button>
+                  <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-rcvyr" title="คัดลอกลงคลิปบอร์ด">📋</button>
                 </div>
               </div>
             </div>
@@ -2290,23 +2206,19 @@
                 <div class="bma-label"><span>ภาษีมูลค่าเพิ่ม (7%)</span></div>
                 <div class="bma-input-row">
                   <input type="text" id="bma-pay-vat" class="bma-input" />
-                  <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-vat" title="คัดลอก/วาง">📋</button>
+                  <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-vat" title="คัดลอกลงคลิปบอร์ด">📋</button>
                 </div>
               </div>
               <div class="bma-field-group">
                 <div class="bma-label"><span>หักภาษีเงินได้ (1%)</span></div>
                 <div class="bma-input-row">
                   <input type="text" id="bma-pay-wht" class="bma-input" />
-                  <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-wht" title="คัดลอก/วาง">📋</button>
+                  <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-wht" title="คัดลอกลงคลิปบอร์ด">📋</button>
                 </div>
               </div>
             </div>
 
             <div id="bma-pay-tax-badge" class="bma-tax-box">สุทธิที่จ่าย: -</div>
-
-            <button type="button" class="bma-btn bma-btn-teal" id="bma-pay-run-1">⚡ ขั้น 1: กรอกใบตรวจรับ + กดแว่นขยาย 🔍</button>
-            <button type="button" class="bma-btn bma-btn-teal" id="bma-pay-run-15" style="background:#0e7490;border-color:#0e7490;">⚡ ขั้น 1.5: รายละเอียด ➔ ติ๊กงบ ➔ ตกลง</button>
-            <button type="button" class="bma-btn bma-btn-teal" id="bma-pay-run-16" style="background:#0369a1;border-color:#0369a1;">⚡ ขั้น 1.6: กรอก VAT 7% + หักภาษี 1%</button>
           </div>
 
           <!-- Pay Sub-tab 2 -->
@@ -2319,46 +2231,44 @@
             <div id="bma-pay-bank-info" class="bma-bank-info">🏦 ธนาคาร: - | 📍 สาขา: -</div>
 
             <div class="bma-check-row">
-              <label><input type="checkbox" id="bma-chk-payTo" ${checks.payTo !== false ? 'checked' : ''} /> จ่ายให้</label>
+              <label style="font-weight:700;color:#1e293b;">จ่ายให้</label>
               <div class="bma-input-row" style="flex:1;">
                 <input type="text" id="bma-pay-to" class="bma-input" />
-                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-to">📋</button>
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-to" title="คัดลอกลงคลิปบอร์ด">📋</button>
               </div>
             </div>
             <div class="bma-check-row">
-              <label><input type="checkbox" id="bma-chk-assignTo" ${checks.assignTo !== false ? 'checked' : ''} /> โดยมอบให้</label>
+              <label style="font-weight:700;color:#1e293b;">โดยมอบให้</label>
               <div class="bma-input-row" style="flex:1;">
                 <input type="text" id="bma-pay-assign" class="bma-input" list="bma-assign-presets" />
                 <datalist id="bma-assign-presets">
                   <option value="${ASSIGN_TO_PRESETS[0]}"></option>
                   <option value="${ASSIGN_TO_PRESETS[1]}"></option>
                 </datalist>
-                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-assign">📋</button>
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-assign" title="คัดลอกลงคลิปบอร์ด">📋</button>
               </div>
             </div>
             <div class="bma-check-row">
-              <label><input type="checkbox" id="bma-chk-bankCode" ${checks.bankCode !== false ? 'checked' : ''} /> รหัสธนาคาร</label>
+              <label style="font-weight:700;color:#1e293b;">รหัสธนาคาร</label>
               <div class="bma-input-row" style="flex:1;">
                 <input type="text" id="bma-pay-bank" class="bma-input" placeholder="3 หลัก เช่น 004" />
-                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-bank">📋</button>
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-bank" title="คัดลอกลงคลิปบอร์ด">📋</button>
               </div>
             </div>
             <div class="bma-check-row">
-              <label><input type="checkbox" id="bma-chk-branchCode" ${checks.branchCode !== false ? 'checked' : ''} /> รหัสสาขา</label>
+              <label style="font-weight:700;color:#1e293b;">รหัสสาขา</label>
               <div class="bma-input-row" style="flex:1;">
                 <input type="text" id="bma-pay-branch" class="bma-input" placeholder="4 หลัก เช่น 0001" />
-                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-branch">📋</button>
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-branch" title="คัดลอกลงคลิปบอร์ด">📋</button>
               </div>
             </div>
             <div class="bma-check-row">
-              <label><input type="checkbox" id="bma-chk-accountNo" ${checks.accountNo !== false ? 'checked' : ''} /> เลขที่บัญชี</label>
+              <label style="font-weight:700;color:#1e293b;">เลขที่บัญชี</label>
               <div class="bma-input-row" style="flex:1;">
                 <input type="text" id="bma-pay-acct" class="bma-input" />
-                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-acct">📋</button>
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-acct" title="คัดลอกลงคลิปบอร์ด">📋</button>
               </div>
             </div>
-
-            <button type="button" class="bma-btn bma-btn-teal" id="bma-pay-run-2">⚡ ขั้น 2: กรอกแท็บ 'ผู้รับเงิน'</button>
           </div>
 
           <!-- Pay Sub-tab 3 -->
@@ -2367,7 +2277,7 @@
               <div class="bma-label"><span>ชื่อผู้ขอเบิก</span></div>
               <div class="bma-input-row">
                 <input type="text" id="bma-pay-requester" class="bma-input" value="${state.defaultRequester || 'นางอรชุมา หุตะโกวิท'}" />
-                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-requester">📋</button>
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-requester" title="คัดลอกลงคลิปบอร์ด">📋</button>
               </div>
             </div>
             <div class="bma-field-group">
@@ -2380,19 +2290,16 @@
               </div>
               <div class="bma-input-row">
                 <input type="text" id="bma-pay-date" class="bma-input" value="${getTodayThaiSlash()}" />
-                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-date">📋</button>
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-date" title="คัดลอกลงคลิปบอร์ด">📋</button>
               </div>
             </div>
             <div class="bma-field-group">
-              <div class="bma-label"><span>คำอธิบายรายการเบิก (MISS Col J)</span></div>
+              <div class="bma-label"><span>คำอธิบายรายการเบิก (MISS Col J + ประเภทบัญชี)</span></div>
               <div class="bma-input-row" style="align-items:flex-start;">
                 <textarea id="bma-pay-desc" class="bma-textarea"></textarea>
-                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-desc" data-copy-multi="1">📋</button>
+                <button type="button" class="bma-copy-btn" data-copy-from="bma-pay-desc" data-copy-multi="1" title="คัดลอกลงคลิปบอร์ด">📋</button>
               </div>
             </div>
-
-            <button type="button" class="bma-btn bma-btn-teal" id="bma-pay-run-3">⚡ ขั้น 3: กรอกแท็บ 'รายละเอียดเงินเบิกจ่าย'</button>
-            <div class="bma-safety-banner">🛑 โหมดปลอดภัย: หยุดก่อนบันทึกทุกครั้ง (คนตรวจและกด 💾 เอง) | กด ESC หยุดทันที</div>
           </div>
 
           <div class="bma-field-group" style="border-top:1px solid #e2e8f0;padding-top:7px;">
@@ -2404,7 +2311,7 @@
           </div>
         </div>
 
-        <div id="bma-status-bar" class="bma-status-bar">พร้อมใช้งาน • กรอกอัตโนมัติและรอคนกดบันทึกทุกครั้ง</div>
+        <div id="bma-status-bar" class="bma-status-bar">พร้อมใช้งาน • จัดซื้อกรอกอัตโนมัติ / เบิกจ่ายคัดลอก-วาง</div>
         <div style="text-align:center;font-size:10.5px;color:#64748b;font-weight:700;letter-spacing:0.02em;padding-top:2px;">
           ผู้พัฒนา: <span style="color:#1d4ed8;">ARISSARA.K</span> • กลุ่มงานเภสัชกรรม รพจ.
         </div>
@@ -2437,7 +2344,7 @@
 
     panelEl.querySelector('#bma-btn-approve-save').addEventListener('click', () => handleApproveSaveAndNext());
 
-    // Event สำหรับปุ่มตัวช่วย Oracle Forms Bridge
+    // Event สำหรับเปิด MIS2 IE และแผงลอยข้อมูลช่วยกรอก
     panelEl.querySelector('#bma-bridge-open-ie').addEventListener('click', () => {
       if (bridgeStatus.connected) {
         sendBridgeRequest('/open-mis2-ie', 'POST', { url: 'http://bmasso.bma.go.th/MIS2DirectLogins/index2.jsp' }, 10000, () => {
@@ -2450,43 +2357,19 @@
 
     panelEl.querySelector('#bma-bridge-open-float').addEventListener('click', () => {
       if (!bridgeStatus.connected) {
-        alert('กรุณาดับเบิลคลิกเปิด START_ORACLE_BRIDGE.bat ก่อนครับ (เมื่อเปิดแล้ว แผงลอยจะเด้งทับหน้าต่าง Oracle Forms อัตโนมัติ)');
+        alert('กรุณาดับเบิลคลิกเปิด START_ORACLE_BRIDGE.bat หรือ START_MIS2_PAY_PANEL.bat ก่อนครับ');
         pollBridgeStatus(false);
         return;
       }
       sendBridgeRequest('/open-floating-pay', 'POST', {}, 10000, (res) => {
         if (res && res.ok && res.data && res.data.ok) {
-          setStatus('📌 เปิดแผงลอยเบิกจ่ายทับหน้าต่าง Oracle Forms แล้ว', 'ok');
+          setStatus('📌 เปิดแผงลอยข้อมูลช่วยกรอกทับหน้าต่าง Oracle Forms แล้ว', 'ok');
         } else {
           setStatus('⚠️ ไม่พบไฟล์ mis2_pay_autofill.ps1 (กด UPDATE_FROM_GITHUB.bat)', 'err');
         }
       });
     });
 
-    panelEl.querySelector('#bma-bridge-pick').addEventListener('click', () => {
-      if (!bridgeStatus.connected) {
-        pollBridgeStatus(false);
-        return;
-      }
-      setStatus('🪟 กำลังเปิดหน้าต่างเลือก Oracle Forms...', '');
-      sendBridgeRequest('/pick-window', 'POST', {}, 300000, () => pollBridgeStatus(false));
-    });
-
-    panelEl.querySelector('#bma-bridge-calib').addEventListener('click', () => {
-      if (!bridgeStatus.connected) {
-        alert('กรุณาดับเบิลคลิกเปิด START_ORACLE_BRIDGE.bat ก่อนกดตั้งพิกัดครับ');
-        pollBridgeStatus(false);
-        return;
-      }
-      setStatus('🎯 กำลังเปิดหน้าต่างตั้งพิกัด Oracle Forms (กด F8)...', '');
-      sendBridgeRequest('/calibrate', 'POST', {}, 300000, () => pollBridgeStatus(false));
-    });
-
-    panelEl.querySelector('#bma-pay-run-1').addEventListener('click', () => runOracleBridgeStep('1'));
-    panelEl.querySelector('#bma-pay-run-15').addEventListener('click', () => runOracleBridgeStep('1.5'));
-    panelEl.querySelector('#bma-pay-run-16').addEventListener('click', () => runOracleBridgeStep('1.6'));
-    panelEl.querySelector('#bma-pay-run-2').addEventListener('click', () => runOracleBridgeStep('2'));
-    panelEl.querySelector('#bma-pay-run-3').addEventListener('click', () => runOracleBridgeStep('3'));
     panelEl.querySelector('#bma-pay-save-doc').addEventListener('click', () => savePayDocToMiss());
 
     panelEl.querySelectorAll('.bma-copy-btn').forEach((btn) => {
@@ -2505,14 +2388,13 @@
       if (v) applyVendorToPayFields(v);
     });
 
-    ['payTo', 'assignTo', 'bankCode', 'branchCode', 'accountNo'].forEach((k) => {
-      const chk = panelEl.querySelector('#bma-chk-' + k);
-      if (chk) {
-        chk.addEventListener('change', () => {
-          state.payChecks = state.payChecks || {};
-          state.payChecks[k] = chk.checked;
-          saveState();
-        });
+    panelEl.querySelector('#bma-pay-branch').addEventListener('change', (e) => {
+      const payToVal = (panelEl.querySelector('#bma-pay-to').value || '').trim();
+      const branchVal = (e.target.value || '').trim();
+      if (payToVal && branchVal) {
+        state.branchOverrides = state.branchOverrides || {};
+        state.branchOverrides[payToVal] = branchVal;
+        saveState();
       }
     });
 

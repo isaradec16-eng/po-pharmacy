@@ -1087,11 +1087,11 @@
     '</tr></table>';
   }
 
-  function ieChkRowHtml(ckId, checked, label, inId) {
+  function ieFieldRowHtml(label, inId) {
     return '<table class="bma-ie-tbl-tight" style="margin-bottom:6px;"><tr>' +
-      '<td class="bma-ie-chkcol"><label style="cursor:pointer;"><input id="' + ckId + '" type="checkbox" ' + (checked ? 'checked="checked"' : '') + ' /> ' + label + '</label></td>' +
+      '<td class="bma-ie-chkcol" style="font-weight:600;color:#1e293b;">' + label + '</td>' +
       '<td><input id="' + inId + '" type="text" /></td>' +
-      '<td class="bma-ie-btncol"><button type="button" class="bma-ie-copy" data-src="' + inId + '" data-multi="0" title="คัดลอกหรือวางลงช่องที่เลือก">คัดลอก</button></td>' +
+      '<td class="bma-ie-btncol"><button type="button" class="bma-ie-copy" data-src="' + inId + '" data-multi="0" title="คัดลอกลงคลิปบอร์ด แล้วกด Ctrl+V วางใน FRM_PAY_DOC">คัดลอก</button></td>' +
     '</tr></table>';
   }
 
@@ -1099,7 +1099,7 @@
     '<div id="bma-ie-header" style="background:#1d4ed8;color:#ffffff;padding:8px 10px;border-radius:7px;margin-bottom:9px;cursor:move;" title="ลากแถบนี้เพื่อย้ายตำแหน่งแผงควบคุม">' +
       '<table class="bma-ie-tbl-tight"><tr>' +
         '<td style="color:#ffffff;font-size:14.5px;font-weight:700;">' +
-          'BMA MIS &amp; MIS2 <span style="font-size:11px;font-weight:600;background:#2563eb;color:#ffffff;padding:2px 6px;border-radius:4px;margin-left:4px;">ARISSARA.K v2.2</span>' +
+          'BMA MIS &amp; MIS2 <span style="font-size:11px;font-weight:600;background:#2563eb;color:#ffffff;padding:2px 6px;border-radius:4px;margin-left:4px;">ARISSARA.K v2.3</span>' +
         '</td>' +
         '<td style="width:94px;text-align:right;">' +
           '<button id="bma-ie-sync" type="button" style="background:#3b82f6;color:#ffffff;border:none;padding:4px 9px;font-size:12px;margin-right:4px;">ซิงค์</button>' +
@@ -1112,7 +1112,7 @@
       '<div style="background:#e2e8f0;padding:4px;border-radius:8px;margin-bottom:9px;">' +
         '<table class="bma-ie-tbl" style="margin-bottom:0;"><tr>' +
           '<td class="bma-ie-pr6"><button id="bma-ie-tab-pur" type="button" style="width:100%;padding:8px 4px;border:none;font-size:13px;">จัดซื้อ/ตรวจรับ (8 ขั้น)</button></td>' +
-          '<td><button id="bma-ie-tab-pay" type="button" style="width:100%;padding:8px 4px;border:none;font-size:13px;">เบิกจ่าย MIS2 (ฎีกา)</button></td>' +
+          '<td><button id="bma-ie-tab-pay" type="button" style="width:100%;padding:8px 4px;border:none;font-size:13px;">ข้อมูลเบิกจ่าย MIS2</button></td>' +
         '</tr></table>' +
       '</div>' +
 
@@ -1162,15 +1162,11 @@
         '</tr></table>' +
       '</div>' +
 
-      /* ===== MODE 2: เบิกจ่าย MIS2 (FRM_PAY_DOC) ===== */
+      /* ===== MODE 2: ข้อมูลช่วยกรอกเบิกจ่าย MIS2 (FRM_PAY_DOC) ===== */
       '<div id="bma-ie-mode-pay" style="display:none;">' +
-        '<div id="bma-ie-bridge-bar" style="background:#fffbeb;border:1px solid #f59e0b;color:#92400e;border-radius:7px;padding:8px 9px;font-size:12.5px;margin-bottom:8px;">' +
-          '<div id="bma-ie-bridge-txt">กำลังตรวจสอบตัวช่วย Oracle Forms...</div>' +
-          '<table class="bma-ie-tbl" style="margin-top:6px;margin-bottom:5px;"><tr>' +
-            '<td class="bma-ie-pr6"><button id="bma-ie-br-pick" type="button" style="width:100%;padding:5px;font-size:12px;background:#fff;color:#1e293b;border:1px solid #94a3b8;">เลือกหน้าต่าง Oracle</button></td>' +
-            '<td><button id="bma-ie-br-cal" type="button" style="width:100%;padding:5px;font-size:12px;background:#fff;color:#1e293b;border:1px solid #94a3b8;">ตั้งพิกัด (F8)</button></td>' +
-          '</tr></table>' +
-          '<button id="bma-ie-br-float" type="button" style="width:100%;padding:6px;font-size:12.5px;background:#0f766e;color:#ffffff;border:none;">เปิดแผงลอยเบิกจ่าย (ลอยทับ Oracle Forms)</button>' +
+        '<div id="bma-ie-bridge-bar" style="background:#ecfdf5;border:1px solid #86efac;color:#166534;border-radius:7px;padding:8px 9px;font-size:12.5px;margin-bottom:8px;">' +
+          '<div id="bma-ie-bridge-txt">โหมดข้อมูลช่วยกรอก: กดปุ่ม <b>คัดลอก</b> ข้างแต่ละช่อง แล้วกด <b>Ctrl+V</b> วางใน FRM_PAY_DOC</div>' +
+          '<button id="bma-ie-br-float" type="button" style="width:100%;padding:6px;margin-top:6px;font-size:12.5px;background:#0f766e;color:#ffffff;border:none;">เปิดแผงลอยข้อมูลช่วยกรอก (ลอยทับ Oracle Forms)</button>' +
         '</div>' +
         '<div id="bma-ie-pay-dup" style="display:none;background:#fef2f2;border:2px solid #dc2626;color:#b91c1c;padding:7px;border-radius:6px;font-weight:700;font-size:12.5px;text-align:center;margin-bottom:7px;"></div>' +
         '<div id="bma-ie-pay-brief" style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:6px;padding:7px 9px;font-size:13px;margin-bottom:8px;"></div>' +
@@ -1192,9 +1188,6 @@
             '<td><div class="bma-ie-lbl">หักภาษีเงินได้ (1%)</div>' + ieInRowHtml('<input id="bma-ie-pay-wht" type="text" />', 'bma-ie-pay-wht', false) + '</td>' +
           '</tr></table>' +
           '<div id="bma-ie-pay-taxbadge" style="background:#f0fdf4;border:1px solid #86efac;color:#166534;padding:7px 9px;border-radius:6px;font-weight:700;font-size:13px;text-align:center;margin-bottom:8px;">ยอดสุทธิที่จ่าย: -</div>' +
-          '<button id="bma-ie-prun-1" type="button" class="bma-ie-actbtn" style="background:#0284c7;">ขั้น 1: กรอกใบตรวจรับ + กดแว่นขยาย</button>' +
-          '<button id="bma-ie-prun-15" type="button" class="bma-ie-actbtn" style="background:#0e7490;">ขั้น 1.5: รายละเอียด &raquo; ติ๊กงบ &raquo; ตกลง</button>' +
-          '<button id="bma-ie-prun-16" type="button" class="bma-ie-actbtn" style="background:#0369a1;">ขั้น 1.6: กรอก VAT 7% + หักภาษี 1%</button>' +
         '</div>' +
 
         /* Pay Sub 2 */
@@ -1202,12 +1195,11 @@
           '<input id="bma-ie-vsearch" type="text" placeholder="ค้นหาบริษัทในทะเบียนบริษัท..." style="margin-bottom:5px;" />' +
           '<select id="bma-ie-vselect" style="margin-bottom:6px;"></select>' +
           '<div id="bma-ie-bankinfo" style="background:#f0f9ff;border:1px solid #7dd3fc;color:#0c4a6e;padding:6px 8px;border-radius:6px;font-size:12.5px;margin-bottom:7px;">ธนาคาร: - | สาขา: -</div>' +
-          ieChkRowHtml('bma-ie-ck-payTo', ieChecks.payTo !== false, 'จ่ายให้', 'bma-ie-pay-to') +
-          ieChkRowHtml('bma-ie-ck-assignTo', ieChecks.assignTo !== false, 'โดยมอบให้', 'bma-ie-pay-assign') +
-          ieChkRowHtml('bma-ie-ck-bankCode', ieChecks.bankCode !== false, 'ธนาคาร', 'bma-ie-pay-bank') +
-          ieChkRowHtml('bma-ie-ck-branchCode', ieChecks.branchCode !== false, 'สาขา 4 หลัก', 'bma-ie-pay-branch') +
-          ieChkRowHtml('bma-ie-ck-accountNo', ieChecks.accountNo !== false, 'เลขบัญชี', 'bma-ie-pay-acct') +
-          '<button id="bma-ie-prun-2" type="button" class="bma-ie-actbtn" style="background:#0284c7;">ขั้น 2: กรอกแท็บ \'ผู้รับเงิน\'</button>' +
+          ieFieldRowHtml('จ่ายให้', 'bma-ie-pay-to') +
+          ieFieldRowHtml('โดยมอบให้', 'bma-ie-pay-assign') +
+          ieFieldRowHtml('ธนาคาร', 'bma-ie-pay-bank') +
+          ieFieldRowHtml('สาขา 4 หลัก', 'bma-ie-pay-branch') +
+          ieFieldRowHtml('เลขบัญชี', 'bma-ie-pay-acct') +
         '</div>' +
 
         /* Pay Sub 3 */
@@ -1221,8 +1213,6 @@
             ieInRowHtml('<input id="bma-ie-pay-date" type="text" value="' + ieTodayThaiSlash() + '" />', 'bma-ie-pay-date', false) +
           '</div>' +
           '<div style="margin-bottom:7px;"><div class="bma-ie-lbl">คำอธิบายรายการเบิก</div>' + ieInRowHtml('<textarea id="bma-ie-pay-desc" style="height:62px;"></textarea>', 'bma-ie-pay-desc', true) + '</div>' +
-          '<button id="bma-ie-prun-3" type="button" class="bma-ie-actbtn" style="background:#0284c7;">ขั้น 3: กรอกแท็บ \'รายละเอียดเบิก\'</button>' +
-          '<div style="background:#fef2f2;border:1px solid #fca5a5;color:#991b1b;padding:6px 8px;border-radius:6px;font-size:12px;font-weight:600;text-align:center;margin-bottom:8px;">หยุดก่อนบันทึกทุกครั้ง (คนตรวจและกดบันทึกเอง) | กด ESC หยุดทันที</div>' +
         '</div>' +
 
         '<div style="border-top:1px solid #cbd5e1;padding-top:8px;margin-bottom:8px;">' +
@@ -1316,15 +1306,12 @@
       bar.style.background = '#ecfdf5';
       bar.style.borderColor = '#4ade80';
       bar.style.color = '#166534';
-      var wStr = ieBridgeStatus.targetFound
-        ? 'หน้าต่างเป้าหมาย: ' + String(ieBridgeStatus.targetTitle || 'Oracle Forms').slice(0, 32)
-        : 'ยังไม่พบหน้าต่าง Oracle Forms (เปิด FRM_PAY_DOC แล้วกดเลือกหน้าต่าง)';
-      txt.innerHTML = '<b>[เชื่อมต่อแล้ว] ตัวช่วย Oracle Forms</b> (พิกัด ' + ieBridgeStatus.calibratedCount + '/' + ieBridgeStatus.totalCalibCount + ')<br/>' + wStr;
+      txt.innerHTML = '<b>[เชื่อมต่อ Google Sheets แล้ว]</b> โหมดข้อมูลช่วยกรอก: กดปุ่ม <b>คัดลอก</b> ข้างแต่ละช่อง แล้วกด <b>Ctrl+V</b> วางใน FRM_PAY_DOC';
     } else {
       bar.style.background = '#fffbeb';
       bar.style.borderColor = '#f59e0b';
       bar.style.color = '#92400e';
-      txt.innerHTML = '<b>[โหมดคัดลอกวาง]</b> ยังไม่เปิดตัวช่วย (เปิด <b>START_ORACLE_BRIDGE.bat</b> เพื่อกรอกอัตโนมัติ)';
+      txt.innerHTML = '<b>[โหมดข้อมูลช่วยกรอก]</b> กดปุ่ม <b>คัดลอก</b> ข้างแต่ละช่องแล้วกด Ctrl+V ได้เลย (เปิด <b>START_ORACLE_BRIDGE.bat</b> เพื่อซิงค์สดบน IE)';
     }
   }
 
@@ -1480,59 +1467,6 @@
         bt.style.color = k === state.paySubTab ? '#ffffff' : '#475569';
       }
     }
-  }
-
-  function runIeBridgeStep(step) {
-    if (!ieBridgeStatus.connected) {
-      alert('ยังไม่ได้เปิดตัวช่วย Oracle Forms\n\n- ดับเบิลคลิก START_ORACLE_BRIDGE.bat เพื่อกรอกอัตโนมัติ\n- หรือกดปุ่ม คัดลอก ข้างแต่ละช่องเพื่อนำไปกด Ctrl+V เองได้ทันที');
-      pollIeBridge();
-      return;
-    }
-    var payload = {};
-    if (step === '1') {
-      payload.rcvNo = String(document.getElementById('bma-ie-pay-rcvno').value || '').replace(/^\s+|\s+$/g, '');
-      payload.rcvYear = String(document.getElementById('bma-ie-pay-rcvyr').value || '').replace(/^\s+|\s+$/g, '');
-      if (!payload.rcvNo) { alert('กรุณาระบุเลขที่ใบตรวจรับก่อนครับ'); return; }
-    } else if (step === '1.6') {
-      payload.vatAmount = String(document.getElementById('bma-ie-pay-vat').value || '').replace(/^\s+|\s+$/g, '');
-      payload.whtAmount = String(document.getElementById('bma-ie-pay-wht').value || '').replace(/^\s+|\s+$/g, '');
-    } else if (step === '2') {
-      var pTo = String(document.getElementById('bma-ie-pay-to').value || '').replace(/^\s+|\s+$/g, '');
-      var br = String(document.getElementById('bma-ie-pay-branch').value || '').replace(/^\s+|\s+$/g, '');
-      if (pTo && br) {
-        state.branchOverrides = state.branchOverrides || {};
-        state.branchOverrides[pTo] = br;
-        saveState();
-      }
-      if (document.getElementById('bma-ie-ck-payTo').checked) payload.payTo = pTo;
-      if (document.getElementById('bma-ie-ck-assignTo').checked) payload.assignTo = String(document.getElementById('bma-ie-pay-assign').value || '').replace(/^\s+|\s+$/g, '');
-      if (document.getElementById('bma-ie-ck-bankCode').checked) payload.bankCode = String(document.getElementById('bma-ie-pay-bank').value || '').replace(/^\s+|\s+$/g, '');
-      if (document.getElementById('bma-ie-ck-branchCode').checked) payload.branchCode = br;
-      if (document.getElementById('bma-ie-ck-accountNo').checked) payload.accountNo = String(document.getElementById('bma-ie-pay-acct').value || '').replace(/^\s+|\s+$/g, '');
-    } else if (step === '3') {
-      payload.requesterName = String(document.getElementById('bma-ie-pay-req').value || '').replace(/^\s+|\s+$/g, '');
-      payload.payDate = String(document.getElementById('bma-ie-pay-date').value || '').replace(/^\s+|\s+$/g, '');
-      payload.description = String(document.getElementById('bma-ie-pay-desc').value || '').replace(/^\s+|\s+$/g, '');
-    }
-
-    setIeStatus('กำลังกรอกขั้นที่ ' + step + ' ลง Oracle Forms... (กด ESC หยุดทันที)');
-    ieBridgeReq('/run-step', 'POST', { step: step, payload: payload }, function (ok, d) {
-      if (!ok || !d) {
-        setIeStatus('[ผิดพลาด] ติดต่อตัวช่วย Oracle Forms ไม่ได้');
-        pollIeBridge();
-        return;
-      }
-      if (d.ok) {
-        setIeStatus('[สำเร็จ] ' + (d.message || ('กรอกขั้นที่ ' + step + ' สำเร็จ')));
-        if (step === '1.6') switchIePaySub('2');
-        if (step === '2') switchIePaySub('3');
-      } else {
-        setIeStatus('[เตือน] ' + (d.error || 'กรอกไม่สำเร็จ'));
-        if (d.needCalibration && confirm((d.error || 'ยังไม่ได้ตั้งพิกัด') + '\n\nเปิดหน้าต่างตั้งพิกัด (F8) ตอนนี้เลยไหมครับ?')) {
-          ieBridgeReq('/calibrate', 'POST', {}, function () { pollIeBridge(); });
-        }
-      }
-    });
   }
 
   function saveIePayDocToMiss() {
@@ -1889,26 +1823,13 @@
   document.getElementById('bma-ie-psub-2').onclick = function () { switchIePaySub('2'); };
   document.getElementById('bma-ie-psub-3').onclick = function () { switchIePaySub('3'); };
 
-  document.getElementById('bma-ie-br-pick').onclick = function () {
-    if (!ieBridgeStatus.connected) { pollIeBridge(); return; }
-    ieBridgeReq('/pick-window', 'POST', {}, function () { pollIeBridge(); });
-  };
-  document.getElementById('bma-ie-br-cal').onclick = function () {
-    if (!ieBridgeStatus.connected) { alert('กรุณาเปิด START_ORACLE_BRIDGE.bat ก่อนกดตั้งพิกัดครับ'); pollIeBridge(); return; }
-    ieBridgeReq('/calibrate', 'POST', {}, function () { pollIeBridge(); });
-  };
   document.getElementById('bma-ie-br-float').onclick = function () {
-    if (!ieBridgeStatus.connected) { alert('กรุณาดับเบิลคลิกเปิด START_ORACLE_BRIDGE.bat ก่อนครับ'); pollIeBridge(); return; }
+    if (!ieBridgeStatus.connected) { alert('กรุณาดับเบิลคลิกเปิด START_ORACLE_BRIDGE.bat หรือ START_MIS2_PAY_PANEL.bat ก่อนครับ'); pollIeBridge(); return; }
     ieBridgeReq('/open-floating-pay', 'POST', {}, function (ok, d) {
-      setIeStatus(ok && d && d.ok ? 'เปิดแผงลอยเบิกจ่ายทับหน้าต่าง Oracle Forms แล้ว' : 'ไม่พบไฟล์ mis2_pay_autofill.ps1 (กด UPDATE_FROM_GITHUB.bat)');
+      setIeStatus(ok && d && d.ok ? 'เปิดแผงลอยข้อมูลช่วยกรอกทับหน้าต่าง Oracle Forms แล้ว' : 'ไม่พบไฟล์ mis2_pay_autofill.ps1 (กด UPDATE_FROM_GITHUB.bat)');
     });
   };
 
-  document.getElementById('bma-ie-prun-1').onclick = function () { runIeBridgeStep('1'); };
-  document.getElementById('bma-ie-prun-15').onclick = function () { runIeBridgeStep('1.5'); };
-  document.getElementById('bma-ie-prun-16').onclick = function () { runIeBridgeStep('1.6'); };
-  document.getElementById('bma-ie-prun-2').onclick = function () { runIeBridgeStep('2'); };
-  document.getElementById('bma-ie-prun-3').onclick = function () { runIeBridgeStep('3'); };
   document.getElementById('bma-ie-pay-savedoc').onclick = saveIePayDocToMiss;
 
   document.getElementById('bma-ie-vsearch').onkeyup = renderIeVendors;
@@ -1930,19 +1851,15 @@
     if (it && it.rcvDate) document.getElementById('bma-ie-pay-date').value = it.rcvDate;
   };
 
-  var ckKeys = ['payTo', 'assignTo', 'bankCode', 'branchCode', 'accountNo'];
-  for (var cki = 0; cki < ckKeys.length; cki++) {
-    (function (k) {
-      var el = document.getElementById('bma-ie-ck-' + k);
-      if (el) {
-        el.onchange = function () {
-          state.payChecks = state.payChecks || {};
-          state.payChecks[k] = !!this.checked;
-          saveState();
-        };
-      }
-    })(ckKeys[cki]);
-  }
+  document.getElementById('bma-ie-pay-branch').onchange = function () {
+    var pTo = String(document.getElementById('bma-ie-pay-to').value || '').replace(/^\s+|\s+$/g, '');
+    var br = String(this.value || '').replace(/^\s+|\s+$/g, '');
+    if (pTo && br) {
+      state.branchOverrides = state.branchOverrides || {};
+      state.branchOverrides[pTo] = br;
+      saveState();
+    }
+  };
   document.getElementById('bma-ie-pay-assign').onchange = function () {
     if (!ieIsAidsBudget(getSelectedItem())) {
       state.defaultAssignTo = String(this.value || '').replace(/^\s+|\s+$/g, '') || ASSIGN_TO_PRESETS[0];
@@ -1959,18 +1876,11 @@
     if ((' ' + (allPanelBtns[ci].className || '') + ' ').indexOf(' bma-ie-copy ') === -1) continue;
     allPanelBtns[ci].onclick = function () {
       var srcId = this.getAttribute('data-src');
-      var isMulti = this.getAttribute('data-multi') === '1';
       var el = document.getElementById(srcId);
       var val = el ? String(el.value || '').replace(/^\s+|\s+$/g, '') : '';
       if (!val) { setIeStatus('[เตือน] ไม่มีข้อมูลในช่องนี้'); return; }
       ieCopyClipboard(val);
-      if (ieBridgeStatus.connected && ieBridgeStatus.targetFound) {
-        ieBridgeReq('/paste', 'POST', { text: val, isMultiline: isMulti }, function (ok, d) {
-          setIeStatus(ok && d && d.pasted ? '[สำเร็จ] วางลง Oracle Forms แล้ว' : 'คัดลอกแล้ว (กด Ctrl+V ใน Oracle Forms)');
-        });
-      } else {
-        setIeStatus('คัดลอกแล้ว (กด Ctrl+V ใน Oracle Forms)');
-      }
+      setIeStatus('คัดลอกแล้ว — กด Ctrl+V วางใน FRM_PAY_DOC ได้เลย');
     };
   }
 
