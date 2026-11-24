@@ -1099,7 +1099,7 @@
     '<div id="bma-ie-header" style="background:#1d4ed8;color:#ffffff;padding:8px 10px;border-radius:7px;margin-bottom:9px;cursor:move;" title="ลากแถบนี้เพื่อย้ายตำแหน่งแผงควบคุม">' +
       '<table class="bma-ie-tbl-tight"><tr>' +
         '<td style="color:#ffffff;font-size:14.5px;font-weight:700;">' +
-          'BMA MIS &amp; MIS2 <span style="font-size:11px;font-weight:600;background:#2563eb;color:#ffffff;padding:2px 6px;border-radius:4px;margin-left:4px;">ARISSARA.K v2.3</span>' +
+          'BMA MIS &amp; MIS2 <span style="font-size:11px;font-weight:600;background:#2563eb;color:#ffffff;padding:2px 6px;border-radius:4px;margin-left:4px;">ARISSARA.K v2.4</span>' +
         '</td>' +
         '<td style="width:94px;text-align:right;">' +
           '<button id="bma-ie-sync" type="button" style="background:#3b82f6;color:#ffffff;border:none;padding:4px 9px;font-size:12px;margin-right:4px;">ซิงค์</button>' +
@@ -1951,4 +1951,35 @@
   switchIePaySub(state.paySubTab);
   pollIeBridge();
   loadDataViaXhr();
+
+  // เฝ้าดูการเปลี่ยนหน้าภายใน Frame/Iframe (เช่น เปลี่ยนขั้นตอนในระบบจัดซื้อโดยไม่ได้รีโหลดหน้าหลัก)
+  var lastIeFrameSig = '';
+  function computeIeFrameSig() {
+    var docs = getTargetDocs();
+    var parts = [String(state.selectedCode || ''), String(state.purHireNo || ''), String(state.poNo || ''), String(state.rcvNo || '')];
+    for (var di = 0; di < docs.length; di++) {
+      try {
+        var u = (docs[di].location && docs[di].location.href) ? String(docs[di].location.href) : '';
+        var inLen = docs[di].getElementsByTagName('input').length;
+        parts.push(u + '#' + inLen);
+      } catch (e) {}
+    }
+    return parts.join('|');
+  }
+  if (!window.__bmaIeFrameWatcher) {
+    window.__bmaIeFrameWatcher = setInterval(function () {
+      try {
+        if (isIeMis2Portal() || state.activeMode === 'pay') return;
+        if (!state.items || state.items.length === 0) return;
+        var sig = computeIeFrameSig();
+        if (sig && sig !== lastIeFrameSig) {
+          lastIeFrameSig = sig;
+          var curItem = getSelectedItem();
+          if (curItem && (!isItemAlreadyRecorded(curItem) || isIePageStep7Or8())) {
+            runAutoFill(undefined, true);
+          }
+        }
+      } catch (e) {}
+    }, 900);
+  }
 })();

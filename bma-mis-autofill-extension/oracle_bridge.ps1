@@ -103,6 +103,14 @@ public class Mis2BridgeWin32 {
     [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int vKey);
     [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT Point);
     [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
+    [DllImport("user32.dll")] private static extern bool EnumChildWindows(IntPtr hWndParent, EnumWindowsProc lpEnumFunc, IntPtr lParam);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern uint RegisterWindowMessage(string lpString);
+    [DllImport("user32.dll", SetLastError = true)] private static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, IntPtr lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+    [DllImport("oleacc.dll")] private static extern int ObjectFromLresult(UIntPtr lResult, ref Guid riid, IntPtr wParam, [MarshalAs(UnmanagedType.IDispatch)] out object ppvObject);
+
+    private static readonly uint WM_HTML_GETOBJECT = RegisterWindowMessage("WM_HTML_GETOBJECT");
+    private static Guid IID_IHTMLDocument2 = new Guid("332C4425-26CB-11D0-B483-00C04FD90119");
+    private static Guid IID_IDispatch      = new Guid("00020400-0000-0000-C000-000000000046");
 
     private const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
     private const uint MOUSEEVENTF_LEFTUP   = 0x0004;
@@ -120,6 +128,55 @@ public class Mis2BridgeWin32 {
     public const byte VK_V       = 0x56;
     public const int  VK_F8      = 0x77;
     public const int  VK_F9      = 0x78;
+
+    public static List<IntPtr> GetVisibleIeServerHwnds() {
+        var result = new List<IntPtr>();
+        var seen = new HashSet<long>();
+        EnumWindows(delegate(IntPtr topHwnd, IntPtr lp1) {
+            if (!IsWindowVisible(topHwnd)) return true;
+            var sbTop = new StringBuilder(128);
+            GetClassName(topHwnd, sbTop, sbTop.Capacity);
+            string topCls = sbTop.ToString();
+            if (topCls != "Chrome_WidgetWin_1" && topCls != "IEFrame" && topCls != "Internet Explorer_TridentDlgFrame" && topCls != "#32770") {
+                return true;
+            }
+            EnumChildWindows(topHwnd, delegate(IntPtr childHwnd, IntPtr lp2) {
+                if (!IsWindowVisible(childHwnd)) return true;
+                var sbChild = new StringBuilder(128);
+                GetClassName(childHwnd, sbChild, sbChild.Capacity);
+                if (sbChild.ToString() == "Internet Explorer_Server") {
+                    long key = childHwnd.ToInt64();
+                    if (seen.Add(key)) {
+                        RECT cr;
+                        GetWindowRect(childHwnd, out cr);
+                        if ((cr.Right - cr.Left) >= 240 && (cr.Bottom - cr.Top) >= 160) {
+                            result.Add(childHwnd);
+                        }
+                    }
+                }
+                return true;
+            }, IntPtr.Zero);
+            return true;
+        }, IntPtr.Zero);
+        return result;
+    }
+
+    public static object GetHtmlDocumentFromHwnd(IntPtr ieServerHwnd) {
+        if (ieServerHwnd == IntPtr.Zero || WM_HTML_GETOBJECT == 0) return null;
+        try {
+            UIntPtr lRes;
+            IntPtr ok = SendMessageTimeout(ieServerHwnd, WM_HTML_GETOBJECT, UIntPtr.Zero, IntPtr.Zero, 0x0002, 400, out lRes);
+            if (ok == IntPtr.Zero || lRes == UIntPtr.Zero) return null;
+            object doc = null;
+            Guid riid = IID_IHTMLDocument2;
+            int hr = ObjectFromLresult(lRes, ref riid, IntPtr.Zero, out doc);
+            if (hr == 0 && doc != null) return doc;
+            riid = IID_IDispatch;
+            hr = ObjectFromLresult(lRes, ref riid, IntPtr.Zero, out doc);
+            if (hr == 0 && doc != null) return doc;
+        } catch {}
+        return null;
+    }
 
     public static List<WinInfo> GetVisibleWindows() {
         var list = new List<WinInfo>();
@@ -1210,12 +1267,90 @@ $pumpTimer.Add_Tick({
 $pumpTimer.Start()
 
 # Unified Watcher:
-# 1) Auto-injects ie-autofill.js into IE pages on bma.go.th across step navigations
+# 1) Auto-injects ie-autofill.js into BOTH Microsoft Edge (IE Mode) tabs/popups AND IE11 on bma.go.th across every step navigation!
 # 2) Auto-launches Always-on-Top MIS2 Pay panel whenever Oracle Developer Forms Runtime opens
 $script:IeScriptFile = Join-Path $script:AppDir "ie-autofill.js"
+$script:IeCodeCache = $null
+$script:IeCodeMtime = [DateTime]::MinValue
+$script:InjectedCooldown = @{}
 $script:LastOracleHwnd = [IntPtr]::Zero
+
+function Get-IeCodeCached {
+    if (-not (Test-Path $script:IeScriptFile)) { return $null }
+    try {
+        $mt = (Get-Item $script:IeScriptFile).LastWriteTimeUtc
+        if ($null -eq $script:IeCodeCache -or $mt -ne $script:IeCodeMtime) {
+            $script:IeCodeCache = [System.IO.File]::ReadAllText($script:IeScriptFile, [System.Text.Encoding]::UTF8)
+            $script:IeCodeMtime = $mt
+        }
+        return $script:IeCodeCache
+    } catch {
+        return $script:IeCodeCache
+    }
+}
+
+function Invoke-InjectIntoHtmlDoc($doc, [string]$code, [string]$hwndKey) {
+    if ($null -eq $doc -or [string]::IsNullOrEmpty($code)) { return $false }
+    try {
+        $u = ""
+        try { $u = [string]$doc.url } catch {}
+        if ([string]::IsNullOrWhiteSpace($u)) {
+            try { $u = [string]$doc.location.href } catch {}
+        }
+        if ($u -notmatch "bmamisapp11\.bma\.go\.th|misweb\.bma\.go\.th|bmasso\.bma\.go\.th") { return $false }
+        $rs = ""
+        try { $rs = ([string]$doc.readyState).ToLower() } catch {}
+        if ($rs -ne "complete" -and $rs -ne "interactive") { return $false }
+        if ($null -eq $doc.body) { return $false }
+
+        $tag = ""
+        try { $tag = ([string]$doc.body.tagName).ToUpper() } catch {}
+        if ($tag -eq "FRAMESET") {
+            $bestFrameDoc = $null
+            $bestArea = 0
+            try {
+                $fCount = [int]$doc.frames.length
+                for ($fi = 0; $fi -lt $fCount; $fi++) {
+                    try {
+                        $fDoc = $doc.frames.item($fi).document
+                        if ($fDoc -and $fDoc.body -and ([string]$fDoc.body.tagName).ToUpper() -eq "BODY") {
+                            $fw = 0; $fh = 0
+                            try { $fw = [int]$fDoc.body.clientWidth; $fh = [int]$fDoc.body.clientHeight } catch {}
+                            $area = $fw * $fh
+                            if ($area -gt $bestArea -and $fw -ge 280 -and $fh -ge 180) {
+                                $bestArea = $area
+                                $bestFrameDoc = $fDoc
+                            }
+                        }
+                    } catch {}
+                }
+            } catch {}
+            if ($null -ne $bestFrameDoc) {
+                return (Invoke-InjectIntoHtmlDoc $bestFrameDoc $code "${hwndKey}_frame")
+            }
+            return $false
+        }
+
+        $existing = $null
+        try { $existing = $doc.getElementById("bma-ie-panel") } catch {}
+        if ($null -ne $existing) { return $false }
+
+        $nowTicks = [DateTime]::Now.Ticks
+        $cdKey = "${hwndKey}|${u}"
+        if ($script:InjectedCooldown.ContainsKey($cdKey)) {
+            $elapsedMs = ($nowTicks - [long]$script:InjectedCooldown[$cdKey]) / 10000.0
+            if ($elapsedMs -lt 2500) { return $false }
+        }
+        $script:InjectedCooldown[$cdKey] = $nowTicks
+        $doc.parentWindow.execScript($code, "javascript")
+        return $true
+    } catch {
+        return $false
+    }
+}
+
 $ieWatchTimer = New-Object System.Windows.Forms.Timer
-$ieWatchTimer.Interval = 1500
+$ieWatchTimer.Interval = 1000
 $ieWatchTimer.Add_Tick({
     # 1. Detect Oracle Developer Forms Runtime (Java Applet window) -> auto-float MIS2 Pay panel on top!
     if ($script:AutoPopOraclePay) {
@@ -1234,25 +1369,39 @@ $ieWatchTimer.Add_Tick({
         } catch {}
     }
 
-    # 2. Auto-inject ie-autofill.js into open IE windows on bma.go.th
+    # 2. Auto-inject ie-autofill.js into Microsoft Edge (IE Mode) tabs/popups & IE11 on bma.go.th
     if (-not $script:AutoInjectIE) { return }
-    if (-not (Test-Path $script:IeScriptFile)) { return }
+    $code = Get-IeCodeCached
+    if ([string]::IsNullOrEmpty($code)) { return }
+
+    # 2A. Edge IE Mode + IE Popups via Win32 Internet Explorer_Server + WM_HTML_GETOBJECT
+    try {
+        $ieHwnds = [Mis2BridgeWin32]::GetVisibleIeServerHwnds()
+        foreach ($h in $ieHwnds) {
+            $doc = $null
+            try {
+                $doc = [Mis2BridgeWin32]::GetHtmlDocumentFromHwnd($h)
+                if ($null -ne $doc) {
+                    Invoke-InjectIntoHtmlDoc $doc $code ([string]$h.ToInt64()) | Out-Null
+                }
+            } catch {} finally {
+                if ($null -ne $doc) {
+                    try { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($doc) | Out-Null } catch {}
+                }
+            }
+        }
+    } catch {}
+
+    # 2B. Standalone IE11 fallback via Shell.Application
     try {
         $shell = New-Object -ComObject Shell.Application
         $wins = $shell.Windows()
-        $codeCache = $null
         foreach ($w in $wins) {
             try {
                 $u = [string]$w.LocationURL
                 if ($u -match "bmamisapp11\.bma\.go\.th|misweb\.bma\.go\.th|bmasso\.bma\.go\.th") {
-                    if ($w.ReadyState -eq 4 -and $w.Document -and $w.Document.body) {
-                        $existing = $w.Document.getElementById("bma-ie-panel")
-                        if ($null -eq $existing) {
-                            if ($null -eq $codeCache) {
-                                $codeCache = [System.IO.File]::ReadAllText($script:IeScriptFile, [System.Text.Encoding]::UTF8)
-                            }
-                            $w.Document.parentWindow.execScript($codeCache, "javascript")
-                        }
+                    if ($w.ReadyState -eq 4 -and $w.Document) {
+                        Invoke-InjectIntoHtmlDoc $w.Document $code "shell_$([string]$w.HWND)" | Out-Null
                     }
                 }
             } catch {}
