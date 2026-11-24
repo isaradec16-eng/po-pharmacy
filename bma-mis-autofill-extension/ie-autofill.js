@@ -882,7 +882,7 @@
     var subj = String(item.missSubject || item.subject || '').replace(/^\s+|\s+$/g, '');
     var parenDesc = !subj ? '' : (subj.indexOf('ค่า') === 0 ? '(' + subj + ')' : '(ค่า' + subj + ')');
     var acctType = vendor && vendor.accountType ? String(vendor.accountType).replace(/^\s+|\s+$/g, '') : '';
-    if (acctType && parenDesc) return acctType + '\n' + parenDesc;
+    if (acctType && parenDesc) return parenDesc + '\n' + acctType;
     return parenDesc || acctType;
   }
 

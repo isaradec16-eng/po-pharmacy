@@ -1660,7 +1660,7 @@
     const subjRaw = String(item.missSubject || item.subject || '').trim();
     const parenDesc = !subjRaw ? '' : (subjRaw.startsWith('ค่า') ? `(${subjRaw})` : `(ค่า${subjRaw})`);
     const acctType = vendor && vendor.accountType ? String(vendor.accountType).trim() : '';
-    if (acctType && parenDesc) return `${acctType}\n${parenDesc}`;
+    if (acctType && parenDesc) return `${parenDesc}\n${acctType}`;
     return parenDesc || acctType;
   }
 

@@ -2250,7 +2250,7 @@ function Format-PayDescription($item, $vendor) {
         $acctType = ([string]$vendor.accountType).Trim()
     }
     if (-not [string]::IsNullOrWhiteSpace($acctType) -and -not [string]::IsNullOrWhiteSpace($baseDesc)) {
-        return "$acctType`r`n$baseDesc"
+        return "$baseDesc`r`n$acctType"
     }
     if (-not [string]::IsNullOrWhiteSpace($baseDesc)) { return $baseDesc }
     return $acctType
