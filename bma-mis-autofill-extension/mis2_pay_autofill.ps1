@@ -501,24 +501,63 @@ function Get-FiscalYearEntry([string]$fy) {
     return @{ missSheetId = ""; missTabName = "ชีต1"; autocratSheetId = ""; autocratTabName = "main" }
 }
 
+$script:UiFontFamily = $null
+function Get-BestThaiFontName {
+    if ($script:UiFontFamily) { return $script:UiFontFamily }
+    $installed = @{}
+    try {
+        foreach ($ff in [System.Drawing.FontFamily]::Families) {
+            $installed[$ff.Name.ToLower()] = $ff.Name
+        }
+    } catch {}
+    $preferred = @(
+        "Noto Sans Thai",
+        "IBM Plex Sans Thai",
+        "Sarabun",
+        "Prompt",
+        "Kanit",
+        "Leelawadee UI",
+        "Tahoma",
+        "Segoe UI"
+    )
+    foreach ($name in $preferred) {
+        if ($installed.ContainsKey($name.ToLower())) {
+            $script:UiFontFamily = $installed[$name.ToLower()]
+            return $script:UiFontFamily
+        }
+    }
+    $script:UiFontFamily = "Leelawadee UI"
+    return $script:UiFontFamily
+}
+
+function Get-UiFont([single]$pt = 11.25, [bool]$bold = $false) {
+    $fam = Get-BestThaiFontName
+    $style = if ($bold) { [System.Drawing.FontStyle]::Bold } else { [System.Drawing.FontStyle]::Regular }
+    try {
+        return New-Object System.Drawing.Font($fam, $pt, $style)
+    } catch {
+        return New-Object System.Drawing.Font("Leelawadee UI", $pt, $style)
+    }
+}
+
 function Show-FiscalYearSettingsDialog([string]$initialYear) {
     $dlg = New-Object System.Windows.Forms.Form
-    $dlg.Text = "⚙️ ตั้งค่าไฟล์ปลายทางตามปีงบประมาณ (MISS / Auto Crat)"
-    $dlg.Size = New-Object System.Drawing.Size(540, 355)
+    $dlg.Text = "ตั้งค่าไฟล์ปลายทางตามปีงบประมาณ (MISS / Auto Crat)"
+    $dlg.Size = New-Object System.Drawing.Size(580, 415)
     $dlg.StartPosition = "CenterScreen"
     $dlg.TopMost = $true
-    $dlg.Font = New-Object System.Drawing.Font("Segoe UI", 9.5)
+    $dlg.Font = Get-UiFont 11 $false
     $dlg.BackColor = [System.Drawing.Color]::FromArgb(245, 248, 252)
 
     $lblY = New-Object System.Windows.Forms.Label
     $lblY.Text = "เลือกปีงบประมาณ:"
-    $lblY.Location = New-Object System.Drawing.Point(14, 16)
-    $lblY.Size = New-Object System.Drawing.Size(120, 22)
+    $lblY.Location = New-Object System.Drawing.Point(16, 18)
+    $lblY.Size = New-Object System.Drawing.Size(145, 26)
     $dlg.Controls.Add($lblY)
 
     $cmbY = New-Object System.Windows.Forms.ComboBox
-    $cmbY.Location = New-Object System.Drawing.Point(138, 13)
-    $cmbY.Size = New-Object System.Drawing.Size(110, 24)
+    $cmbY.Location = New-Object System.Drawing.Point(166, 14)
+    $cmbY.Size = New-Object System.Drawing.Size(110, 30)
     $cmbY.DropDownStyle = "DropDownList"
     foreach ($k in ($script:Config["fiscalYears"].Keys | Sort-Object { [int]$_ })) {
         $cmbY.Items.Add($k) | Out-Null
@@ -526,81 +565,81 @@ function Show-FiscalYearSettingsDialog([string]$initialYear) {
     $dlg.Controls.Add($cmbY)
 
     $btnAddY = New-Object System.Windows.Forms.Button
-    $btnAddY.Text = "➕ เพิ่มปีงบถัดไป"
-    $btnAddY.Location = New-Object System.Drawing.Point(258, 12)
-    $btnAddY.Size = New-Object System.Drawing.Size(130, 27)
+    $btnAddY.Text = "+ เพิ่มปีงบถัดไป"
+    $btnAddY.Location = New-Object System.Drawing.Point(288, 13)
+    $btnAddY.Size = New-Object System.Drawing.Size(156, 32)
     $btnAddY.BackColor = [System.Drawing.Color]::FromArgb(224, 242, 254)
     $btnAddY.FlatStyle = "Flat"
     $dlg.Controls.Add($btnAddY)
 
     $lblMiss = New-Object System.Windows.Forms.Label
     $lblMiss.Text = "ลิงก์หรือ ID ไฟล์ MISS (เช่น ลิงก์ไฟล์ MISS70 / MISS71):"
-    $lblMiss.Location = New-Object System.Drawing.Point(14, 54)
-    $lblMiss.Size = New-Object System.Drawing.Size(490, 20)
-    $lblMiss.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    $lblMiss.Location = New-Object System.Drawing.Point(16, 60)
+    $lblMiss.Size = New-Object System.Drawing.Size(530, 24)
+    $lblMiss.Font = Get-UiFont 11 $true
     $dlg.Controls.Add($lblMiss)
 
     $txtMissUrl = New-Object System.Windows.Forms.TextBox
-    $txtMissUrl.Location = New-Object System.Drawing.Point(14, 76)
-    $txtMissUrl.Size = New-Object System.Drawing.Size(495, 24)
+    $txtMissUrl.Location = New-Object System.Drawing.Point(16, 86)
+    $txtMissUrl.Size = New-Object System.Drawing.Size(532, 30)
     $dlg.Controls.Add($txtMissUrl)
 
     $lblMissTab = New-Object System.Windows.Forms.Label
     $lblMissTab.Text = "ชื่อชีตในไฟล์ MISS (ค่าเริ่มต้น: ชีต1):"
-    $lblMissTab.Location = New-Object System.Drawing.Point(14, 108)
-    $lblMissTab.Size = New-Object System.Drawing.Size(220, 20)
+    $lblMissTab.Location = New-Object System.Drawing.Point(16, 124)
+    $lblMissTab.Size = New-Object System.Drawing.Size(264, 26)
     $dlg.Controls.Add($lblMissTab)
 
     $txtMissTab = New-Object System.Windows.Forms.TextBox
-    $txtMissTab.Location = New-Object System.Drawing.Point(240, 105)
-    $txtMissTab.Size = New-Object System.Drawing.Size(120, 24)
+    $txtMissTab.Location = New-Object System.Drawing.Point(284, 121)
+    $txtMissTab.Size = New-Object System.Drawing.Size(140, 30)
     $dlg.Controls.Add($txtMissTab)
 
     $lblAc = New-Object System.Windows.Forms.Label
     $lblAc.Text = "ลิงก์หรือ ID ไฟล์ Auto Crat-EGP (เช่น Auto Crat-EGP70 / 71):"
-    $lblAc.Location = New-Object System.Drawing.Point(14, 144)
-    $lblAc.Size = New-Object System.Drawing.Size(490, 20)
-    $lblAc.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    $lblAc.Location = New-Object System.Drawing.Point(16, 164)
+    $lblAc.Size = New-Object System.Drawing.Size(530, 24)
+    $lblAc.Font = Get-UiFont 11 $true
     $dlg.Controls.Add($lblAc)
 
     $txtAcUrl = New-Object System.Windows.Forms.TextBox
-    $txtAcUrl.Location = New-Object System.Drawing.Point(14, 166)
-    $txtAcUrl.Size = New-Object System.Drawing.Size(495, 24)
+    $txtAcUrl.Location = New-Object System.Drawing.Point(16, 190)
+    $txtAcUrl.Size = New-Object System.Drawing.Size(532, 30)
     $dlg.Controls.Add($txtAcUrl)
 
     $lblAcTab = New-Object System.Windows.Forms.Label
     $lblAcTab.Text = "ชื่อชีตในไฟล์ Auto Crat (ค่าเริ่มต้น: main):"
-    $lblAcTab.Location = New-Object System.Drawing.Point(14, 198)
-    $lblAcTab.Size = New-Object System.Drawing.Size(220, 20)
+    $lblAcTab.Location = New-Object System.Drawing.Point(16, 228)
+    $lblAcTab.Size = New-Object System.Drawing.Size(264, 26)
     $dlg.Controls.Add($lblAcTab)
 
     $txtAcTab = New-Object System.Windows.Forms.TextBox
-    $txtAcTab.Location = New-Object System.Drawing.Point(240, 195)
-    $txtAcTab.Size = New-Object System.Drawing.Size(120, 24)
+    $txtAcTab.Location = New-Object System.Drawing.Point(284, 225)
+    $txtAcTab.Size = New-Object System.Drawing.Size(140, 30)
     $dlg.Controls.Add($txtAcTab)
 
     $lblHint = New-Object System.Windows.Forms.Label
-    $lblHint.Location = New-Object System.Drawing.Point(14, 228)
-    $lblHint.Size = New-Object System.Drawing.Size(495, 34)
+    $lblHint.Location = New-Object System.Drawing.Point(16, 264)
+    $lblHint.Size = New-Object System.Drawing.Size(532, 46)
     $lblHint.ForeColor = [System.Drawing.Color]::FromArgb(71, 85, 105)
-    $lblHint.Font = New-Object System.Drawing.Font("Segoe UI", 8.2)
-    $lblHint.Text = "💡 วาง URL เต็มของ Google Sheets ได้เลย ระบบจะตัดรหัส Spreadsheet ID ให้อัตโนมัติ`r`n   (อย่าลืม Deploy โค้ด google-apps-script.gs ล่าสุดเพื่อให้รองรับการสลับปีงบแบบ Live)"
+    $lblHint.Font = Get-UiFont 10 $false
+    $lblHint.Text = "วาง URL เต็มของ Google Sheets ได้เลย ระบบจะตัดรหัส Spreadsheet ID ให้อัตโนมัติ`r`n(อย่าลืม Deploy โค้ด google-apps-script.gs ล่าสุดเพื่อให้รองรับการสลับปีงบแบบ Live)"
     $dlg.Controls.Add($lblHint)
 
     $btnSave = New-Object System.Windows.Forms.Button
-    $btnSave.Text = "💾 บันทึกและใช้ปีงบนี้"
-    $btnSave.Location = New-Object System.Drawing.Point(344, 270)
-    $btnSave.Size = New-Object System.Drawing.Size(165, 34)
+    $btnSave.Text = "บันทึกและใช้ปีงบนี้"
+    $btnSave.Location = New-Object System.Drawing.Point(358, 322)
+    $btnSave.Size = New-Object System.Drawing.Size(190, 38)
     $btnSave.BackColor = [System.Drawing.Color]::FromArgb(13, 148, 136)
     $btnSave.ForeColor = [System.Drawing.Color]::White
-    $btnSave.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
+    $btnSave.Font = Get-UiFont 11 $true
     $btnSave.FlatStyle = "Flat"
     $dlg.Controls.Add($btnSave)
 
     $btnCancel = New-Object System.Windows.Forms.Button
     $btnCancel.Text = "ยกเลิก"
-    $btnCancel.Location = New-Object System.Drawing.Point(244, 270)
-    $btnCancel.Size = New-Object System.Drawing.Size(92, 34)
+    $btnCancel.Location = New-Object System.Drawing.Point(252, 322)
+    $btnCancel.Size = New-Object System.Drawing.Size(96, 38)
     $btnCancel.FlatStyle = "Flat"
     $btnCancel.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
     $dlg.Controls.Add($btnCancel)
@@ -1505,59 +1544,61 @@ function Show-WindowPickerDialog {
 Load-Config
 
 [System.Windows.Forms.Application]::EnableVisualStyles()
+try { [System.Windows.Forms.Application]::SetCompatibleTextRenderingDefault($false) } catch {}
 
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "BMA MIS2 ข้อมูลช่วยกรอกเบิกจ่าย (FRM_PAY_DOC) — พัฒนาโดย ARISSARA.K"
 $screenArea = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
-$initH = [Math]::Min(695, [Math]::Max(520, $screenArea.Height - 24))
-$form.Size = New-Object System.Drawing.Size(478, $initH)
-$form.MinimumSize = New-Object System.Drawing.Size(440, [Math]::Min(520, $initH))
+$initH = [Math]::Min(820, [Math]::Max(580, $screenArea.Height - 24))
+$form.Size = New-Object System.Drawing.Size(566, $initH)
+$form.MinimumSize = New-Object System.Drawing.Size(520, [Math]::Min(580, $initH))
 $form.AutoScroll = $true
 $form.StartPosition = "Manual"
-$form.Location = New-Object System.Drawing.Point(([Math]::Max(10, $screenArea.Right - 488)), 12)
+$form.Location = New-Object System.Drawing.Point(([Math]::Max(10, $screenArea.Right - 576)), 12)
 $form.TopMost = $true
 $form.BackColor = [System.Drawing.Color]::FromArgb(244, 247, 251)
-$form.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+$form.Font = Get-UiFont 11.25 $false
 
 # --- Top Header Panel ---
 $header = New-Object System.Windows.Forms.Panel
 $header.Dock = "Top"
-$header.Height = 92
+$header.Height = 108
 $header.BackColor = [System.Drawing.Color]::FromArgb(15, 76, 129)
 $form.Controls.Add($header)
 
 $lblTitle = New-Object System.Windows.Forms.Label
 $lblTitle.Text = "BMA MIS2 ข้อมูลช่วยกรอกเบิกจ่าย (FRM_PAY_DOC)"
 $lblTitle.Location = New-Object System.Drawing.Point(12, 8)
-$lblTitle.Size = New-Object System.Drawing.Size(356, 24)
+$lblTitle.Size = New-Object System.Drawing.Size(436, 28)
 $lblTitle.ForeColor = [System.Drawing.Color]::White
-$lblTitle.Font = New-Object System.Drawing.Font("Segoe UI", 10.5, [System.Drawing.FontStyle]::Bold)
+$lblTitle.Font = Get-UiFont 12.25 $true
 $header.Controls.Add($lblTitle)
 
 $chkTopMost = New-Object System.Windows.Forms.CheckBox
 $chkTopMost.Text = "ปักหมุด"
 $chkTopMost.Checked = $true
-$chkTopMost.Location = New-Object System.Drawing.Point(374, 9)
-$chkTopMost.Size = New-Object System.Drawing.Size(78, 22)
+$chkTopMost.Location = New-Object System.Drawing.Point(452, 10)
+$chkTopMost.Size = New-Object System.Drawing.Size(92, 26)
+$chkTopMost.Font = Get-UiFont 10.5 $false
 $chkTopMost.ForeColor = [System.Drawing.Color]::FromArgb(186, 230, 253)
 $chkTopMost.Add_CheckedChanged({ $form.TopMost = $chkTopMost.Checked })
 $header.Controls.Add($chkTopMost)
 
 $lblSafety = New-Object System.Windows.Forms.Label
-$lblSafety.Text = "โหมดข้อมูลช่วยกรอก: กดปุ่ม [คัดลอก] ข้างแต่ละช่อง แล้วกด Ctrl+V วางใน FRM_PAY_DOC"
-$lblSafety.Location = New-Object System.Drawing.Point(12, 34)
-$lblSafety.Size = New-Object System.Drawing.Size(442, 18)
+$lblSafety.Text = "กดปุ่ม [คัดลอก] ข้างแต่ละช่อง แล้วกด Ctrl+V วางใน FRM_PAY_DOC"
+$lblSafety.Location = New-Object System.Drawing.Point(12, 39)
+$lblSafety.Size = New-Object System.Drawing.Size(530, 22)
 $lblSafety.ForeColor = [System.Drawing.Color]::FromArgb(254, 240, 138)
-$lblSafety.Font = New-Object System.Drawing.Font("Segoe UI", 8.2, [System.Drawing.FontStyle]::Bold)
+$lblSafety.Font = Get-UiFont 10 $false
 $header.Controls.Add($lblSafety)
 
 $btnOpenWeb = New-Object System.Windows.Forms.Button
 $btnOpenWeb.Text = "เปิดหน้าเว็บ MIS2 (IE)"
-$btnOpenWeb.Location = New-Object System.Drawing.Point(12, 56)
-$btnOpenWeb.Size = New-Object System.Drawing.Size(212, 28)
+$btnOpenWeb.Location = New-Object System.Drawing.Point(12, 66)
+$btnOpenWeb.Size = New-Object System.Drawing.Size(256, 32)
 $btnOpenWeb.BackColor = [System.Drawing.Color]::FromArgb(2, 132, 199)
 $btnOpenWeb.ForeColor = [System.Drawing.Color]::White
-$btnOpenWeb.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+$btnOpenWeb.Font = Get-UiFont 10.75 $true
 $btnOpenWeb.FlatStyle = "Flat"
 $btnOpenWeb.FlatAppearance.BorderSize = 0
 $btnOpenWeb.Add_Click({
@@ -1576,11 +1617,11 @@ $header.Controls.Add($btnOpenWeb)
 
 $btnReload = New-Object System.Windows.Forms.Button
 $btnReload.Text = "ซิงค์ข้อมูล Google Sheets"
-$btnReload.Location = New-Object System.Drawing.Point(232, 56)
-$btnReload.Size = New-Object System.Drawing.Size(214, 28)
+$btnReload.Location = New-Object System.Drawing.Point(276, 66)
+$btnReload.Size = New-Object System.Drawing.Size(262, 32)
 $btnReload.BackColor = [System.Drawing.Color]::FromArgb(13, 148, 136)
 $btnReload.ForeColor = [System.Drawing.Color]::White
-$btnReload.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+$btnReload.Font = Get-UiFont 10.75 $true
 $btnReload.FlatStyle = "Flat"
 $btnReload.FlatAppearance.BorderSize = 0
 $header.Controls.Add($btnReload)
@@ -1588,22 +1629,23 @@ $header.Controls.Add($btnReload)
 # --- Bottom Status & Developer Credit Bar ---
 $lblDevCredit = New-Object System.Windows.Forms.Label
 $lblDevCredit.Dock = "Bottom"
-$lblDevCredit.Height = 20
+$lblDevCredit.Height = 24
 $lblDevCredit.BackColor = [System.Drawing.Color]::FromArgb(15, 23, 42)
 $lblDevCredit.ForeColor = [System.Drawing.Color]::FromArgb(148, 163, 184)
 $lblDevCredit.TextAlign = "MiddleRight"
-$lblDevCredit.Padding = New-Object System.Windows.Forms.Padding(8, 0, 10, 0)
-$lblDevCredit.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
+$lblDevCredit.Padding = New-Object System.Windows.Forms.Padding(8, 0, 12, 0)
+$lblDevCredit.Font = Get-UiFont 9.5 $true
 $lblDevCredit.Text = "ผู้พัฒนา: ARISSARA.K"
 $form.Controls.Add($lblDevCredit)
 
 $statusBar = New-Object System.Windows.Forms.Label
 $statusBar.Dock = "Bottom"
-$statusBar.Height = 26
+$statusBar.Height = 30
 $statusBar.BackColor = [System.Drawing.Color]::FromArgb(30, 41, 59)
 $statusBar.ForeColor = [System.Drawing.Color]::FromArgb(226, 232, 240)
 $statusBar.TextAlign = "MiddleLeft"
-$statusBar.Padding = New-Object System.Windows.Forms.Padding(8, 0, 8, 0)
+$statusBar.Padding = New-Object System.Windows.Forms.Padding(10, 0, 10, 0)
+$statusBar.Font = Get-UiFont 10 $false
 $statusBar.Text = "กำลังเตรียมโหลดข้อมูลจาก Google Sheets..."
 $form.Controls.Add($statusBar)
 
@@ -1620,111 +1662,121 @@ $y = 8
 # --- Fiscal Year Selector Bar (starts at 70, expandable & per-year target files) ---
 $pnlFy = New-Object System.Windows.Forms.Panel
 $pnlFy.Location = New-Object System.Drawing.Point(10, $y)
-$pnlFy.Size = New-Object System.Drawing.Size(434, 32)
+$pnlFy.Size = New-Object System.Drawing.Size(514, 42)
 $pnlFy.BackColor = [System.Drawing.Color]::FromArgb(224, 242, 254)
 $body.Controls.Add($pnlFy)
 
 $lblFy = New-Object System.Windows.Forms.Label
 $lblFy.Text = "ปีงบประมาณ:"
-$lblFy.Location = New-Object System.Drawing.Point(8, 7)
-$lblFy.Size = New-Object System.Drawing.Size(88, 20)
+$lblFy.Location = New-Object System.Drawing.Point(10, 9)
+$lblFy.Size = New-Object System.Drawing.Size(112, 26)
 $lblFy.ForeColor = [System.Drawing.Color]::FromArgb(12, 74, 110)
-$lblFy.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+$lblFy.Font = Get-UiFont 11 $true
 $pnlFy.Controls.Add($lblFy)
 
 $cmbFiscalYear = New-Object System.Windows.Forms.ComboBox
-$cmbFiscalYear.Location = New-Object System.Drawing.Point(98, 4)
-$cmbFiscalYear.Size = New-Object System.Drawing.Size(84, 24)
+$cmbFiscalYear.Location = New-Object System.Drawing.Point(124, 6)
+$cmbFiscalYear.Size = New-Object System.Drawing.Size(86, 30)
 $cmbFiscalYear.DropDownStyle = "DropDownList"
-$cmbFiscalYear.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
+$cmbFiscalYear.Font = Get-UiFont 11.25 $true
 $pnlFy.Controls.Add($cmbFiscalYear)
 
 $lblFyFileStatus = New-Object System.Windows.Forms.Label
-$lblFyFileStatus.Location = New-Object System.Drawing.Point(188, 7)
-$lblFyFileStatus.Size = New-Object System.Drawing.Size(124, 20)
+$lblFyFileStatus.Location = New-Object System.Drawing.Point(218, 9)
+$lblFyFileStatus.Size = New-Object System.Drawing.Size(142, 26)
 $lblFyFileStatus.ForeColor = [System.Drawing.Color]::FromArgb(15, 118, 110)
-$lblFyFileStatus.Font = New-Object System.Drawing.Font("Segoe UI", 8.2, [System.Drawing.FontStyle]::Bold)
-$lblFyFileStatus.Text = "ไฟล์: MISS70"
+$lblFyFileStatus.Font = Get-UiFont 10.5 $false
+$lblFyFileStatus.Text = "✓ ไฟล์ MISS70"
 $pnlFy.Controls.Add($lblFyFileStatus)
 
 $btnFyConfig = New-Object System.Windows.Forms.Button
 $btnFyConfig.Text = "ตั้งค่าไฟล์ปีงบ"
-$btnFyConfig.Location = New-Object System.Drawing.Point(316, 3)
-$btnFyConfig.Size = New-Object System.Drawing.Size(112, 26)
+$btnFyConfig.Location = New-Object System.Drawing.Point(366, 5)
+$btnFyConfig.Size = New-Object System.Drawing.Size(138, 32)
 $btnFyConfig.BackColor = [System.Drawing.Color]::FromArgb(2, 132, 199)
 $btnFyConfig.ForeColor = [System.Drawing.Color]::White
-$btnFyConfig.Font = New-Object System.Drawing.Font("Segoe UI", 8.2, [System.Drawing.FontStyle]::Bold)
+$btnFyConfig.Font = Get-UiFont 10.5 $true
 $btnFyConfig.FlatStyle = "Flat"
 $btnFyConfig.FlatAppearance.BorderSize = 0
 $pnlFy.Controls.Add($btnFyConfig)
 
-$y += 38
+$y += 50
 
 # --- Section 1: Data Source Selection ---
 $grpSource = New-Object System.Windows.Forms.GroupBox
 $grpSource.Text = " 1. ค้นหารายการเบิกจ่าย (Auto Crat-EGP70 + MISS70 + ทะเบียนบริษัท) "
 $grpSource.Location = New-Object System.Drawing.Point(10, $y)
-$grpSource.Size = New-Object System.Drawing.Size(434, 174)
+$grpSource.Size = New-Object System.Drawing.Size(514, 224)
 $grpSource.BackColor = [System.Drawing.Color]::White
+$grpSource.Font = Get-UiFont 10.5 $false
 $body.Controls.Add($grpSource)
 
 $lblSearchCode = New-Object System.Windows.Forms.Label
 $lblSearchCode.Text = "ค้นหารหัส ซ. (เช่น 1งบ, 7งบ):"
-$lblSearchCode.Location = New-Object System.Drawing.Point(10, 22)
-$lblSearchCode.Size = New-Object System.Drawing.Size(165, 20)
+$lblSearchCode.Location = New-Object System.Drawing.Point(12, 28)
+$lblSearchCode.Size = New-Object System.Drawing.Size(218, 26)
+$lblSearchCode.Font = Get-UiFont 10.75 $false
 $grpSource.Controls.Add($lblSearchCode)
 
 $txtSearchCode = New-Object System.Windows.Forms.TextBox
-$txtSearchCode.Location = New-Object System.Drawing.Point(175, 19)
-$txtSearchCode.Size = New-Object System.Drawing.Size(120, 24)
+$txtSearchCode.Location = New-Object System.Drawing.Point(234, 24)
+$txtSearchCode.Size = New-Object System.Drawing.Size(136, 30)
+$txtSearchCode.Font = Get-UiFont 11.25 $false
 $grpSource.Controls.Add($txtSearchCode)
 
 $btnClearCode = New-Object System.Windows.Forms.Button
 $btnClearCode.Text = "แสดงทั้งหมด"
-$btnClearCode.Location = New-Object System.Drawing.Point(300, 18)
-$btnClearCode.Size = New-Object System.Drawing.Size(120, 25)
+$btnClearCode.Location = New-Object System.Drawing.Point(378, 24)
+$btnClearCode.Size = New-Object System.Drawing.Size(124, 30)
+$btnClearCode.Font = Get-UiFont 10.5 $false
 $btnClearCode.FlatStyle = "Flat"
 $grpSource.Controls.Add($btnClearCode)
 
 $cmbItem = New-Object System.Windows.Forms.ComboBox
-$cmbItem.Location = New-Object System.Drawing.Point(10, 48)
-$cmbItem.Size = New-Object System.Drawing.Size(410, 24)
+$cmbItem.Location = New-Object System.Drawing.Point(12, 62)
+$cmbItem.Size = New-Object System.Drawing.Size(490, 32)
+$cmbItem.Font = Get-UiFont 11 $false
 $cmbItem.DropDownStyle = "DropDownList"
 $grpSource.Controls.Add($cmbItem)
 
 $lblSearchVendor = New-Object System.Windows.Forms.Label
 $lblSearchVendor.Text = "หรือค้นหาบริษัท (ทะเบียนบริษัท):"
-$lblSearchVendor.Location = New-Object System.Drawing.Point(10, 79)
-$lblSearchVendor.Size = New-Object System.Drawing.Size(175, 20)
+$lblSearchVendor.Location = New-Object System.Drawing.Point(12, 102)
+$lblSearchVendor.Size = New-Object System.Drawing.Size(230, 26)
+$lblSearchVendor.Font = Get-UiFont 10.75 $false
 $grpSource.Controls.Add($lblSearchVendor)
 
 $txtSearchVendor = New-Object System.Windows.Forms.TextBox
-$txtSearchVendor.Location = New-Object System.Drawing.Point(188, 76)
-$txtSearchVendor.Size = New-Object System.Drawing.Size(232, 24)
+$txtSearchVendor.Location = New-Object System.Drawing.Point(246, 98)
+$txtSearchVendor.Size = New-Object System.Drawing.Size(256, 30)
+$txtSearchVendor.Font = Get-UiFont 11.25 $false
 $grpSource.Controls.Add($txtSearchVendor)
 
 $cmbVendor = New-Object System.Windows.Forms.ComboBox
-$cmbVendor.Location = New-Object System.Drawing.Point(10, 104)
-$cmbVendor.Size = New-Object System.Drawing.Size(410, 24)
+$cmbVendor.Location = New-Object System.Drawing.Point(12, 134)
+$cmbVendor.Size = New-Object System.Drawing.Size(490, 32)
+$cmbVendor.Font = Get-UiFont 11 $false
 $cmbVendor.DropDownStyle = "DropDownList"
 $grpSource.Controls.Add($cmbVendor)
 
 $lblAlert = New-Object System.Windows.Forms.Label
-$lblAlert.Location = New-Object System.Drawing.Point(10, 132)
-$lblAlert.Size = New-Object System.Drawing.Size(410, 34)
+$lblAlert.Location = New-Object System.Drawing.Point(12, 172)
+$lblAlert.Size = New-Object System.Drawing.Size(490, 44)
 $lblAlert.BackColor = [System.Drawing.Color]::FromArgb(241, 245, 249)
 $lblAlert.ForeColor = [System.Drawing.Color]::FromArgb(51, 65, 85)
-$lblAlert.Padding = New-Object System.Windows.Forms.Padding(6, 3, 6, 3)
-$lblAlert.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+$lblAlert.Padding = New-Object System.Windows.Forms.Padding(8, 4, 8, 4)
+$lblAlert.Font = Get-UiFont 10 $false
 $lblAlert.Text = "เลือกรายการงบหรือบริษัทด้านบน แล้วกดปุ่ม [คัดลอก] ข้างแต่ละช่องเพื่อนำไปวาง"
 $grpSource.Controls.Add($lblAlert)
 
-$y += 180
+$y += 232
 
 # --- Section 2: 3-Tab Data Helper (Copy-to-Clipboard ONLY — No Auto-Clicking!) ---
 $tabs = New-Object System.Windows.Forms.TabControl
 $tabs.Location = New-Object System.Drawing.Point(10, $y)
-$tabs.Size = New-Object System.Drawing.Size(434, 272)
+$tabs.Size = New-Object System.Drawing.Size(514, 360)
+$tabs.Font = Get-UiFont 10.75 $false
+$tabs.Padding = New-Object System.Drawing.Point(10, 5)
 $body.Controls.Add($tabs)
 
 # Helper to create pure 1-click Copy button beside each field
@@ -1732,10 +1784,10 @@ function Add-QuickPasteBtn($parent, [int]$x, [int]$yPos, $targetControl, [bool]$
     $b = New-Object System.Windows.Forms.Button
     $b.Text = "คัดลอก"
     $b.Location = New-Object System.Drawing.Point($x, $yPos)
-    $b.Size = New-Object System.Drawing.Size(54, 24)
+    $b.Size = New-Object System.Drawing.Size(72, 30)
     $b.BackColor = [System.Drawing.Color]::FromArgb(224, 242, 254)
     $b.ForeColor = [System.Drawing.Color]::FromArgb(3, 105, 161)
-    $b.Font = New-Object System.Drawing.Font("Segoe UI", 8.2, [System.Drawing.FontStyle]::Bold)
+    $b.Font = Get-UiFont 10.5 $true
     $b.FlatStyle = "Flat"
     $b.FlatAppearance.BorderColor = [System.Drawing.Color]::FromArgb(125, 211, 252)
     $b.Tag = @{ Control = $targetControl; Multi = $isMultiline }
@@ -1750,7 +1802,7 @@ function Add-QuickPasteBtn($parent, [int]$x, [int]$yPos, $targetControl, [bool]$
             return
         }
         Set-ClipboardSafe $val | Out-Null
-        $preview = if ($val.Length -gt 38) { $val.Substring(0, 38) + "..." } else { $val.Replace("`r`n", " / ") }
+        $preview = if ($val.Length -gt 42) { $val.Substring(0, 42) + "..." } else { $val.Replace("`r`n", " / ") }
         $statusBar.Text = "คัดลอกแล้ว: $preview (กด Ctrl+V เพื่อวาง)"
     })
     $parent.Controls.Add($b)
@@ -1765,78 +1817,79 @@ $tabs.TabPages.Add($tab1)
 
 $lblRcv = New-Object System.Windows.Forms.Label
 $lblRcv.Text = "เอกสารตรวจรับงานซื้อ/จ้าง (เลขที่ / ปี):"
-$lblRcv.Location = New-Object System.Drawing.Point(12, 12)
-$lblRcv.Size = New-Object System.Drawing.Size(260, 20)
-$lblRcv.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+$lblRcv.Location = New-Object System.Drawing.Point(12, 10)
+$lblRcv.Size = New-Object System.Drawing.Size(478, 26)
+$lblRcv.Font = Get-UiFont 11 $true
 $tab1.Controls.Add($lblRcv)
 
 $txtRcvNo = New-Object System.Windows.Forms.TextBox
-$txtRcvNo.Location = New-Object System.Drawing.Point(12, 35)
-$txtRcvNo.Size = New-Object System.Drawing.Size(102, 25)
-$txtRcvNo.Font = New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold)
+$txtRcvNo.Location = New-Object System.Drawing.Point(12, 40)
+$txtRcvNo.Size = New-Object System.Drawing.Size(116, 30)
+$txtRcvNo.Font = Get-UiFont 12 $true
 $tab1.Controls.Add($txtRcvNo)
-Add-QuickPasteBtn $tab1 118 35 $txtRcvNo $false | Out-Null
+Add-QuickPasteBtn $tab1 134 40 $txtRcvNo $false | Out-Null
 
 $lblSlash = New-Object System.Windows.Forms.Label
 $lblSlash.Text = "/"
-$lblSlash.Location = New-Object System.Drawing.Point(178, 37)
-$lblSlash.Size = New-Object System.Drawing.Size(16, 24)
-$lblSlash.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+$lblSlash.Location = New-Object System.Drawing.Point(214, 42)
+$lblSlash.Size = New-Object System.Drawing.Size(18, 28)
+$lblSlash.Font = Get-UiFont 13 $true
 $tab1.Controls.Add($lblSlash)
 
 $txtRcvYear = New-Object System.Windows.Forms.TextBox
 $txtRcvYear.Text = [string]$script:Config["fiscalYear"]
-$txtRcvYear.Location = New-Object System.Drawing.Point(198, 35)
-$txtRcvYear.Size = New-Object System.Drawing.Size(60, 25)
-$txtRcvYear.Font = New-Object System.Drawing.Font("Segoe UI", 11, [System.Drawing.FontStyle]::Bold)
+$txtRcvYear.Location = New-Object System.Drawing.Point(238, 40)
+$txtRcvYear.Size = New-Object System.Drawing.Size(76, 30)
+$txtRcvYear.Font = Get-UiFont 12 $true
 $tab1.Controls.Add($txtRcvYear)
-Add-QuickPasteBtn $tab1 262 35 $txtRcvYear $false | Out-Null
+Add-QuickPasteBtn $tab1 320 40 $txtRcvYear $false | Out-Null
 
 $lblItemSummary = New-Object System.Windows.Forms.Label
-$lblItemSummary.Location = New-Object System.Drawing.Point(12, 68)
-$lblItemSummary.Size = New-Object System.Drawing.Size(400, 92)
+$lblItemSummary.Location = New-Object System.Drawing.Point(12, 80)
+$lblItemSummary.Size = New-Object System.Drawing.Size(480, 140)
 $lblItemSummary.BackColor = [System.Drawing.Color]::FromArgb(248, 250, 252)
 $lblItemSummary.BorderStyle = "FixedSingle"
-$lblItemSummary.Padding = New-Object System.Windows.Forms.Padding(6)
+$lblItemSummary.Padding = New-Object System.Windows.Forms.Padding(8)
+$lblItemSummary.Font = Get-UiFont 11 $false
 $lblItemSummary.Text = "สรุปรายการจาก Google Sheets:`r`n- เลขที่ใบสั่งซื้อ: -  |  ยอดเงิน: -`r`n- บริษัท: -`r`n- เรื่อง: -"
 $tab1.Controls.Add($lblItemSummary)
 
 $lblVat = New-Object System.Windows.Forms.Label
 $lblVat.Text = "ภาษีมูลค่าเพิ่ม (7%):"
-$lblVat.Location = New-Object System.Drawing.Point(12, 172)
-$lblVat.Size = New-Object System.Drawing.Size(116, 20)
-$lblVat.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+$lblVat.Location = New-Object System.Drawing.Point(12, 234)
+$lblVat.Size = New-Object System.Drawing.Size(148, 26)
+$lblVat.Font = Get-UiFont 10.75 $false
 $tab1.Controls.Add($lblVat)
 
 $txtVatAmount = New-Object System.Windows.Forms.TextBox
-$txtVatAmount.Location = New-Object System.Drawing.Point(130, 169)
-$txtVatAmount.Size = New-Object System.Drawing.Size(92, 23)
-$txtVatAmount.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
+$txtVatAmount.Location = New-Object System.Drawing.Point(162, 230)
+$txtVatAmount.Size = New-Object System.Drawing.Size(108, 30)
+$txtVatAmount.Font = Get-UiFont 11.5 $true
 $tab1.Controls.Add($txtVatAmount)
-Add-QuickPasteBtn $tab1 226 169 $txtVatAmount $false | Out-Null
+Add-QuickPasteBtn $tab1 276 230 $txtVatAmount $false | Out-Null
 
 $lblWht = New-Object System.Windows.Forms.Label
 $lblWht.Text = "หักภาษีเงินได้ (1%):"
-$lblWht.Location = New-Object System.Drawing.Point(12, 202)
-$lblWht.Size = New-Object System.Drawing.Size(116, 20)
-$lblWht.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+$lblWht.Location = New-Object System.Drawing.Point(12, 274)
+$lblWht.Size = New-Object System.Drawing.Size(148, 26)
+$lblWht.Font = Get-UiFont 10.75 $false
 $tab1.Controls.Add($lblWht)
 
 $txtWhtAmount = New-Object System.Windows.Forms.TextBox
-$txtWhtAmount.Location = New-Object System.Drawing.Point(130, 199)
-$txtWhtAmount.Size = New-Object System.Drawing.Size(92, 23)
-$txtWhtAmount.Font = New-Object System.Drawing.Font("Segoe UI", 9.5, [System.Drawing.FontStyle]::Bold)
+$txtWhtAmount.Location = New-Object System.Drawing.Point(162, 270)
+$txtWhtAmount.Size = New-Object System.Drawing.Size(108, 30)
+$txtWhtAmount.Font = Get-UiFont 11.5 $true
 $tab1.Controls.Add($txtWhtAmount)
-Add-QuickPasteBtn $tab1 226 199 $txtWhtAmount $false | Out-Null
+Add-QuickPasteBtn $tab1 276 270 $txtWhtAmount $false | Out-Null
 
 $lblWhtBadge = New-Object System.Windows.Forms.Label
-$lblWhtBadge.Location = New-Object System.Drawing.Point(286, 169)
-$lblWhtBadge.Size = New-Object System.Drawing.Size(126, 54)
+$lblWhtBadge.Location = New-Object System.Drawing.Point(356, 230)
+$lblWhtBadge.Size = New-Object System.Drawing.Size(136, 70)
 $lblWhtBadge.BackColor = [System.Drawing.Color]::FromArgb(241, 245, 249)
 $lblWhtBadge.ForeColor = [System.Drawing.Color]::FromArgb(51, 65, 85)
 $lblWhtBadge.BorderStyle = "FixedSingle"
 $lblWhtBadge.TextAlign = "MiddleCenter"
-$lblWhtBadge.Font = New-Object System.Drawing.Font("Segoe UI", 8, [System.Drawing.FontStyle]::Bold)
+$lblWhtBadge.Font = Get-UiFont 10 $true
 $lblWhtBadge.Text = "สุทธิที่จ่าย:`r`n-"
 $tab1.Controls.Add($lblWhtBadge)
 
@@ -1847,29 +1900,30 @@ $tab2.BackColor = [System.Drawing.Color]::White
 $tab2.AutoScroll = $true
 $tabs.TabPages.Add($tab2)
 
-$t2y = 10
+$t2y = 12
 function Add-PayeeRow([string]$chkKey, [string]$label, [bool]$defChecked, [bool]$isMulti = $false) {
     $lbl = New-Object System.Windows.Forms.Label
     $lbl.Text = $label
-    $lbl.Location = New-Object System.Drawing.Point(8, ($script:t2y + 3))
-    $lbl.Size = New-Object System.Drawing.Size(116, 20)
-    $lbl.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+    $lbl.Location = New-Object System.Drawing.Point(10, ($script:t2y + 4))
+    $lbl.Size = New-Object System.Drawing.Size(136, 26)
+    $lbl.Font = Get-UiFont 10.5 $false
     $lbl.ForeColor = [System.Drawing.Color]::FromArgb(30, 41, 59)
     $tab2.Controls.Add($lbl)
 
     $tb = New-Object System.Windows.Forms.TextBox
-    $tb.Location = New-Object System.Drawing.Point(126, $script:t2y)
+    $tb.Location = New-Object System.Drawing.Point(148, $script:t2y)
+    $tb.Font = Get-UiFont 11.25 $false
     if ($isMulti) {
         $tb.Multiline = $true
         $tb.ScrollBars = "Vertical"
-        $tb.Size = New-Object System.Drawing.Size(226, 42)
+        $tb.Size = New-Object System.Drawing.Size(268, 52)
     } else {
-        $tb.Size = New-Object System.Drawing.Size(226, 23)
+        $tb.Size = New-Object System.Drawing.Size(268, 30)
     }
     $tab2.Controls.Add($tb)
-    Add-QuickPasteBtn $tab2 356 $script:t2y $tb $isMulti | Out-Null
+    Add-QuickPasteBtn $tab2 422 $script:t2y $tb $isMulti | Out-Null
 
-    $script:t2y += if ($isMulti) { 47 } else { 31 }
+    $script:t2y += if ($isMulti) { 58 } else { 40 }
     return @{ Check = @{ Checked = $true }; Box = $tb }
 }
 
@@ -1878,21 +1932,22 @@ $rPayTo = Add-PayeeRow "payTo" "จ่ายให้ (Col A)" $true $false
 # โดยมอบให้ (ComboBox with presets)
 $lblAssign = New-Object System.Windows.Forms.Label
 $lblAssign.Text = "โดยมอบให้"
-$lblAssign.Location = New-Object System.Drawing.Point(8, ($t2y + 3))
-$lblAssign.Size = New-Object System.Drawing.Size(116, 20)
-$lblAssign.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+$lblAssign.Location = New-Object System.Drawing.Point(10, ($t2y + 4))
+$lblAssign.Size = New-Object System.Drawing.Size(136, 26)
+$lblAssign.Font = Get-UiFont 10.5 $false
 $lblAssign.ForeColor = [System.Drawing.Color]::FromArgb(30, 41, 59)
 $tab2.Controls.Add($lblAssign)
 $chkAssign = @{ Checked = $true }
 
 $cmbAssign = New-Object System.Windows.Forms.ComboBox
-$cmbAssign.Location = New-Object System.Drawing.Point(126, $t2y)
-$cmbAssign.Size = New-Object System.Drawing.Size(226, 23)
+$cmbAssign.Location = New-Object System.Drawing.Point(148, $t2y)
+$cmbAssign.Size = New-Object System.Drawing.Size(268, 30)
+$cmbAssign.Font = Get-UiFont 11 $false
 foreach ($p in $script:Config["assignToPresets"]) { $cmbAssign.Items.Add($p) | Out-Null }
 $cmbAssign.Text = [string]$script:Config["defaultAssignTo"]
 $tab2.Controls.Add($cmbAssign)
-Add-QuickPasteBtn $tab2 356 $t2y $cmbAssign $false | Out-Null
-$t2y += 31
+Add-QuickPasteBtn $tab2 422 $t2y $cmbAssign $false | Out-Null
+$t2y += 40
 
 # Bank Code + Branch Code + Account No + Branch Info Strip
 $rBankCode   = Add-PayeeRow "bankCode"   "รหัสธนาคาร (B)" $true $false
@@ -1906,13 +1961,13 @@ $rBranchCode.Box.Add_Leave({
 })
 
 $lblBankBranchInfo = New-Object System.Windows.Forms.Label
-$lblBankBranchInfo.Location = New-Object System.Drawing.Point(8, ($t2y + 4))
-$lblBankBranchInfo.Size = New-Object System.Drawing.Size(402, 42)
+$lblBankBranchInfo.Location = New-Object System.Drawing.Point(10, ($t2y + 6))
+$lblBankBranchInfo.Size = New-Object System.Drawing.Size(484, 62)
 $lblBankBranchInfo.BackColor = [System.Drawing.Color]::FromArgb(254, 249, 195)
 $lblBankBranchInfo.ForeColor = [System.Drawing.Color]::FromArgb(133, 77, 14)
 $lblBankBranchInfo.BorderStyle = "FixedSingle"
-$lblBankBranchInfo.Padding = New-Object System.Windows.Forms.Padding(6, 4, 6, 4)
-$lblBankBranchInfo.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+$lblBankBranchInfo.Padding = New-Object System.Windows.Forms.Padding(8, 5, 8, 5)
+$lblBankBranchInfo.Font = Get-UiFont 10.5 $false
 $lblBankBranchInfo.Text = "ธนาคาร (B): -  |  สาขา (C): -"
 $tab2.Controls.Add($lblBankBranchInfo)
 
@@ -1924,44 +1979,48 @@ $tabs.TabPages.Add($tab3)
 
 $lblReq = New-Object System.Windows.Forms.Label
 $lblReq.Text = "ชื่อผู้เบิก (แก้ไขได้และจำค่าอัตโนมัติ):"
-$lblReq.Location = New-Object System.Drawing.Point(12, 10)
-$lblReq.Size = New-Object System.Drawing.Size(396, 18)
-$lblReq.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+$lblReq.Location = New-Object System.Drawing.Point(12, 8)
+$lblReq.Size = New-Object System.Drawing.Size(480, 24)
+$lblReq.Font = Get-UiFont 10.5 $false
 $tab3.Controls.Add($lblReq)
 
 $txtRequester = New-Object System.Windows.Forms.TextBox
-$txtRequester.Location = New-Object System.Drawing.Point(12, 30)
-$txtRequester.Size = New-Object System.Drawing.Size(342, 24)
+$txtRequester.Location = New-Object System.Drawing.Point(12, 34)
+$txtRequester.Size = New-Object System.Drawing.Size(404, 30)
+$txtRequester.Font = Get-UiFont 11.25 $false
 $txtRequester.Text = [string]$script:Config["defaultRequester"]
 $tab3.Controls.Add($txtRequester)
-Add-QuickPasteBtn $tab3 358 30 $txtRequester $false | Out-Null
+Add-QuickPasteBtn $tab3 422 34 $txtRequester $false | Out-Null
 
 $lblPayDate = New-Object System.Windows.Forms.Label
 $lblPayDate.Text = "วันที่เบิก (dd/MM/yyyy พ.ศ.):"
-$lblPayDate.Location = New-Object System.Drawing.Point(12, 62)
-$lblPayDate.Size = New-Object System.Drawing.Size(180, 18)
-$lblPayDate.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+$lblPayDate.Location = New-Object System.Drawing.Point(12, 72)
+$lblPayDate.Size = New-Object System.Drawing.Size(260, 24)
+$lblPayDate.Font = Get-UiFont 10.5 $false
 $tab3.Controls.Add($lblPayDate)
 
 $txtPayDate = New-Object System.Windows.Forms.TextBox
 $txtPayDate.Text = Get-TodayThaiSlash
-$txtPayDate.Location = New-Object System.Drawing.Point(12, 82)
-$txtPayDate.Size = New-Object System.Drawing.Size(115, 24)
+$txtPayDate.Location = New-Object System.Drawing.Point(12, 98)
+$txtPayDate.Size = New-Object System.Drawing.Size(142, 30)
+$txtPayDate.Font = Get-UiFont 11.25 $false
 $tab3.Controls.Add($txtPayDate)
-Add-QuickPasteBtn $tab3 131 82 $txtPayDate $false | Out-Null
+Add-QuickPasteBtn $tab3 160 98 $txtPayDate $false | Out-Null
 
 $btnDateToday = New-Object System.Windows.Forms.Button
 $btnDateToday.Text = "วันนี้"
-$btnDateToday.Location = New-Object System.Drawing.Point(192, 82)
-$btnDateToday.Size = New-Object System.Drawing.Size(58, 24)
+$btnDateToday.Location = New-Object System.Drawing.Point(242, 98)
+$btnDateToday.Size = New-Object System.Drawing.Size(74, 30)
+$btnDateToday.Font = Get-UiFont 10.5 $false
 $btnDateToday.FlatStyle = "Flat"
 $btnDateToday.Add_Click({ $txtPayDate.Text = Get-TodayThaiSlash })
 $tab3.Controls.Add($btnDateToday)
 
 $btnDateRcv = New-Object System.Windows.Forms.Button
 $btnDateRcv.Text = "วันตรวจรับ"
-$btnDateRcv.Location = New-Object System.Drawing.Point(255, 82)
-$btnDateRcv.Size = New-Object System.Drawing.Size(80, 24)
+$btnDateRcv.Location = New-Object System.Drawing.Point(322, 98)
+$btnDateRcv.Size = New-Object System.Drawing.Size(106, 30)
+$btnDateRcv.Font = Get-UiFont 10.5 $false
 $btnDateRcv.FlatStyle = "Flat"
 $btnDateRcv.Add_Click({
     if ($script:SelectedItem -and $script:SelectedItem.rcvDate) {
@@ -1972,47 +2031,51 @@ $tab3.Controls.Add($btnDateRcv)
 
 $lblDesc = New-Object System.Windows.Forms.Label
 $lblDesc.Text = "คำอธิบายรายการเบิก ((ค่า...) + ประเภทบัญชี คอลัมน์ F):"
-$lblDesc.Location = New-Object System.Drawing.Point(12, 114)
-$lblDesc.Size = New-Object System.Drawing.Size(396, 18)
-$lblDesc.Font = New-Object System.Drawing.Font("Segoe UI", 8.5, [System.Drawing.FontStyle]::Bold)
+$lblDesc.Location = New-Object System.Drawing.Point(12, 138)
+$lblDesc.Size = New-Object System.Drawing.Size(480, 24)
+$lblDesc.Font = Get-UiFont 10.5 $false
 $tab3.Controls.Add($lblDesc)
 
 $txtDesc = New-Object System.Windows.Forms.TextBox
 $txtDesc.Multiline = $true
 $txtDesc.ScrollBars = "Vertical"
-$txtDesc.Location = New-Object System.Drawing.Point(12, 134)
-$txtDesc.Size = New-Object System.Drawing.Size(342, 98)
+$txtDesc.Location = New-Object System.Drawing.Point(12, 164)
+$txtDesc.Size = New-Object System.Drawing.Size(404, 140)
+$txtDesc.Font = Get-UiFont 11.25 $false
 $tab3.Controls.Add($txtDesc)
-Add-QuickPasteBtn $tab3 358 134 $txtDesc $true | Out-Null
+Add-QuickPasteBtn $tab3 422 164 $txtDesc $true | Out-Null
 
-$y += 280
+$y += 368
 
 # --- Section 3: Writeback เลขที่ใบขอเบิก to MISS70 Column H ---
 $grpWriteback = New-Object System.Windows.Forms.GroupBox
 $grpWriteback.Text = " บันทึก 'เลขที่ใบขอเบิก.../70' กลับลงชีต MISS70 (คอลัมน์ H) "
 $grpWriteback.Location = New-Object System.Drawing.Point(10, $y)
-$grpWriteback.Size = New-Object System.Drawing.Size(434, 66)
+$grpWriteback.Size = New-Object System.Drawing.Size(514, 80)
 $grpWriteback.BackColor = [System.Drawing.Color]::White
+$grpWriteback.Font = Get-UiFont 10.5 $false
 $body.Controls.Add($grpWriteback)
 
 $lblPayDoc = New-Object System.Windows.Forms.Label
 $lblPayDoc.Text = "เลขที่ใบขอเบิกที่ได้:"
-$lblPayDoc.Location = New-Object System.Drawing.Point(10, 28)
-$lblPayDoc.Size = New-Object System.Drawing.Size(112, 20)
+$lblPayDoc.Location = New-Object System.Drawing.Point(12, 34)
+$lblPayDoc.Size = New-Object System.Drawing.Size(144, 26)
+$lblPayDoc.Font = Get-UiFont 10.75 $false
 $grpWriteback.Controls.Add($lblPayDoc)
 
 $txtPayDocNo = New-Object System.Windows.Forms.TextBox
-$txtPayDocNo.Location = New-Object System.Drawing.Point(124, 25)
-$txtPayDocNo.Size = New-Object System.Drawing.Size(124, 24)
+$txtPayDocNo.Location = New-Object System.Drawing.Point(160, 30)
+$txtPayDocNo.Size = New-Object System.Drawing.Size(152, 30)
+$txtPayDocNo.Font = Get-UiFont 11.5 $true
 $grpWriteback.Controls.Add($txtPayDocNo)
 
 $btnSavePayDoc = New-Object System.Windows.Forms.Button
 $btnSavePayDoc.Text = "บันทึกลง MISS70"
-$btnSavePayDoc.Location = New-Object System.Drawing.Point(254, 24)
-$btnSavePayDoc.Size = New-Object System.Drawing.Size(166, 27)
+$btnSavePayDoc.Location = New-Object System.Drawing.Point(320, 29)
+$btnSavePayDoc.Size = New-Object System.Drawing.Size(182, 34)
 $btnSavePayDoc.BackColor = [System.Drawing.Color]::FromArgb(22, 163, 74)
 $btnSavePayDoc.ForeColor = [System.Drawing.Color]::White
-$btnSavePayDoc.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+$btnSavePayDoc.Font = Get-UiFont 11 $true
 $btnSavePayDoc.FlatStyle = "Flat"
 $btnSavePayDoc.FlatAppearance.BorderSize = 0
 $grpWriteback.Controls.Add($btnSavePayDoc)
@@ -2191,11 +2254,11 @@ function Apply-ItemToFields($item) {
     if (-not [string]::IsNullOrWhiteSpace([string]$item.payDocNo)) {
         $lblAlert.BackColor = [System.Drawing.Color]::FromArgb(254, 226, 226)
         $lblAlert.ForeColor = [System.Drawing.Color]::FromArgb(185, 28, 28)
-        $lblAlert.Text = "⛔ มีประวัติการขอเบิกแล้วใน MISS70 (เลขที่ใบขอเบิก: $($item.payDocNo)) — ระวังการเบิกซ้ำ!"
+        $lblAlert.Text = "[เตือน] มีประวัติการขอเบิกแล้วใน MISS$($script:Config['fiscalYear']) (เลขที่ใบขอเบิก: $($item.payDocNo)) — ระวังการเบิกซ้ำ!"
     } elseif ([string]::IsNullOrWhiteSpace([string]$item.rcvNo)) {
         $lblAlert.BackColor = [System.Drawing.Color]::FromArgb(254, 243, 199)
         $lblAlert.ForeColor = [System.Drawing.Color]::FromArgb(146, 64, 14)
-        $lblAlert.Text = "⚠️ รายการนี้ยังไม่มี 'เลขที่ใบตรวจรับ' ในชีต MISS70 (คอลัมน์ D) — สามารถพิมพ์เองด้านล่างได้"
+        $lblAlert.Text = "[แจ้งเตือน] รายการนี้ยังไม่มี 'เลขที่ใบตรวจรับ' ในชีต MISS$($script:Config['fiscalYear']) — สามารถพิมพ์เองด้านล่างได้"
     } else {
         $lblAlert.BackColor = [System.Drawing.Color]::FromArgb(220, 252, 231)
         $lblAlert.ForeColor = [System.Drawing.Color]::FromArgb(22, 101, 52)
@@ -2227,7 +2290,7 @@ function Apply-ItemToFields($item) {
         } else {
             $cmbAssign.Text = [string]$script:Config["defaultAssignTo"]
         }
-        $lblBankBranchInfo.Text = "⚠️ ไม่พบบริษัทนี้ในชีต 'ทะเบียนบริษัท' — ค้นหาและเลือกจากช่องบริษัทด้านบนได้"
+        $lblBankBranchInfo.Text = "[แจ้งเตือน] ไม่พบบริษัทนี้ในชีต 'ทะเบียนบริษัท' — ค้นหาและเลือกจากช่องบริษัทด้านบนได้"
     }
 }
 
@@ -2305,7 +2368,7 @@ function Ensure-CalibratedOrGuide([string[]]$requiredKeys) {
     }
     if ($missing.Count -gt 0) {
         $res = [System.Windows.Forms.MessageBox]::Show(
-            "ยังไม่ได้ตั้งพิกัดหน้าจอ Oracle Forms สำหรับขั้นตอนนี้ (ทำเพียงครั้งเดียวต่อเครื่อง)`r`n`r`nต้องการเปิดหน้าต่างตั้งพิกัดตอนนี้เลยไหมครับ?`r`n(หรือหากไม่ตั้งพิกัด สามารถคลิกช่องใน Oracle Forms แล้วกดปุ่ม 📋 ข้างแต่ละช่องเพื่อวางทีละช่องได้ทันที)",
+            "ยังไม่ได้ตั้งพิกัดหน้าจอ Oracle Forms สำหรับขั้นตอนนี้ (ทำเพียงครั้งเดียวต่อเครื่อง)`r`n`r`nต้องการเปิดหน้าต่างตั้งพิกัดตอนนี้เลยไหมครับ?",
             "ตั้งพิกัดหน้าจอ Oracle Forms",
             [System.Windows.Forms.MessageBoxButtons]::YesNo,
             [System.Windows.Forms.MessageBoxIcon]::Information
@@ -2341,7 +2404,7 @@ $btnReload.Add_Click({
     $msg = Sync-GoogleSheetsData
     Refresh-VendorCombo
     Refresh-ItemCombo
-    $statusBar.Text = "โหลดสำเร็จ — $msg"
+    $statusBar.Text = "✓ โหลดสำเร็จ — $msg"
 })
 
 # --- Fiscal Year Selector & Target File Sync ---
@@ -2369,12 +2432,12 @@ function Refresh-FiscalYearUi {
             $lblFyFileStatus.Text = "✓ ไฟล์ MISS$curFy"
             $lblFyFileStatus.ForeColor = [System.Drawing.Color]::FromArgb(15, 118, 110)
         } else {
-            $lblFyFileStatus.Text = "⚠️ ยังไม่ใส่ลิงก์"
+            $lblFyFileStatus.Text = "[ยังไม่ใส่ลิงก์]"
             $lblFyFileStatus.ForeColor = [System.Drawing.Color]::FromArgb(180, 83, 9)
         }
         $grpSource.Text    = " 1. ค้นหารายการเบิกจ่าย (Auto Crat-EGP$curFy + MISS$curFy + ทะเบียนบริษัท) "
-        $grpWriteback.Text = " บันทึก 'เลขที่ใบขอเบิก.../$curFy' กลับลงชีต MISS$curFy (คอลัมน์ H) หลังคนกดบันทึกเอง "
-        $btnSavePayDoc.Text = "💾 บันทึกลง MISS$curFy"
+        $grpWriteback.Text = " บันทึก 'เลขที่ใบขอเบิก.../$curFy' กลับลงชีต MISS$curFy (คอลัมน์ H) "
+        $btnSavePayDoc.Text = "บันทึกลง MISS$curFy"
     } finally {
         $script:SuppressFyEvent = $false
     }
@@ -2403,7 +2466,7 @@ $cmbFiscalYear.Add_SelectedIndexChanged({
         }
     }
 
-    $statusBar.Text = "🔄 กำลังโหลดข้อมูลปีงบประมาณ $chosenFy (MISS$chosenFy)..."
+    $statusBar.Text = "กำลังโหลดข้อมูลปีงบประมาณ $chosenFy (MISS$chosenFy)..."
     [System.Windows.Forms.Application]::DoEvents()
     $msg = Sync-GoogleSheetsData
     Refresh-VendorCombo
@@ -2415,7 +2478,7 @@ $btnFyConfig.Add_Click({
     $curFy = [string]$script:Config["fiscalYear"]
     if (Show-FiscalYearSettingsDialog $curFy) {
         Refresh-FiscalYearUi
-        $statusBar.Text = "🔄 กำลังโหลดข้อมูลปีงบประมาณ $($script:Config['fiscalYear'])..."
+        $statusBar.Text = "กำลังโหลดข้อมูลปีงบประมาณ $($script:Config['fiscalYear'])..."
         [System.Windows.Forms.Application]::DoEvents()
         $msg = Sync-GoogleSheetsData
         Refresh-VendorCombo
@@ -2439,7 +2502,7 @@ $btnSavePayDoc.Add_Click({
         return
     }
     try {
-        $statusBar.Text = "💾 กำลังบันทึกเลขที่ใบขอเบิก '$payNo' ลงชีต MISS$fy คอลัมน์ H..."
+        $statusBar.Text = "กำลังบันทึกเลขที่ใบขอเบิก '$payNo' ลงชีต MISS$fy คอลัมน์ H..."
         [System.Windows.Forms.Application]::DoEvents()
         $resp = Post-Utf8Json -url ([string]$script:Config["gasWebAppUrl"]) -payload @{
             action       = "updatePayDocNo"
@@ -2458,7 +2521,7 @@ $btnSavePayDoc.Add_Click({
         }
     } catch {
         [System.Windows.Forms.MessageBox]::Show("บันทึกไม่สำเร็จ: $($_.Exception.Message)`r`n`r`n(หากยังไม่เคยอัปเดตโค้ด google-apps-script.gs ล่าสุดใน Apps Script กรุณา Deploy เวอร์ชันใหม่ก่อนครับ)", "แจ้งเตือน")
-        $statusBar.Text = "❌ บันทึก MISS$fy ไม่สำเร็จ"
+        $statusBar.Text = "[ผิดพลาด] บันทึก MISS$fy ไม่สำเร็จ"
     }
 })
 
@@ -2469,7 +2532,7 @@ $form.Add_Shown({
     $form.BringToFront()
     $form.Activate()
     Refresh-FiscalYearUi
-    $statusBar.Text = "🔄 กำลังโหลดฐานข้อมูลจาก Google Sheets..."
+    $statusBar.Text = "กำลังโหลดฐานข้อมูลจาก Google Sheets..."
     [System.Windows.Forms.Application]::DoEvents()
     $msg = Sync-GoogleSheetsData
     Refresh-VendorCombo

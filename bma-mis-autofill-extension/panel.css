@@ -2,14 +2,15 @@
   position: fixed;
   top: 12px;
   right: 12px;
-  width: 360px;
+  width: 420px;
   max-height: 92vh;
   background: #ffffff;
   border: 2px solid #2563eb;
   border-radius: 12px;
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.22);
-  font-family: 'Sarabun', 'Leelawadee UI', 'Segoe UI', Tahoma, sans-serif;
-  font-size: 13px;
+  font-family: 'Noto Sans Thai', 'Sarabun', 'Leelawadee UI', 'Segoe UI', Tahoma, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
   color: #1e293b;
   z-index: 2147483647;
   display: flex;
@@ -19,8 +20,8 @@
 }
 
 #bma-mis-autofill-panel.minimized {
-  width: 210px;
-  max-height: 42px;
+  width: 230px;
+  max-height: 46px;
 }
 
 #bma-mis-autofill-panel * {
@@ -30,7 +31,7 @@
 .bma-panel-header {
   background: linear-gradient(135deg, #1d4ed8 0%, #2563eb 100%);
   color: #ffffff;
-  padding: 9px 12px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -40,7 +41,7 @@
 
 .bma-panel-title {
   font-weight: 700;
-  font-size: 13.5px;
+  font-size: 15.5px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -49,7 +50,7 @@
 .bma-panel-header-btns {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 
 .bma-icon-btn {
@@ -57,8 +58,8 @@
   border: none;
   color: #ffffff;
   border-radius: 6px;
-  padding: 3px 7px;
-  font-size: 12px;
+  padding: 4px 8px;
+  font-size: 13.5px;
   cursor: pointer;
   font-weight: 600;
 }
@@ -68,11 +69,11 @@
 }
 
 .bma-panel-body {
-  padding: 12px;
+  padding: 14px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 11px;
 }
 
 #bma-mis-autofill-panel.minimized .bma-panel-body {
@@ -83,10 +84,10 @@
   background: #eff6ff;
   border: 1px solid #bfdbfe;
   color: #1d4ed8;
-  padding: 6px 10px;
+  padding: 7px 10px;
   border-radius: 8px;
-  font-weight: 700;
-  font-size: 12.5px;
+  font-weight: 600;
+  font-size: 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -95,13 +96,13 @@
 .bma-field-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
 .bma-label {
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #475569;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #334155;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -109,10 +110,10 @@
 
 .bma-input, .bma-select {
   width: 100%;
-  padding: 6px 9px;
+  padding: 7px 10px;
   border: 1px solid #cbd5e1;
   border-radius: 7px;
-  font-size: 12.5px;
+  font-size: 15px;
   font-family: inherit;
   color: #0f172a;
   background: #f8fafc;
@@ -141,16 +142,16 @@
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 12px;
-  line-height: 1.45;
+  padding: 9px 11px;
+  font-size: 14.5px;
+  line-height: 1.5;
 }
 
 .bma-summary-row {
   display: flex;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 
 .bma-summary-key {
@@ -168,19 +169,19 @@
 .bma-amount-highlight {
   color: #16a34a;
   font-weight: 700;
-  font-size: 13px;
+  font-size: 15.5px;
 }
 
 .bma-btn {
   width: 100%;
-  padding: 8px 10px;
+  padding: 9px 12px;
   border-radius: 8px;
   border: 1px solid #cbd5e1;
   background: #ffffff;
   color: #1e293b;
   font-family: inherit;
-  font-size: 12.5px;
-  font-weight: 700;
+  font-size: 14.5px;
+  font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -207,19 +208,19 @@
   background: #fef2f2;
   border: 2px solid #dc2626;
   color: #b91c1c;
-  padding: 8px 10px;
+  padding: 9px 11px;
   border-radius: 8px;
-  font-weight: 700;
-  font-size: 12.5px;
+  font-weight: 600;
+  font-size: 14px;
   text-align: center;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .bma-approval-box {
   background: #fffbeb;
   border: 2px solid #f59e0b;
   border-radius: 10px;
-  padding: 9px 10px;
+  padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -229,7 +230,7 @@
 .bma-approval-title {
   color: #b45309;
   font-weight: 700;
-  font-size: 12.5px;
+  font-size: 14.5px;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -237,8 +238,8 @@
 
 .bma-approval-desc {
   color: #78350f;
-  font-size: 11.5px;
-  line-height: 1.35;
+  font-size: 13.5px;
+  line-height: 1.45;
 }
 
 .bma-btn-approve {
@@ -285,8 +286,8 @@
 }
 
 .bma-status-bar {
-  font-size: 11.5px;
-  padding: 6px 8px;
+  font-size: 13.5px;
+  padding: 7px 10px;
   border-radius: 6px;
   background: #f1f5f9;
   color: #334155;
@@ -306,12 +307,12 @@
 .bma-step-pills {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 4px;
+  gap: 5px;
 }
 
 .bma-step-btn {
-  padding: 5px 4px;
-  font-size: 11px;
+  padding: 6px 5px;
+  font-size: 13px;
   font-weight: 600;
   border-radius: 6px;
   border: 1px solid #dbeafe;
@@ -336,14 +337,14 @@
 }
 
 .bma-mode-tab {
-  padding: 7px 6px;
+  padding: 8px 6px;
   border: none;
   border-radius: 7px;
   background: transparent;
   color: #475569;
   font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -365,12 +366,12 @@
 /* ===== MIS2 Disbursement (Pay) Panel ===== */
 .bma-bridge-bar {
   border-radius: 8px;
-  padding: 7px 9px;
-  font-size: 11px;
-  line-height: 1.35;
+  padding: 8px 10px;
+  font-size: 13.5px;
+  line-height: 1.45;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 6px;
 }
 
 .bma-bridge-bar.connected {
@@ -386,15 +387,14 @@
 }
 
 .bma-bridge-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 4px;
+  display: flex;
+  gap: 6px;
 }
 
 .bma-mini-btn {
-  padding: 4px 5px;
-  font-size: 10.5px;
-  font-weight: 700;
+  padding: 6px 8px;
+  font-size: 13px;
+  font-weight: 600;
   font-family: inherit;
   border-radius: 6px;
   border: 1px solid #cbd5e1;
@@ -411,13 +411,13 @@
 .bma-subtabs {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 4px;
+  gap: 5px;
 }
 
 .bma-subtab {
-  padding: 6px 4px;
-  font-size: 11px;
-  font-weight: 700;
+  padding: 7px 5px;
+  font-size: 13.5px;
+  font-weight: 600;
   font-family: inherit;
   border-radius: 7px;
   border: 1px solid #cbd5e1;
@@ -435,7 +435,7 @@
 .bma-input-row {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 5px;
 }
 
 .bma-input-row .bma-input,
@@ -446,14 +446,14 @@
 
 .bma-copy-btn {
   flex: 0 0 auto;
-  width: 30px;
-  height: 28px;
+  width: 36px;
+  height: 36px;
   border: 1px solid #7dd3fc;
   background: #e0f2fe;
   color: #0369a1;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -467,18 +467,18 @@
 .bma-check-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  margin-bottom: 4px;
+  gap: 6px;
+  margin-bottom: 5px;
 }
 
 .bma-check-row label {
   display: flex;
   align-items: center;
   gap: 4px;
-  width: 82px;
-  flex: 0 0 82px;
-  font-size: 11px;
-  font-weight: 700;
+  width: 96px;
+  flex: 0 0 96px;
+  font-size: 14px;
+  font-weight: 600;
   color: #334155;
   cursor: pointer;
 }
@@ -488,9 +488,9 @@
   border: 1px solid #bbf7d0;
   color: #166534;
   border-radius: 7px;
-  padding: 6px 8px;
-  font-size: 11.5px;
-  font-weight: 700;
+  padding: 8px 10px;
+  font-size: 14.5px;
+  font-weight: 600;
   text-align: center;
 }
 
@@ -505,11 +505,11 @@
   border: 1px solid #fca5a5;
   color: #991b1b;
   border-radius: 7px;
-  padding: 6px 8px;
-  font-size: 11px;
-  font-weight: 700;
+  padding: 7px 9px;
+  font-size: 13px;
+  font-weight: 600;
   text-align: center;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .bma-bank-info {
@@ -517,22 +517,23 @@
   border: 1px solid #bae6fd;
   color: #0c4a6e;
   border-radius: 7px;
-  padding: 5px 8px;
-  font-size: 11px;
-  line-height: 1.35;
+  padding: 7px 10px;
+  font-size: 14px;
+  line-height: 1.45;
 }
 
 .bma-textarea {
   width: 100%;
-  padding: 6px 8px;
+  padding: 7px 10px;
   border: 1px solid #cbd5e1;
   border-radius: 7px;
-  font-size: 12px;
+  font-size: 15px;
+  line-height: 1.5;
   font-family: inherit;
   color: #0f172a;
   background: #f8fafc;
   resize: vertical;
-  min-height: 54px;
+  min-height: 70px;
 }
 
 .bma-textarea:focus {
